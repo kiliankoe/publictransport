@@ -1,5 +1,7 @@
 #🚇 publictransport
 
+[![Travis](https://img.shields.io/travis/public-transport/publictransport-rs.svg?style=flat-square)](https://travis-ci.org/public-transport/publictransport-rs)
+
 #### *Work in Progress*
 
 This library aims to be a high-level abstraction to the APIs of several public transport providers. It's currently nothing more than an idea though and will likely keep on being a playground for quite some time. 
