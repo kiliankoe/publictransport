@@ -1,6 +1,6 @@
-#🚇 publictransport
+# 🚇 publictransport
 
-[![Travis](https://img.shields.io/travis/public-transport/publictransport-rs.svg?style=flat-square)](https://travis-ci.org/public-transport/publictransport-rs)
+[![Travis](https://img.shields.io/travis/kiliankoe/publictransport-rs.svg?style=flat-square)](https://travis-ci.org/kiliankoe/publictransport-rs)
 
 #### *Work in Progress*
 
