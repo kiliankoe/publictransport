@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: DeterminateSystems/nix-installer-action@v23
+      - uses: Swatinem/rust-cache@v2
+      - run: nix fmt -- --check flake.nix
+      - run: nix develop -c cargo fmt --all --check
+      - run: nix develop -c cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - run: nix develop -c cargo test --workspace --all-features
+      - run: nix develop -c cargo deny check

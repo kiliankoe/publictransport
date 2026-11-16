@@ -1,0 +1,10 @@
+[package]
+name = "publictransport"
+description = "Client for public transport APIs that builds requests and parses responses without doing any I/O"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
