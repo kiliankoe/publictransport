@@ -1,0 +1,54 @@
+[build-system]
+requires = ["maturin>=1.9,<2"]
+build-backend = "maturin"
+
+[project]
+name = "publictransport"
+version = "0.0.0"
+description = "Client for public transport APIs such as EFA and MOTIS"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+requires-python = ">=3.10"
+dependencies = ["httpx>=0.28"]
+
+[project.urls]
+Repository = "https://github.com/kiliankoe/publictransport"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.maturin]
+bindings = "uniffi"
+manifest-path = "../../bindings/uniffi/Cargo.toml"
+python-source = "python"
+module-name = "publictransport._uniffi"
+# An editable install leaves the generated module in the source tree, where a
+# later build would pick it up a second time.
+exclude = ["python/publictransport/_uniffi/**/*", "**/__pycache__/**/*"]
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+  # Conflict with the formatter.
+  "COM812",
+  "D203",
+  "D213",
+  # The license is in the package metadata.
+  "CPY001",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D", "INP001", "S101", "PLR2004"]
+
+[tool.pyright]
+include = ["python", "tests"]
+exclude = ["python/publictransport/_uniffi"]
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

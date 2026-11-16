@@ -39,6 +39,8 @@
 
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShell {
+          # Use the Python of this shell, not one that uv downloads.
+          UV_PYTHON_PREFERENCE = "only-system";
           packages = [
             (pkgs.rust-bin.stable.latest.default.override {
               extensions = [
@@ -47,6 +49,11 @@
               ];
             })
             pkgs.cargo-deny
+            # The Python package in packages/python
+            pkgs.python3
+            pkgs.uv
+            pkgs.ruff
+            pkgs.pyright
           ];
         };
       });

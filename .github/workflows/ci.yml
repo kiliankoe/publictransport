@@ -22,4 +22,24 @@ jobs:
       - run: nix develop -c cargo fmt --all --check
       - run: nix develop -c cargo clippy --workspace --all-targets --all-features -- -D warnings
       - run: nix develop -c cargo test --workspace --all-features
+      # The workspace build always has the uniffi feature on, through bindings/uniffi.
+      - run: nix develop -c cargo clippy -p publictransport --all-targets -- -D warnings
+      - run: nix develop -c cargo test -p publictransport
       - run: nix develop -c cargo deny check
+
+  python:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/python
+    steps:
+      - uses: actions/checkout@v7
+      - uses: DeterminateSystems/nix-installer-action@v23
+      - uses: Swatinem/rust-cache@v2
+      # Builds the Rust library and installs the package into .venv.
+      - run: nix develop -c uv sync --locked
+      - run: nix develop -c ruff check .
+      - run: nix develop -c ruff format --check .
+      - run: nix develop -c pyright
+      - run: nix develop -c uv run --no-sync pytest
+      - run: nix develop -c uv build --wheel

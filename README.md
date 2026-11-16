@@ -25,6 +25,8 @@ cargo test --workspace --all-features
 cargo deny check
 ```
 
+A Python package in `packages/python` wraps the library through [UniFFI](https://mozilla.github.io/uniffi-rs/); see its README. The crate in `bindings/uniffi` builds the shared library for it.
+
 The tests replay responses recorded from real servers. `crates/core/tests/fixtures/record.sh` records them again.
 
 ## License
