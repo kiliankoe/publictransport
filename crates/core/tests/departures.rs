@@ -443,6 +443,14 @@ fn motis_stop_time_without_a_stop_is_a_parse_error() {
     assert!(matches!(result, Err(Error::Parse { .. })), "{result:?}");
 }
 
+/// Other languages cannot hold such a time.
+#[test]
+fn time_outside_the_years_1_to_9999_is_a_parse_error() {
+    let body = br#"{"stopTimes":[{"place":{"name":"X","stopId":"a_de:1:2","lat":51.04,"lon":13.73,"scheduledDeparture":"0000-06-01T00:00:00Z"},"mode":"TRAM"}]}"#;
+    let result = parse(Protocol::Motis, body);
+    assert!(matches!(result, Err(Error::Parse { .. })), "{result:?}");
+}
+
 #[test]
 fn response_without_departures_is_an_empty_list() {
     for (protocol, body) in [
