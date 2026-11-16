@@ -226,9 +226,9 @@ pub enum Mode {
 #[non_exhaustive]
 pub struct TripsQuery {
     /// Where the trip starts.
-    pub from: Place,
+    pub origin: Place,
     /// Where the trip ends.
-    pub to: Place,
+    pub destination: Place,
     /// When to leave or arrive. `None` means leaving now.
     pub time: Option<TripTime>,
     /// How many trips are wanted. Servers treat this as a guide and may
@@ -237,12 +237,12 @@ pub struct TripsQuery {
 }
 
 impl TripsQuery {
-    /// Trips from `from` to `to` that leave now.
+    /// Trips from `origin` to `destination` that leave now.
     #[must_use]
-    pub fn new(from: Place, to: Place) -> Self {
+    pub fn new(origin: Place, destination: Place) -> Self {
         Self {
-            from,
-            to,
+            origin,
+            destination,
             time: None,
             limit: None,
         }

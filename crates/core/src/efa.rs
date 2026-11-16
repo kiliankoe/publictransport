@@ -82,8 +82,8 @@ pub(crate) fn departures_request(
 
 pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<HttpRequest, Error> {
     let limit = query.limit.map(|limit| limit.to_string());
-    let (from_type, from) = place(query.from.checked()?);
-    let (to_type, to) = place(query.to.checked()?);
+    let (from_type, from) = place(query.origin.checked()?);
+    let (to_type, to) = place(query.destination.checked()?);
     let time = query
         .time
         .map(|time| match time {

@@ -135,8 +135,8 @@ pub(crate) fn parse_departures(response: &HttpResponse) -> Result<Vec<Departure>
 }
 
 pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<HttpRequest, Error> {
-    let from = place(query.from.checked()?);
-    let to = place(query.to.checked()?);
+    let from = place(query.origin.checked()?);
+    let to = place(query.destination.checked()?);
     let limit = query.limit.map(|limit| limit.to_string());
     let (time, arrive_by) = match query.time {
         Some(TripTime::DepartAt(time)) => (Some(time), false),
