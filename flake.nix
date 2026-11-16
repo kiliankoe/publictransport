@@ -49,12 +49,16 @@
               ];
             })
             pkgs.cargo-deny
+            # Finds OpenSSL for the native-tls feature of the client.
+            pkgs.pkg-config
             # The Python package in packages/python
             pkgs.python3
             pkgs.uv
             pkgs.ruff
             pkgs.pyright
           ];
+          # On Linux the native-tls feature of the client links OpenSSL.
+          buildInputs = [ pkgs.openssl ];
         };
       });
     };
