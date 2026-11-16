@@ -27,6 +27,16 @@ jobs:
       - run: nix develop -c cargo test -p publictransport
       - run: nix develop -c cargo deny check
 
+  commits:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: DeterminateSystems/nix-installer-action@v23
+      # Every commit after the first, in the format CONTRIBUTING.md describes.
+      - run: nix develop -c committed "$(git rev-list --max-parents=0 HEAD)..HEAD"
+
   python:
     runs-on: ubuntu-latest
     defaults:

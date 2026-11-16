@@ -49,6 +49,9 @@
               ];
             })
             pkgs.cargo-deny
+            # The commit convention, see CONTRIBUTING.md
+            pkgs.committed
+            pkgs.git-cliff
             # Finds OpenSSL for the native-tls feature of the client.
             pkgs.pkg-config
             # The Python package in packages/python

@@ -29,6 +29,8 @@ A Python package in `packages/python` wraps the library through [UniFFI](https:/
 
 The tests replay responses recorded from real servers. `crates/core/tests/fixtures/record.sh` records them again.
 
+`CONTRIBUTING.md` describes the commit message format and how the changelog is made.
+
 ## License
 
 Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT license](LICENSE-MIT) at your option.

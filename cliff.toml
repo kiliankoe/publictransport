@@ -1,0 +1,39 @@
+# Generates the changelog from the commit messages, see CONTRIBUTING.md.
+
+[changelog]
+header = """
+# Changelog
+
+"""
+body = """
+{% if version %}\
+## {{ version | trim_start_matches(pat="v") }} ({{ timestamp | date(format="%Y-%m-%d") }})
+{% else %}\
+## Unreleased
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim }}
+
+{% for commit in commits %}\
+- {% if commit.scope %}{{ commit.scope }}: {% endif %}{{ commit.message | upper_first }}
+{% endfor %}\
+{% endfor %}
+"""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+# Readers of the changelog care about what changed for them. Refactorings,
+# tests, CI and the like are left out.
+commit_parsers = [
+  { message = "^[a-z]+(\\(.*\\))?!:", group = "<!-- 0 -->Breaking changes" },
+  { message = "^feat", group = "<!-- 1 -->Features" },
+  { message = "^fix\\(ci\\)", skip = true },
+  { message = "^fix", group = "<!-- 2 -->Fixes" },
+  { message = "^perf", group = "<!-- 3 -->Performance" },
+  { message = ".*", skip = true },
+]
+filter_commits = true
+tag_pattern = "v[0-9].*"
+sort_commits = "oldest"

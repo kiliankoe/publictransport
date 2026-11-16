@@ -1,0 +1,6 @@
+style = "conventional"
+subject_length = 72
+# Subjects start in lower case after the type.
+subject_capitalized = false
+allowed_types = ["feat", "fix", "docs", "refactor", "perf", "test", "build", "ci", "chore"]
+allowed_scopes = ["core", "client", "uniffi", "python", "ci", "deps"]
