@@ -1,0 +1,32 @@
+[package]
+name = "publictransport-client"
+description = "HTTP client for public transport APIs, built on publictransport and reqwest"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["rustls", "http2", "system-proxy"]
+# TLS through rustls with the aws-lc-rs provider, which needs a C toolchain
+# to build.
+rustls = ["reqwest/rustls"]
+# TLS through the platform's library.
+native-tls = ["reqwest/native-tls"]
+http2 = ["reqwest/http2"]
+# Use the proxy that the environment configures.
+system-proxy = ["reqwest/system-proxy"]
+
+[dependencies]
+publictransport = { path = "../core", version = "0.0.0" }
+reqwest = { version = "0.13.5", default-features = false }
+thiserror = "2.0.21"
+
+[dev-dependencies]
+# For the example. The features match those of publictransport.
+jiff = { version = "1.0.0", default-features = false, features = ["std", "tzdb-bundle-always"] }
+tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread"] }
+wiremock = "0.6.5"

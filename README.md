@@ -6,7 +6,13 @@ The project is at an early stage. It can search for locations by name, list the 
 
 ## Design
 
-The core crate does no I/O. It builds HTTP requests and parses HTTP responses, and the caller sends them. This keeps the core usable from other languages and from WebAssembly, where each platform brings its own HTTP stack. A separate client crate will do the HTTP calls for Rust users. The crate documentation of `publictransport` shows the request and parse steps and what the HTTP client has to do.
+The core crate does no I/O. It builds HTTP requests and parses HTTP responses, and the caller sends them. This keeps the core usable from other languages and from WebAssembly, where each platform brings its own HTTP stack. The crate documentation of `publictransport` shows the request and parse steps and what the HTTP client has to do.
+
+Rust applications that do not want to bring their own HTTP client use `publictransport-client`, which sends the requests with `reqwest`. Its example plans a trip against a live server:
+
+```sh
+cargo run -p publictransport-client --example trip -- vvo "Dresden Hauptbahnhof" "Dresden Albertplatz"
+```
 
 ## Development
 
