@@ -15,8 +15,7 @@
 //!     "https://efa.vvo-online.de/std3",
 //!     Protocol::Efa,
 //! );
-//! let mut query = LocationQuery::new("Hauptbahnhof");
-//! query.limit = Some(5);
+//! let query = LocationQuery::new("Hauptbahnhof").with_limit(5);
 //!
 //! let request = network.locations_request(&query)?;
 //! // Send `request` with an HTTP client and copy its answer into a response.

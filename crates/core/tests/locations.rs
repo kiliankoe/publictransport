@@ -91,8 +91,7 @@ proptest! {
 #[test]
 fn motis_request_passes_the_limit() {
     let network = network(Protocol::Motis, "https://api.transitous.org/api");
-    let mut query = LocationQuery::new("Hauptbahnhof");
-    query.limit = Some(7);
+    let mut query = LocationQuery::new("Hauptbahnhof").with_limit(7);
     let request = network.locations_request(&query).unwrap();
     assert_eq!(parameter(&request, "numResults"), ["7"]);
 
@@ -235,6 +234,7 @@ fn motis_takes_the_locality_from_the_default_area_and_the_global_id_from_the_id(
     assert_eq!(place.kind, LocationKind::Poi);
     assert_eq!(place.id, "node/2675542513");
     assert_eq!(place.global_id, None);
+    assert_eq!(place.timezone.as_deref(), Some("Europe/Berlin"));
 }
 
 #[test]

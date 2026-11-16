@@ -174,13 +174,12 @@ fn efa_request_with_a_time_needs_a_known_time_zone() {
 #[test]
 fn motis_request_always_sends_a_number_and_the_time_in_utc_without_a_time_zone() {
     let network = network(Protocol::Motis);
-    let mut query = DeparturesQuery::new("de-DELFI_de:14612:28");
+    let query = DeparturesQuery::new("de-DELFI_de:14612:28");
     let request = network.departures_request(&query).unwrap();
     assert_eq!(parameter(&request, "n"), ["10"]);
     assert_eq!(parameter(&request, "time"), Vec::<String>::new());
 
-    query.limit = Some(7);
-    query.time = Some(utc(13, 24, 0));
+    let query = query.with_limit(7).with_time(utc(13, 24, 0));
     let request = network.departures_request(&query).unwrap();
     assert_eq!(parameter(&request, "n"), ["7"]);
     assert_eq!(parameter(&request, "time"), ["2026-11-16T13:24:00Z"]);
@@ -188,8 +187,21 @@ fn motis_request_always_sends_a_number_and_the_time_in_utc_without_a_time_zone()
 
 #[test]
 fn efa_names_a_platform_after_its_station() {
-    let departures = parse(Protocol::Efa, VVO).unwrap();
+    let response = HttpResponse {
+        status: 200,
+        headers: Vec::new(),
+        body: VVO.to_vec(),
+    };
+    let departures = network(Protocol::Efa)
+        .with_timezone("Europe/Berlin")
+        .parse_departures(&response)
+        .unwrap();
     assert_eq!(departures.len(), 10);
+    // EFA sends no time zone, so the stop gets the one of the network.
+    assert_eq!(
+        departures[0].stop.timezone.as_deref(),
+        Some("Europe/Berlin")
+    );
     // The server orders by scheduled time; line 8 is five minutes late.
     assert!(departures.is_sorted_by_key(Departure::expected_time));
 
@@ -243,6 +255,7 @@ fn efa_tells_the_planned_platform_from_the_current_one() {
     // A train without a line is named by its category and number.
     assert_eq!(fields("ICE 109").0, Mode::HighSpeedTrain, "class 16");
     let stop = &departures[0].stop;
+    assert_eq!(stop.timezone, None, "the network has no time zone");
     assert_eq!(stop.name, "Düsseldorf Hbf");
     assert_eq!(stop.locality.as_deref(), Some("Düsseldorf"));
 }
@@ -321,6 +334,7 @@ fn motis_orders_by_expected_time_and_reads_the_stop_from_the_place() {
     assert_eq!(tram.stop.kind, LocationKind::Stop);
     assert_eq!(tram.stop.name, "Dresden Hauptbahnhof");
     assert_eq!(tram.stop.locality, None);
+    assert_eq!(tram.stop.timezone.as_deref(), Some("Europe/Berlin"));
     // The JSON parser may be off by one unit in the last place.
     let coordinate = tram.stop.coordinate.unwrap();
     assert!(

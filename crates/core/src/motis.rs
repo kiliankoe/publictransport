@@ -29,6 +29,7 @@ struct Match {
     id: String,
     lat: f64,
     lon: f64,
+    tz: Option<String>,
     #[serde(default)]
     areas: Vec<Area>,
 }
@@ -66,6 +67,7 @@ impl From<Match> for Location {
                 latitude: wire.lat,
                 longitude: wire.lon,
             }),
+            timezone: wire.tz,
         }
     }
 }
@@ -170,6 +172,7 @@ struct Place {
     name: String,
     lat: f64,
     lon: f64,
+    tz: Option<String>,
     departure: Option<WireTime>,
     scheduled_departure: WireTime,
     track: Option<String>,
@@ -213,6 +216,7 @@ impl From<StopTime> for Departure {
                     latitude: wire.place.lat,
                     longitude: wire.place.lon,
                 }),
+                timezone: wire.place.tz,
             },
         }
     }

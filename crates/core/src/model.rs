@@ -16,6 +16,13 @@ impl LocationQuery {
             limit: None,
         }
     }
+
+    /// Sets [`LocationQuery::limit`].
+    #[must_use]
+    pub fn with_limit(mut self, limit: u32) -> Self {
+        self.limit = Some(limit);
+        self
+    }
 }
 
 /// A place a trip can start or end at.
@@ -37,6 +44,10 @@ pub struct Location {
     pub locality: Option<String>,
     /// The position.
     pub coordinate: Option<Coordinate>,
+    /// The IANA name of the time zone the location is in, e.g.
+    /// `Europe/Berlin`, for showing times there. MOTIS sends it; for EFA it
+    /// is [`Network::timezone`](crate::Network::timezone).
+    pub timezone: Option<String>,
 }
 
 impl Location {
@@ -105,6 +116,20 @@ impl DeparturesQuery {
             time: None,
             limit: None,
         }
+    }
+
+    /// Sets [`DeparturesQuery::time`].
+    #[must_use]
+    pub fn with_time(mut self, time: Timestamp) -> Self {
+        self.time = Some(time);
+        self
+    }
+
+    /// Sets [`DeparturesQuery::limit`].
+    #[must_use]
+    pub fn with_limit(mut self, limit: u32) -> Self {
+        self.limit = Some(limit);
+        self
     }
 }
 

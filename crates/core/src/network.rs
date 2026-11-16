@@ -18,7 +18,8 @@ pub struct Network {
     /// The protocol the server speaks.
     pub protocol: Protocol,
     /// The IANA name of the time zone the server works in, e.g.
-    /// `Europe/Berlin`. EFA needs it for requests that carry a time.
+    /// `Europe/Berlin`. EFA needs it for requests that carry a time, and the
+    /// locations of an EFA network get it as their time zone.
     pub timezone: Option<String>,
 }
 
@@ -77,7 +78,7 @@ impl Network {
     /// is not what the protocol defines.
     pub fn parse_locations(&self, response: &HttpResponse) -> Result<Vec<Location>, Error> {
         match self.protocol {
-            Protocol::Efa => efa::parse_locations(response),
+            Protocol::Efa => efa::parse_locations(self, response),
             Protocol::Motis => motis::parse_locations(response),
         }
     }
@@ -110,7 +111,7 @@ impl Network {
     /// is not what the protocol defines.
     pub fn parse_departures(&self, response: &HttpResponse) -> Result<Vec<Departure>, Error> {
         match self.protocol {
-            Protocol::Efa => efa::parse_departures(response),
+            Protocol::Efa => efa::parse_departures(self, response),
             Protocol::Motis => motis::parse_departures(response),
         }
     }

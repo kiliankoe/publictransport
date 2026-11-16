@@ -26,7 +26,10 @@ pub(crate) fn locations_request(network: &Network, query: &LocationQuery) -> Htt
     HttpRequest::get(&network.endpoint, "XML_STOPFINDER_REQUEST", parameters)
 }
 
-pub(crate) fn parse_locations(response: &HttpResponse) -> Result<Vec<Location>, Error> {
+pub(crate) fn parse_locations(
+    network: &Network,
+    response: &HttpResponse,
+) -> Result<Vec<Location>, Error> {
     // `systemMessages` is not checked: the server reports an ambiguous search
     // as an error there and still returns the matches.
     let mut response: StopFinderResponse = response.json()?;
@@ -34,7 +37,11 @@ pub(crate) fn parse_locations(response: &HttpResponse) -> Result<Vec<Location>, 
     response
         .locations
         .sort_by_key(|location| std::cmp::Reverse(location.match_quality));
-    Ok(response.locations.into_iter().map(Location::from).collect())
+    Ok(response
+        .locations
+        .into_iter()
+        .map(|location| location.into_location(network))
+        .collect())
 }
 
 pub(crate) fn departures_request(
@@ -93,7 +100,10 @@ pub(crate) fn departures_request(
     ))
 }
 
-pub(crate) fn parse_departures(response: &HttpResponse) -> Result<Vec<Departure>, Error> {
+pub(crate) fn parse_departures(
+    network: &Network,
+    response: &HttpResponse,
+) -> Result<Vec<Departure>, Error> {
     let response: DeparturesResponse = response.json()?;
     // Unless the query names exactly one stop, the server sends the places
     // it considered and no departures.
@@ -105,7 +115,10 @@ pub(crate) fn parse_departures(response: &HttpResponse) -> Result<Vec<Departure>
             }),
         };
     };
-    let mut departures: Vec<_> = stop_events.into_iter().map(Departure::from).collect();
+    let mut departures: Vec<_> = stop_events
+        .into_iter()
+        .map(|event| event.into_departure(network))
+        .collect();
     departures.sort_by_key(Departure::expected_time);
     Ok(departures)
 }
@@ -223,8 +236,9 @@ fn non_empty(text: Option<String>) -> Option<String> {
     text.filter(|text| !text.is_empty())
 }
 
-impl From<WireLocation> for Location {
-    fn from(wire: WireLocation) -> Self {
+impl WireLocation {
+    fn into_location(self, network: &Network) -> Location {
+        let wire = self;
         let locality = wire
             .ancestor("locality")
             .and_then(|locality| locality.name.clone());
@@ -241,7 +255,9 @@ impl From<WireLocation> for Location {
             "poi" => (LocationKind::Poi, None),
             _ => (LocationKind::Other, None),
         };
-        Self {
+        Location {
+            // The server sends no time zone.
+            timezone: network.timezone.clone(),
             global_id: (wire.is_global_id == Some(true)).then(|| wire.id.clone()),
             id: wire.id,
             kind,
@@ -257,8 +273,9 @@ impl From<WireLocation> for Location {
     }
 }
 
-impl From<StopEvent> for Departure {
-    fn from(mut wire: StopEvent) -> Self {
+impl StopEvent {
+    fn into_departure(self, network: &Network) -> Departure {
+        let mut wire = self;
         let platforms = wire.location.properties.take();
         let transportation = wire.transportation;
         let product = transportation.product;
@@ -271,8 +288,8 @@ impl From<StopEvent> for Departure {
             .and_then(|properties| properties.line_display)
             .is_none_or(|display| display != "TRAIN");
         let number = non_empty(transportation.number);
-        Self {
-            stop: wire.location.into(),
+        Departure {
+            stop: wire.location.into_location(network),
             line: Line {
                 name: match (has_line, &train_type, number) {
                     (false, Some(train_type), Some(number)) => format!("{train_type} {number}"),
