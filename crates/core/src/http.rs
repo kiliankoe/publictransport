@@ -2,6 +2,8 @@ use crate::Error;
 
 /// An HTTP request for the caller to send.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub struct HttpRequest {
     /// The request method.
     pub method: Method,
@@ -15,6 +17,8 @@ pub struct HttpRequest {
 
 /// An HTTP request method.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub enum Method {
     /// `GET`
     Get,
@@ -25,6 +29,8 @@ pub enum Method {
 /// An HTTP response as the caller received it. The HTTP client must not
 /// follow redirects, so that a moved endpoint is reported as [`Error::Moved`].
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub struct HttpResponse {
     /// The status code.
     pub status: u16,
@@ -36,6 +42,8 @@ pub struct HttpResponse {
 
 /// One HTTP header.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub struct Header {
     /// The header name.
     pub name: String,

@@ -41,8 +41,13 @@
 //!   all headers, whatever the status. The parse methods turn failures into
 //!   an [`Error`].
 
+#[cfg(feature = "uniffi")]
+uniffi::setup_scaffolding!();
+
 mod efa;
 mod error;
+#[cfg(feature = "uniffi")]
+mod ffi;
 mod http;
 mod model;
 mod motis;

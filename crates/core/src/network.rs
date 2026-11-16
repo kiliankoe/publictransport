@@ -6,6 +6,8 @@ use crate::{
 /// One server that answers public transport queries.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub struct Network {
     /// A short identifier, e.g. `vvo`.
     pub id: String,
@@ -20,12 +22,15 @@ pub struct Network {
     /// The IANA name of the time zone the server works in, e.g.
     /// `Europe/Berlin`. EFA needs it for requests that carry a time, and the
     /// locations of an EFA network get it as their time zone.
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub timezone: Option<String>,
 }
 
 /// The protocol a [`Network`] speaks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub enum Protocol {
     /// The JSON interface of MDV's EFA journey planner.
     Efa,
@@ -56,7 +61,10 @@ impl Network {
         self.timezone = Some(timezone.into());
         self
     }
+}
 
+#[cfg_attr(feature = "uniffi", uniffi::export)]
+impl Network {
     /// Builds the request that searches for locations by name.
     ///
     /// # Errors

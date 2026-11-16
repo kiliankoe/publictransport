@@ -1,6 +1,7 @@
 /// Why a request could not be built or a response could not be used.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
 pub enum Error {
     /// The [`Network`](crate::Network) lacks something the request needs,
     /// such as a time zone.

@@ -12,7 +12,13 @@ workspace = true
 [dev-dependencies]
 proptest = "1.12.0"
 
+[features]
+# Exports the types and functions to other languages through UniFFI.
+uniffi = ["dep:uniffi"]
+
 [dependencies]
+# Bindings and library must come from the same UniFFI version.
+uniffi = { version = "=0.32.2", optional = true, default-features = false }
 form_urlencoded = "1.2.2"
 jiff = { version = "1.0.0", default-features = false, features = ["std", "tzdb-bundle-always"] }
 serde = { version = "1.0.229", features = ["derive"] }

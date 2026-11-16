@@ -1,3 +1,10 @@
+[advisories]
+ignore = [
+  # basic-toml is unmaintained. It only comes in through the generator of
+  # UniFFI, which runs at build time and is not part of the library.
+  "RUSTSEC-2026-0374",
+]
+
 [licenses]
 allow = [
   "MIT",
@@ -8,6 +15,8 @@ allow = [
   "ISC",
   "BSD-3-Clause",
   "CDLA-Permissive-2.0",
+  # UniFFI. Its copyleft covers UniFFI's own files only.
+  "MPL-2.0",
 ]
 
 [bans]

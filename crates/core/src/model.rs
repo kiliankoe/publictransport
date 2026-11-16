@@ -1,10 +1,13 @@
 /// A search for locations by name.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub struct LocationQuery {
     /// The text to search for, as a user typed it.
     pub text: String,
     /// The largest number of results wanted. Servers may return fewer.
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub limit: Option<u32>,
 }
 
@@ -28,6 +31,8 @@ impl LocationQuery {
 /// A place a trip can start or end at.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub struct Location {
     /// Identifies the location on the network that returned it. Other
     /// networks do not understand it.
@@ -68,6 +73,8 @@ impl Location {
 /// The kind of a [`Location`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub enum LocationKind {
     /// A stop or station.
     Stop,
@@ -81,6 +88,8 @@ pub enum LocationKind {
 
 /// A WGS 84 position in degrees.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub struct Coordinate {
     /// Latitude, positive to the north.
     pub latitude: f64,
@@ -98,13 +107,17 @@ pub struct Timestamp {
 /// A request for the next departures at a stop.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub struct DeparturesQuery {
     /// The [`Location::id`] of a stop, from the same network.
     pub stop_id: String,
     /// The time from which on departures are wanted. `None` means now.
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub time: Option<Timestamp>,
     /// How many departures are wanted. Servers treat this as a guide and may
     /// return a few more or fewer. `None` leaves the number to the server.
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub limit: Option<u32>,
 }
 
@@ -136,6 +149,8 @@ impl DeparturesQuery {
 /// One vehicle leaving a stop.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub struct Departure {
     /// Where the vehicle leaves from. Servers name the platform here where
     /// they have one in their data and the station otherwise, so compare
@@ -160,6 +175,7 @@ pub struct Departure {
     pub cancelled: bool,
 }
 
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl Departure {
     /// The time the vehicle is expected to leave: the predicted time if
     /// there is one, otherwise the scheduled time.
@@ -172,6 +188,8 @@ impl Departure {
 /// A line of a public transport network.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub struct Line {
     /// The short name shown on vehicles, e.g. `7`, `S1` or `RE13`. Trains
     /// without a line have their category and number here, e.g. `ICE 1652`.
@@ -188,6 +206,8 @@ pub struct Line {
 /// The kind of vehicle that serves a [`Line`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub enum Mode {
     /// A high-speed train, e.g. ICE or TGV.
     HighSpeedTrain,
@@ -224,15 +244,19 @@ pub enum Mode {
 /// A request for trips from one place to another.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub struct TripsQuery {
     /// Where the trip starts.
     pub origin: Place,
     /// Where the trip ends.
     pub destination: Place,
     /// When to leave or arrive. `None` means leaving now.
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub time: Option<TripTime>,
     /// How many trips are wanted. Servers treat this as a guide and may
     /// return more or fewer. `None` leaves the number to the server.
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub limit: Option<u32>,
 }
 
@@ -289,6 +313,8 @@ impl Place {
 
 /// One end of a trip in a [`TripsQuery`].
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub enum Place {
     /// A [`Location::id`] from the same network.
     Id(String),
@@ -298,6 +324,8 @@ pub enum Place {
 
 /// The time a [`TripsQuery`] is bound to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub enum TripTime {
     /// Leave at this time or later.
     DepartAt(Timestamp),
@@ -308,6 +336,8 @@ pub enum TripTime {
 /// One way to get from the start to the destination.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub struct Trip {
     /// The parts of the trip in the order they are traveled. Never empty.
     pub legs: Vec<Leg>,
@@ -341,6 +371,8 @@ impl Trip {
 /// One part of a [`Trip`]: a ride in one vehicle, or a walk.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub struct Leg {
     /// How this part is traveled.
     pub kind: LegKind,
@@ -358,6 +390,8 @@ pub struct Leg {
 /// How a [`Leg`] is traveled.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub enum LegKind {
     /// A ride in a public transport vehicle.
     Transit {
@@ -376,6 +410,8 @@ pub enum LegKind {
 /// those of a [`Departure`].
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub struct LegEnd {
     /// The stop, platform or other place.
     pub stop: Location,
@@ -394,6 +430,7 @@ pub struct LegEnd {
     pub cancelled: bool,
 }
 
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl LegEnd {
     /// The predicted time if there is one, otherwise the scheduled time.
     #[must_use]
@@ -432,6 +469,8 @@ impl Stopover {
 /// The fields follow the same rules as those of a [`Departure`].
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub struct Stopover {
     /// The stop, platform or other place.
     pub stop: Location,
