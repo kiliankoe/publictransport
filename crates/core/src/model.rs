@@ -220,3 +220,233 @@ pub enum Mode {
     /// Anything else.
     Other,
 }
+
+/// A request for trips from one place to another.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct TripsQuery {
+    /// Where the trip starts.
+    pub from: Place,
+    /// Where the trip ends.
+    pub to: Place,
+    /// When to leave or arrive. `None` means leaving now.
+    pub time: Option<TripTime>,
+    /// How many trips are wanted. Servers treat this as a guide and may
+    /// return more or fewer. `None` leaves the number to the server.
+    pub limit: Option<u32>,
+}
+
+impl TripsQuery {
+    /// Trips from `from` to `to` that leave now.
+    #[must_use]
+    pub fn new(from: Place, to: Place) -> Self {
+        Self {
+            from,
+            to,
+            time: None,
+            limit: None,
+        }
+    }
+
+    /// Asks for trips that leave at `time` or later.
+    #[must_use]
+    pub fn with_departure(mut self, time: Timestamp) -> Self {
+        self.time = Some(TripTime::DepartAt(time));
+        self
+    }
+
+    /// Asks for trips that arrive at `time` or earlier.
+    #[must_use]
+    pub fn with_arrival(mut self, time: Timestamp) -> Self {
+        self.time = Some(TripTime::ArriveBy(time));
+        self
+    }
+
+    /// Sets [`TripsQuery::limit`].
+    #[must_use]
+    pub fn with_limit(mut self, limit: u32) -> Self {
+        self.limit = Some(limit);
+        self
+    }
+}
+
+impl Place {
+    /// The place as a coordinate, checked to be on the globe.
+    pub(crate) fn checked(&self) -> Result<&Self, crate::Error> {
+        match self {
+            Self::Coordinate(coordinate)
+                if !(-90.0..=90.0).contains(&coordinate.latitude)
+                    || !(-180.0..=180.0).contains(&coordinate.longitude) =>
+            {
+                Err(crate::Error::InvalidQuery {
+                    message: "the coordinate is not on the globe".to_owned(),
+                })
+            }
+            place => Ok(place),
+        }
+    }
+}
+
+/// One end of a trip in a [`TripsQuery`].
+#[derive(Debug, Clone, PartialEq)]
+pub enum Place {
+    /// A [`Location::id`] from the same network.
+    Id(String),
+    /// A position, such as where the user is.
+    Coordinate(Coordinate),
+}
+
+/// The time a [`TripsQuery`] is bound to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TripTime {
+    /// Leave at this time or later.
+    DepartAt(Timestamp),
+    /// Arrive at this time or earlier.
+    ArriveBy(Timestamp),
+}
+
+/// One way to get from the start to the destination.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct Trip {
+    /// The parts of the trip in the order they are traveled. Never empty.
+    pub legs: Vec<Leg>,
+}
+
+impl Trip {
+    /// Where and when the trip starts. `None` only if `legs` is empty, which
+    /// it never is in a trip this crate parsed.
+    #[must_use]
+    pub fn departure(&self) -> Option<&LegEnd> {
+        self.legs.first().map(|leg| &leg.departure)
+    }
+
+    /// Where and when the trip ends. `None` only if `legs` is empty.
+    #[must_use]
+    pub fn arrival(&self) -> Option<&LegEnd> {
+        self.legs.last().map(|leg| &leg.arrival)
+    }
+
+    /// The number of rides minus one. Walks do not count.
+    #[must_use]
+    pub fn transfers(&self) -> usize {
+        self.legs
+            .iter()
+            .filter(|leg| matches!(leg.kind, LegKind::Transit { .. }))
+            .count()
+            .saturating_sub(1)
+    }
+}
+
+/// One part of a [`Trip`]: a ride in one vehicle, or a walk.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct Leg {
+    /// How this part is traveled.
+    pub kind: LegKind,
+    /// Where and when the leg starts.
+    pub departure: LegEnd,
+    /// Where and when the leg ends.
+    pub arrival: LegEnd,
+    /// The stops the vehicle calls at between the two ends.
+    pub intermediate_stops: Vec<Stopover>,
+    /// Whether the ride does not take place, or does not call at the stop
+    /// where the leg starts or ends.
+    pub cancelled: bool,
+}
+
+/// How a [`Leg`] is traveled.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum LegKind {
+    /// A ride in a public transport vehicle.
+    Transit {
+        /// The line the vehicle runs on.
+        line: Line,
+        /// Where the vehicle is headed, as shown on it.
+        direction: Option<String>,
+    },
+    /// A walk, including one inside a station to change vehicles.
+    Walk,
+    /// Any other way to travel, such as a bike or a taxi.
+    Other,
+}
+
+/// The start or the end of a [`Leg`]. The fields follow the same rules as
+/// those of a [`Departure`].
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct LegEnd {
+    /// The stop, platform or other place.
+    pub stop: Location,
+    /// The time according to the timetable. For a walk it is the time the
+    /// trip was planned with.
+    pub scheduled_time: Timestamp,
+    /// The predicted time. `None` if the server has no prediction, which is
+    /// always the case for a walk. A walk after a late ride therefore keeps
+    /// its planned times and can start before the ride arrives.
+    pub realtime_time: Option<Timestamp>,
+    /// The platform according to the timetable.
+    pub scheduled_platform: Option<String>,
+    /// The platform as far as the server knows now.
+    pub realtime_platform: Option<String>,
+    /// Whether the vehicle skips this stop although the timetable has it.
+    pub cancelled: bool,
+}
+
+impl LegEnd {
+    /// The predicted time if there is one, otherwise the scheduled time.
+    #[must_use]
+    pub fn expected_time(&self) -> Timestamp {
+        self.realtime_time.unwrap_or(self.scheduled_time)
+    }
+}
+
+impl Stopover {
+    /// The stopover as the start of a leg, if it has a departure time.
+    pub(crate) fn into_leg_start(self) -> Option<LegEnd> {
+        Some(LegEnd {
+            stop: self.stop,
+            scheduled_time: self.scheduled_departure?,
+            realtime_time: self.realtime_departure,
+            scheduled_platform: self.scheduled_platform,
+            realtime_platform: self.realtime_platform,
+            cancelled: self.cancelled,
+        })
+    }
+
+    /// The stopover as the end of a leg, if it has an arrival time.
+    pub(crate) fn into_leg_end(self) -> Option<LegEnd> {
+        Some(LegEnd {
+            stop: self.stop,
+            scheduled_time: self.scheduled_arrival?,
+            realtime_time: self.realtime_arrival,
+            scheduled_platform: self.scheduled_platform,
+            realtime_platform: self.realtime_platform,
+            cancelled: self.cancelled,
+        })
+    }
+}
+
+/// A call at a stop: where it is and when the vehicle arrives and leaves.
+/// The fields follow the same rules as those of a [`Departure`].
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct Stopover {
+    /// The stop, platform or other place.
+    pub stop: Location,
+    /// The arrival time according to the timetable.
+    pub scheduled_arrival: Option<Timestamp>,
+    /// The predicted arrival time. `None` if the server has no prediction.
+    pub realtime_arrival: Option<Timestamp>,
+    /// The departure time according to the timetable.
+    pub scheduled_departure: Option<Timestamp>,
+    /// The predicted departure time. `None` if the server has no prediction.
+    pub realtime_departure: Option<Timestamp>,
+    /// The platform according to the timetable.
+    pub scheduled_platform: Option<String>,
+    /// The platform as far as the server knows now.
+    pub realtime_platform: Option<String>,
+    /// Whether the vehicle skips this stop although the timetable has it.
+    pub cancelled: bool,
+}

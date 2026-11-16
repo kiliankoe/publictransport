@@ -435,6 +435,14 @@ fn station_id_of_a_station_is_its_global_id() {
     assert_eq!(locations[0].station_id(), Some("de:14612:28"));
 }
 
+/// The id of a place without a stop would be of no use in a query.
+#[test]
+fn motis_stop_time_without_a_stop_is_a_parse_error() {
+    let body = br#"{"stopTimes":[{"place":{"name":"X","lat":51.04,"lon":13.73,"scheduledDeparture":"2026-11-16T13:24:00Z"},"mode":"TRAM"}]}"#;
+    let result = parse(Protocol::Motis, body);
+    assert!(matches!(result, Err(Error::Parse { .. })), "{result:?}");
+}
+
 #[test]
 fn response_without_departures_is_an_empty_list() {
     for (protocol, body) in [

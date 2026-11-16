@@ -28,9 +28,10 @@
 //! # }
 //! ```
 //!
-//! Departures work the same way with [`Network::departures_request`] and
-//! [`Network::parse_departures`]. An EFA network needs
-//! [`Network::with_timezone`] to ask for departures at a given time.
+//! Departures and trips work the same way, with
+//! [`Network::departures_request`] and [`Network::parse_departures`], and
+//! with [`Network::trips_request`] and [`Network::parse_trips`]. An EFA
+//! network needs [`Network::with_timezone`] for requests that carry a time.
 //!
 //! The HTTP client has two duties:
 //!
@@ -51,7 +52,7 @@ mod time;
 pub use error::Error;
 pub use http::{Header, HttpRequest, HttpResponse, Method};
 pub use model::{
-    Coordinate, Departure, DeparturesQuery, Line, Location, LocationKind, LocationQuery, Mode,
-    Timestamp,
+    Coordinate, Departure, DeparturesQuery, Leg, LegEnd, LegKind, Line, Location, LocationKind,
+    LocationQuery, Mode, Place, Stopover, Timestamp, Trip, TripTime, TripsQuery,
 };
 pub use network::{Network, Protocol};

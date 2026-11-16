@@ -1,6 +1,6 @@
 use crate::{
-    Departure, DeparturesQuery, Error, HttpRequest, HttpResponse, Location, LocationQuery, efa,
-    motis,
+    Departure, DeparturesQuery, Error, HttpRequest, HttpResponse, Location, LocationQuery, Trip,
+    TripsQuery, efa, motis,
 };
 
 /// One server that answers public transport queries.
@@ -113,6 +113,43 @@ impl Network {
         match self.protocol {
             Protocol::Efa => efa::parse_departures(self, response),
             Protocol::Motis => motis::parse_departures(response),
+        }
+    }
+
+    /// Builds the request for trips between two places.
+    ///
+    /// EFA takes the time as local time to the minute, with the same limits
+    /// as in [`Network::departures_request`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidNetwork`] if the query has a time and the
+    /// network needs a time zone for it but has none or an unknown one, and
+    /// [`Error::InvalidQuery`] if the time is outside the supported range.
+    pub fn trips_request(&self, query: &TripsQuery) -> Result<HttpRequest, Error> {
+        match self.protocol {
+            Protocol::Efa => efa::trips_request(self, query),
+            Protocol::Motis => motis::trips_request(self, query),
+        }
+    }
+
+    /// Parses the response to a [`Network::trips_request`]. The trips are in
+    /// the order the server ranks them. No connection between the two places
+    /// gives an empty list.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::NotFound`] if the network does not know one of the
+    /// two places, and another error if the status code reports a failure or
+    /// if the body is not what the protocol defines.
+    ///
+    /// The trips are as the server planned them. Some may have left already
+    /// or may no longer work out because a vehicle is late; that is for the
+    /// application to check against its clock.
+    pub fn parse_trips(&self, response: &HttpResponse) -> Result<Vec<Trip>, Error> {
+        match self.protocol {
+            Protocol::Efa => efa::parse_trips(self, response),
+            Protocol::Motis => motis::parse_trips(response),
         }
     }
 }

@@ -19,8 +19,13 @@ impl<'de> Deserialize<'de> for WireTime {
 
 impl Timestamp {
     pub(crate) fn to_jiff(self) -> Result<jiff::Timestamp, Error> {
-        jiff::Timestamp::from_second(self.unix_seconds).map_err(|_| Error::InvalidQuery {
-            message: "the time is outside the supported range".to_owned(),
-        })
+        // The years 1 to 9999, which every protocol can write down.
+        let range = -62_135_596_800..253_402_300_800;
+        jiff::Timestamp::from_second(self.unix_seconds)
+            .ok()
+            .filter(|_| range.contains(&self.unix_seconds))
+            .ok_or_else(|| Error::InvalidQuery {
+                message: "the time is outside the years 1 to 9999".to_owned(),
+            })
     }
 }
