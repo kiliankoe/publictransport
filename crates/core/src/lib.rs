@@ -1,4 +1,50 @@
 //! Client for public transport APIs such as EFA and MOTIS.
 //!
 //! This crate does no I/O. It builds HTTP requests and parses HTTP responses,
-//! so each platform can send them with its own HTTP stack.
+//! so each platform can send them with its own HTTP stack. Every operation is
+//! a pair of methods on [`Network`]: one returns the [`HttpRequest`] to send,
+//! the other turns the [`HttpResponse`] into model types.
+//!
+//! ```
+//! use publictransport::{HttpResponse, LocationQuery, Network, Protocol};
+//!
+//! # fn main() -> Result<(), publictransport::Error> {
+//! let network = Network::new(
+//!     "vvo",
+//!     "Verkehrsverbund Oberelbe",
+//!     "https://efa.vvo-online.de/std3",
+//!     Protocol::Efa,
+//! );
+//! let mut query = LocationQuery::new("Hauptbahnhof");
+//! query.limit = Some(5);
+//!
+//! let request = network.locations_request(&query)?;
+//! // Send `request` with an HTTP client and copy its answer into a response.
+//! # let body = br#"{"locations":[{"id":"de:14612:28","name":"Dresden, Hauptbahnhof","type":"stop"}]}"#.to_vec();
+//! let response = HttpResponse { status: 200, headers: Vec::new(), body };
+//! for location in network.parse_locations(&response)? {
+//!     println!("{} ({})", location.name, location.id);
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! The HTTP client has two duties:
+//!
+//! - It sets a `User-Agent` header. The header identifies the application, so
+//!   requests carry none. Some servers, such as Transitous, require one.
+//! - It does not follow redirects and passes on every response as it is, with
+//!   all headers, whatever the status. The parse methods turn failures into
+//!   an [`Error`].
+
+mod efa;
+mod error;
+mod http;
+mod model;
+mod motis;
+mod network;
+
+pub use error::Error;
+pub use http::{Header, HttpRequest, HttpResponse, Method};
+pub use model::{Coordinate, Location, LocationKind, LocationQuery};
+pub use network::{Network, Protocol};

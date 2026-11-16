@@ -1,5 +1,7 @@
 [licenses]
-allow = ["MIT", "Apache-2.0"]
+# Unicode-3.0 covers the Unicode data tables in unicode-ident, which the
+# derive macros depend on.
+allow = ["MIT", "Apache-2.0", "Unicode-3.0"]
 
 [bans]
 multiple-versions = "warn"
