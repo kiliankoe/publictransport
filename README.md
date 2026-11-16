@@ -2,7 +2,7 @@
 
 A client library for public transport APIs. One shared model for stops, departures and trips covers several server types, so an application can query any supported network the same way.
 
-The project is at an early stage. It can search for locations by name on servers that speak EFA (the JSON interface of MDV's journey planner, used by many German transport associations) or MOTIS (the routing engine behind [Transitous](https://transitous.org)). Departures and trips come next.
+The project is at an early stage. It can search for locations by name and list the departures at a stop on servers that speak EFA (the JSON interface of MDV's journey planner, used by many German transport associations) or MOTIS (the routing engine behind [Transitous](https://transitous.org)). Trips come next.
 
 ## Design
 

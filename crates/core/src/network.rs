@@ -1,4 +1,7 @@
-use crate::{Error, HttpRequest, HttpResponse, Location, LocationQuery, efa, motis};
+use crate::{
+    Departure, DeparturesQuery, Error, HttpRequest, HttpResponse, Location, LocationQuery, efa,
+    motis,
+};
 
 /// One server that answers public transport queries.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14,6 +17,9 @@ pub struct Network {
     pub endpoint: String,
     /// The protocol the server speaks.
     pub protocol: Protocol,
+    /// The IANA name of the time zone the server works in, e.g.
+    /// `Europe/Berlin`. EFA needs it for requests that carry a time.
+    pub timezone: Option<String>,
 }
 
 /// The protocol a [`Network`] speaks.
@@ -39,7 +45,15 @@ impl Network {
             name: name.into(),
             endpoint: endpoint.into(),
             protocol,
+            timezone: None,
         }
+    }
+
+    /// Sets [`Network::timezone`].
+    #[must_use]
+    pub fn with_timezone(mut self, timezone: impl Into<String>) -> Self {
+        self.timezone = Some(timezone.into());
+        self
     }
 
     /// Builds the request that searches for locations by name.
@@ -65,6 +79,39 @@ impl Network {
         match self.protocol {
             Protocol::Efa => efa::parse_locations(response),
             Protocol::Motis => motis::parse_locations(response),
+        }
+    }
+
+    /// Builds the request for the next departures at a stop.
+    ///
+    /// EFA takes the time as local time to the minute. In the hour that
+    /// repeats when daylight saving time ends, it cannot tell the first pass
+    /// from the second.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidNetwork`] if the query has a time and the
+    /// network needs a time zone for it but has none or an unknown one, and
+    /// [`Error::InvalidQuery`] if the time is outside the supported range.
+    pub fn departures_request(&self, query: &DeparturesQuery) -> Result<HttpRequest, Error> {
+        match self.protocol {
+            Protocol::Efa => efa::departures_request(self, query),
+            Protocol::Motis => motis::departures_request(self, query),
+        }
+    }
+
+    /// Parses the response to a [`Network::departures_request`]. The
+    /// departures are ordered by [`Departure::expected_time`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::NotFound`] if the network does not know the stop,
+    /// and another error if the status code reports a failure or if the body
+    /// is not what the protocol defines.
+    pub fn parse_departures(&self, response: &HttpResponse) -> Result<Vec<Departure>, Error> {
+        match self.protocol {
+            Protocol::Efa => efa::parse_departures(response),
+            Protocol::Motis => motis::parse_departures(response),
         }
     }
 }

@@ -2,6 +2,26 @@
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
+    /// The [`Network`](crate::Network) lacks something the request needs,
+    /// such as a time zone.
+    #[error("the network is not usable for this request: {message}")]
+    InvalidNetwork {
+        /// What is missing or wrong.
+        message: String,
+    },
+    /// The query holds a value no request can carry, such as a time outside
+    /// the supported range.
+    #[error("the query is invalid: {message}")]
+    InvalidQuery {
+        /// What is wrong.
+        message: String,
+    },
+    /// The network does not know the stop the query names.
+    #[error("not found: {message}")]
+    NotFound {
+        /// What the server said, or what was missing in its answer.
+        message: String,
+    },
     /// The server redirected the request, so the endpoint has moved.
     #[error("the endpoint has moved (new location: {location:?})")]
     Moved {

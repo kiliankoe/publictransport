@@ -24,6 +24,8 @@ efa() {
 
 # Dresden Hauptbahnhof to Albertplatz
 efa vvo https://efa.vvo-online.de/std3 Hauptbahnhof de:14612:28 de:14612:13
+# A stop that does not exist
+fetch efa/vvo-departures-unknown-stop.json 'https://efa.vvo-online.de/std3/XML_DM_REQUEST?type_dm=any&name_dm=de:14612:99999&mode=direct&useRealtime=1&limit=10&outputFormat=rapidJSON&coordOutputFormat=WGS84%5Bdd.ddddd%5D'
 # Düsseldorf Hbf to Essen Hbf
 efa vrr https://efa.vrr.de/standard 'D%C3%BCsseldorf%20Hbf' de:05111:18235 de:05113:9289
 

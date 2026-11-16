@@ -29,6 +29,10 @@
 //! # }
 //! ```
 //!
+//! Departures work the same way with [`Network::departures_request`] and
+//! [`Network::parse_departures`]. An EFA network needs
+//! [`Network::with_timezone`] to ask for departures at a given time.
+//!
 //! The HTTP client has two duties:
 //!
 //! - It sets a `User-Agent` header. The header identifies the application, so
@@ -43,8 +47,12 @@ mod http;
 mod model;
 mod motis;
 mod network;
+mod time;
 
 pub use error::Error;
 pub use http::{Header, HttpRequest, HttpResponse, Method};
-pub use model::{Coordinate, Location, LocationKind, LocationQuery};
+pub use model::{
+    Coordinate, Departure, DeparturesQuery, Line, Location, LocationKind, LocationQuery, Mode,
+    Timestamp,
+};
 pub use network::{Network, Protocol};
