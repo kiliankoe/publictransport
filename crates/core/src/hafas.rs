@@ -171,13 +171,15 @@ fn object<const N: usize>(fields: [(&str, Option<Value>); N]) -> Value {
         .into()
 }
 
-/// A stop, address or point of interest by its ID. Only stops have a short
-/// one; the others are known by the server's full identifier.
+/// A stop, address or point of interest by its ID. A number is the short
+/// ID of a stop. Anything else is the full identifier of the server, which
+/// addresses and points of interest have, and stops on servers that do not
+/// number them.
 fn place_by_id(id: &str) -> Value {
-    if id.contains('@') {
-        json!({"lid": id})
-    } else {
+    if !id.is_empty() && id.bytes().all(|byte| byte.is_ascii_digit()) {
         json!({"lid": format!("A=1@L={id}@")})
+    } else {
+        json!({"lid": id})
     }
 }
 
@@ -315,8 +317,9 @@ fn result<T: for<'a> Deserialize<'a>>(
             .map_err(|error| Error::Parse {
                 message: error.to_string(),
             }),
-        Some("LOCATION") => Err(Error::NotFound {
-            message: service.err_txt.unwrap_or_else(|| "LOCATION".to_owned()),
+        // An unknown place, and a place without stops to start from.
+        Some(code @ ("LOCATION" | "H9220")) => Err(Error::NotFound {
+            message: service.err_txt.unwrap_or_else(|| code.to_owned()),
         }),
         Some(code) if empty.contains(&code) => Ok(None),
         Some(code) => Err(failed(code, service.err_txt.as_deref())),

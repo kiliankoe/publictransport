@@ -104,14 +104,20 @@ fn departure_answer(cls: u32, date: &str, time: &str) -> Value {
     }}]})
 }
 
-/// A stop ID or a full identifier, with the place a request names it as.
+/// A stop number or a full identifier, with the place a request names it
+/// as. Some servers have identifiers of their own without an `@`, such as
+/// `de:03241:31`.
 fn stop() -> impl Strategy<Value = (String, Value)> {
     prop_oneof![
         "[0-9]{1,9}".prop_map(|id| {
             let lid = format!("A=1@L={id}@");
             (id, json!({"lid": lid}))
         }),
-        "[A-Za-z0-9=. ]{0,8}@[A-Za-z0-9=@. ]{0,8}".prop_map(|id| (id.clone(), json!({"lid": id}))),
+        "[A-Za-z0-9=@:. ]{0,12}"
+            .prop_filter("no stop number", |id| {
+                id.is_empty() || !id.bytes().all(|byte| byte.is_ascii_digit())
+            })
+            .prop_map(|id| (id.clone(), json!({"lid": id}))),
     ]
 }
 
@@ -594,6 +600,9 @@ fn errors_inside_a_successful_response_are_told_apart() {
         );
     }
     let result = network.parse_departures(&respond(UNKNOWN_STOP));
+    assert!(matches!(result, Err(Error::NotFound { .. })), "{result:?}");
+    // A place of a trip search that the server cannot route from.
+    let result = network.parse_trips(&respond(service("H9220")));
     assert!(matches!(result, Err(Error::NotFound { .. })), "{result:?}");
     let result = network.parse_departures(&respond("<html></html>"));
     assert!(matches!(result, Err(Error::Parse { .. })), "{result:?}");
