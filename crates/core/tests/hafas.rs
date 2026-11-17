@@ -607,6 +607,45 @@ fn errors_inside_a_successful_response_are_told_apart() {
     );
 }
 
+/// Seen on servers with versions 1.16 to 1.88 of the interface.
+#[test]
+fn other_versions_of_the_interface_spell_fields_differently() {
+    // The hour from 2:00 to 3:00 happens twice on this day in Berlin.
+    let mut answer = departure_answer(8, "20261025", "023000");
+    let result = &mut answer["svcResL"][0]["res"];
+    let location = &mut result["common"]["locL"][0];
+    location["globalIdL"] = json!([
+        {"id": "DBS_8089001", "type": "b"},
+        {"id": "de:11000:900100003", "type": "A"}
+    ]);
+    // A server may send the old and the new spelling at once.
+    location["gidL"] = json!(["A×de:11000:900100003"]);
+    let stop = &mut result["jnyL"][0]["stbStop"];
+    stop["dPlatfS"] = json!("7");
+    stop["dPltfS"] = json!({"type": "PL", "txt": "7"});
+    stop["dPlatfR"] = json!("5");
+    stop["dTZOffset"] = json!(60);
+    // After the repeated hour, and without an offset of its own.
+    stop["dTimeR"] = json!("031000");
+
+    let departures = vbb()
+        .parse_departures(&respond(answer.to_string()))
+        .unwrap();
+    let departure = &departures[0];
+    assert_eq!(departure.stop.global_ids, [ifopt("de:11000:900100003")]);
+    assert_eq!(departure.scheduled_platform.as_deref(), Some("7"));
+    assert_eq!(departure.realtime_platform.as_deref(), Some("5"));
+    // The offset names the second time the clock shows 2:30.
+    let second_time = Timestamp {
+        unix_seconds: 1_792_891_800,
+    };
+    assert_eq!(departure.scheduled_time, second_time);
+    assert_eq!(
+        departure.realtime_time.map(|time| time.unix_seconds),
+        Some(second_time.unix_seconds + 40 * 60)
+    );
+}
+
 #[test]
 fn answer_with_times_needs_the_time_zone() {
     let result = bare(options()).parse_departures(&respond(DEPARTURES));

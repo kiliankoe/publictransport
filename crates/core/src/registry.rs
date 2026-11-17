@@ -158,7 +158,9 @@ impl Network {
     /// `ojp` with `options.ojpVersion`, `options.requestorRef`, and
     /// `usageTerms` for [`Network::terms`]. An entry of the type
     /// `hafasMgate` gives a network with [`Network::hafas`] that asks in the
-    /// first of the entry's `supportedLanguages`. For
+    /// first of the entry's `supportedLanguages`. Its salts for signed
+    /// requests are not read: the crate does not sign, and no server that
+    /// was tried asks for it. For
     /// MOTIS the entry names the root of the server, and the endpoint gets
     /// `api` appended unless it ends in it.
     ///
@@ -173,8 +175,8 @@ impl Network {
     /// # Errors
     ///
     /// Returns [`Error::InvalidNetwork`] if the text is not such an entry,
-    /// if its protocol is not one of this crate's, if the server wants a
-    /// key in an HTTP header, or if a HAFAS server wants signed requests.
+    /// if its protocol is not one of this crate's, or if the server wants a
+    /// key in an HTTP header.
     pub fn from_json(id: &str, json: &str) -> Result<Self, Error> {
         let invalid = |message: String| Error::InvalidNetwork { message };
         let entry: Entry =
@@ -299,8 +301,6 @@ struct Options {
     ext: Option<String>,
     ver: Option<String>,
     version: Option<String>,
-    checksum_salt: Option<String>,
-    mic_mac_salt: Option<String>,
     #[serde(default)]
     products: Vec<WireProduct>,
 }
@@ -318,13 +318,6 @@ impl Options {
                 .map(|value| value.to_string())
                 .ok_or_else(|| invalid(name))
         };
-        if self.checksum_salt.is_some() || self.mic_mac_salt.is_some() {
-            return Err(Error::InvalidNetwork {
-                message: format!(
-                    "{id}: the server wants signed requests, which this crate cannot send"
-                ),
-            });
-        }
         Ok(HafasOptions {
             client: object(self.client.take(), "client")?,
             auth: object(self.auth.take(), "auth")?,

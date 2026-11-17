@@ -463,11 +463,16 @@ impl<'a> Reader<'a> {
 
     /// A time of day on or after `date`: `HHMMSS`, with the number of days
     /// to add in front if the time is on a later day.
-    fn time(&self, date: &str, time: &str) -> Result<Timestamp, Error> {
+    ///
+    /// Newer versions of the interface send the offset from UTC in minutes
+    /// with a time. It tells apart the two times a clock shows in the hour
+    /// that is repeated when daylight saving time ends; without it the
+    /// first is taken. Everything else follows the time zone, because a
+    /// real-time time may come with the offset of the scheduled one.
+    fn time(&self, date: &str, time: &str, offset: Option<i32>) -> Result<Timestamp, Error> {
         let unreadable = || Error::Parse {
             message: format!("{date} {time} is not a date and a time"),
         };
-        let zone = self.zone.clone()?;
         let (days, time) = time
             .len()
             .checked_sub(6)
@@ -482,12 +487,22 @@ impl<'a> Reader<'a> {
             .ok()
             .filter(|_| date.len() == 8)
             .ok_or_else(unreadable)?;
-        let time = jiff::Span::new()
+        let local = jiff::Span::new()
             .try_days(days)
             .and_then(|days| local.checked_add(days))
-            .and_then(|local| local.to_zoned_datetime(zone))
-            .map_err(|_| unreadable())?
-            .timestamp();
+            .map_err(|_| unreadable())?;
+        let ambiguous = self.zone.clone()?.to_ambiguous_timestamp(local);
+        let time = match ambiguous.offset() {
+            jiff::tz::AmbiguousOffset::Fold { after, .. }
+                if offset.is_some_and(|minutes| {
+                    i64::from(minutes) * 60 == i64::from(after.seconds())
+                }) =>
+            {
+                ambiguous.later()
+            }
+            _ => ambiguous.compatible(),
+        }
+        .map_err(|_| unreadable())?;
         // The check on the range of years is the one for times in a query.
         let time = Timestamp {
             unix_seconds: time.as_second(),
@@ -496,8 +511,13 @@ impl<'a> Reader<'a> {
         Ok(time)
     }
 
-    fn optional_time(&self, date: &str, time: Option<&String>) -> Result<Option<Timestamp>, Error> {
-        time.map(|time| self.time(date, time)).transpose()
+    fn optional_time(
+        &self,
+        date: &str,
+        time: Option<&String>,
+        offset: Option<i32>,
+    ) -> Result<Option<Timestamp>, Error> {
+        time.map(|time| self.time(date, time, offset)).transpose()
     }
 
     fn leg_end(&self, date: &str, stop: &Stop, side: Side) -> Result<LegEnd, Error> {
@@ -512,15 +532,31 @@ impl<'a> Reader<'a> {
     }
 
     fn stopover(&self, date: &str, stop: &Stop) -> Result<Stopover, Error> {
-        let text = |platform: &Option<Platform>| platform.as_ref().and_then(|p| p.txt.clone());
+        // Older versions of the interface send the name, newer ones an
+        // object with it, and a server may send both.
+        let platform = |name: &Option<String>, object: &Option<Platform>| {
+            let named = object.as_ref().and_then(|platform| platform.txt.clone());
+            name.clone().or(named).filter(|name| !name.is_empty())
+        };
+        let (arrival, departure) = (stop.a_tz_offset, stop.d_tz_offset);
         Ok(Stopover {
             stop: self.location(stop.loc_x)?,
-            scheduled_arrival: self.optional_time(date, stop.a_time_s.as_ref())?,
-            realtime_arrival: self.optional_time(date, stop.a_time_r.as_ref())?,
-            scheduled_departure: self.optional_time(date, stop.d_time_s.as_ref())?,
-            realtime_departure: self.optional_time(date, stop.d_time_r.as_ref())?,
-            scheduled_platform: text(&stop.d_pltf_s).or_else(|| text(&stop.a_pltf_s)),
-            realtime_platform: text(&stop.d_pltf_r).or_else(|| text(&stop.a_pltf_r)),
+            scheduled_arrival: self.optional_time(date, stop.a_time_s.as_ref(), arrival)?,
+            realtime_arrival: self.optional_time(
+                date,
+                stop.a_time_r.as_ref(),
+                stop.a_tz_offset_r.or(arrival),
+            )?,
+            scheduled_departure: self.optional_time(date, stop.d_time_s.as_ref(), departure)?,
+            realtime_departure: self.optional_time(
+                date,
+                stop.d_time_r.as_ref(),
+                stop.d_tz_offset_r.or(departure),
+            )?,
+            scheduled_platform: platform(&stop.d_platf_s, &stop.d_pltf_s)
+                .or_else(|| platform(&stop.a_platf_s, &stop.a_pltf_s)),
+            realtime_platform: platform(&stop.d_platf_r, &stop.d_pltf_r)
+                .or_else(|| platform(&stop.a_platf_r, &stop.a_pltf_r)),
             cancelled: stop.d_cncl || stop.a_cncl,
         })
     }
@@ -601,8 +637,17 @@ struct WireLocation {
     name: Option<String>,
     ext_id: Option<String>,
     crd: Option<Position>,
-    #[serde(default)]
-    gid_l: Vec<String>,
+    /// Global IDs as `<kind>×<id>`.
+    gid_l: Option<Vec<String>>,
+    /// The same in newer versions of the interface.
+    global_id_l: Option<Vec<TypedId>>,
+}
+
+#[derive(Deserialize, Clone)]
+struct TypedId {
+    id: String,
+    #[serde(rename = "type")]
+    kind: String,
 }
 
 /// A position in millionths of a degree.
@@ -621,13 +666,27 @@ impl WireLocation {
                 .filter(|_| self.kind.as_deref() == Some("S"))
                 .or(self.lid)
                 .unwrap_or_default(),
-            // The letter in front names the kind of ID.
+            // The kind `A` is the one with IFOPT IDs. A server may send
+            // both lists.
             global_ids: self
                 .gid_l
                 .iter()
+                .flatten()
                 .filter_map(|id| id.strip_prefix("A×"))
+                .chain(
+                    self.global_id_l
+                        .iter()
+                        .flatten()
+                        .filter(|id| id.kind == "A")
+                        .map(|id| id.id.as_str()),
+                )
                 .filter_map(GlobalId::ifopt)
-                .collect(),
+                .fold(Vec::new(), |mut ids, id| {
+                    if !ids.contains(&id) {
+                        ids.push(id);
+                    }
+                    ids
+                }),
             kind: match self.kind.as_deref() {
                 Some("S") => LocationKind::Stop,
                 Some("A") => LocationKind::Address,
@@ -698,6 +757,18 @@ struct Stop {
     a_time_r: Option<String>,
     d_time_s: Option<String>,
     d_time_r: Option<String>,
+    #[serde(rename = "aTZOffset")]
+    a_tz_offset: Option<i32>,
+    #[serde(rename = "aTZOffsetR")]
+    a_tz_offset_r: Option<i32>,
+    #[serde(rename = "dTZOffset")]
+    d_tz_offset: Option<i32>,
+    #[serde(rename = "dTZOffsetR")]
+    d_tz_offset_r: Option<i32>,
+    a_platf_s: Option<String>,
+    a_platf_r: Option<String>,
+    d_platf_s: Option<String>,
+    d_platf_r: Option<String>,
     a_pltf_s: Option<Platform>,
     a_pltf_r: Option<Platform>,
     d_pltf_s: Option<Platform>,

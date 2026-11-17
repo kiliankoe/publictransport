@@ -203,13 +203,6 @@ fn rejects_entries_it_cannot_serve() {
             ),
         ),
         ("OJP 2.0", entry("ojp", r#", "ojpVersion": "2.0""#)),
-        (
-            "HAFAS with signed requests",
-            entry(
-                "hafasMgate",
-                r#", "client": {}, "auth": {}, "ver": "1.44", "checksumSalt": "abc""#,
-            ),
-        ),
     ];
     for (case, json) in cases {
         let result = Network::from_json("example", &json);
@@ -229,6 +222,7 @@ fn reads_the_hafas_options() {
         ("version", "", "en"),
     ];
     for (version_key, languages, language) in cases {
+        // The salt is for signed requests, which no server asks for.
         let json = format!(
             r#"{{
                 "name": "Example",
@@ -240,6 +234,7 @@ fn reads_the_hafas_options() {
                     "client": {{ "type": "WEB", "id": "EXAMPLE" }},
                     "auth": {{ "type": "AID", "aid": "secret" }},
                     "ext": "EX.1",
+                    "checksumSalt": "6162",
                     "{version_key}": "1.33",
                     "products": [{{ "id": "bus", "bitmasks": [8, 16], "name": "Bus" }}]
                 }}
