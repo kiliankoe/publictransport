@@ -4,13 +4,17 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 from publictransport import (
+    Coordinate,
     DeparturesQuery,
+    Error,
     LegEnd,
     Location,
     LocationKind,
     LocationQuery,
     Network,
     Protocol,
+    Registry,
+    network_from_json,
 )
 
 MOTIS = Network(
@@ -80,3 +84,27 @@ def test_kinds_of_a_location_query_are_optional_and_reach_the_request() -> None:
 
 def test_station_id_is_shared_by_a_station_and_its_platforms() -> None:
     assert leg_end(datetime.now(timezone.utc)).stop.station_id() == "de:14612:28"
+
+
+def test_registry_finds_the_bundled_networks_that_cover_a_position() -> None:
+    dresden = Coordinate(latitude=51.05, longitude=13.74)
+
+    covering = [found.network.id for found in Registry.bundled().covering(dresden)]
+
+    assert "vvo-efa" in covering
+    assert "vrr-efa" not in covering
+
+
+def test_network_is_read_from_a_transport_apis_entry() -> None:
+    entry = """{
+        "name": "Example",
+        "type": {"efa": true},
+        "options": {"endpoint": "https://efa.example/base"},
+        "coverage": {"anyCoverage": {"region": ["DE"]}}
+    }"""
+
+    network = network_from_json("example", entry)
+
+    assert (network.id, network.protocol) == ("example", Protocol.EFA)
+    with pytest.raises(Error.InvalidNetwork):
+        network_from_json("broken", "{}")

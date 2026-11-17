@@ -32,6 +32,8 @@ with Client(user_agent="my-app/1.0 (+https://example.org)") as client:
 
 `AsyncClient` has the same methods as coroutines.
 
+`Registry.bundled()` holds the networks that ship with the package, so a `Network` does not have to be written by hand: `Registry.bundled().get("vvo-efa")` is the server above, and `covering(Coordinate(...))` lists the networks for a position, each with the tier of its coverage there. `network_from_json(id, json)` reads further ones from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis).
+
 Times are timezone-aware `datetime` objects in UTC, and `Location.timezone` names the zone to show them in. A time in a query has to be timezone-aware too, in any zone. An EFA network needs its `timezone` to send a query time. A TRIAS or OJP network needs a `requestor_ref`, which public servers document, e.g. `OpenService`.
 
 Failures that the server or the query cause are raised as subclasses of `publictransport.Error`, such as `Error.NotFound` or `Error.RateLimited`. Failures of the HTTP exchange are raised as httpx raises them. An answer above 16 MB raises `ResponseTooLarge`.
