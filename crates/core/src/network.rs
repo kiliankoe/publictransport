@@ -1,6 +1,7 @@
 use crate::{
     Attribution, Coverage, Departure, DeparturesQuery, Error, Header, HttpRequest, HttpResponse,
-    Location, LocationKind, LocationQuery, Operation, Place, Trip, TripsQuery, efa, motis, trias,
+    IdScheme, Location, LocationKind, LocationQuery, Operation, Place, Trip, TripsQuery, efa,
+    motis, trias,
 };
 
 /// One server that answers public transport queries.
@@ -150,14 +151,15 @@ impl Network {
         location.network.as_deref() == Some(self.id.as_str())
     }
 
-    /// Whether the protocol takes a global ID where it takes a stop ID. The
-    /// German EFA, TRIAS and OJP servers do; that every server of these
-    /// protocols does is an assumption. MOTIS IDs carry the name of a feed.
-    fn takes_global_ids(&self) -> bool {
-        matches!(
-            self.protocol,
-            Protocol::Efa | Protocol::Trias | Protocol::Ojp1
-        )
+    /// The scheme of global IDs that the protocol takes where it takes a
+    /// stop ID. The German EFA, TRIAS and OJP servers take an IFOPT ID; that
+    /// every server of these protocols does is an assumption. MOTIS IDs
+    /// carry the name of a feed.
+    fn global_ids(&self) -> Option<IdScheme> {
+        match self.protocol {
+            Protocol::Efa | Protocol::Trias | Protocol::Ojp1 => Some(IdScheme::Ifopt),
+            Protocol::Motis => None,
+        }
     }
 
     fn check(&self, operation: Operation) -> Result<(), Error> {
@@ -196,10 +198,12 @@ impl Network {
         if self.returned(location) {
             return Some(location.id.clone());
         }
+        let scheme = self.global_ids()?;
         location
-            .station_id()
-            .filter(|_| self.takes_global_ids())
-            .map(str::to_owned)
+            .station_ids()
+            .into_iter()
+            .find(|id| id.scheme == scheme)
+            .map(|id| id.value)
     }
 
     /// The location as an end of a trip on this network, for

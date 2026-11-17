@@ -2,8 +2,8 @@
 
 use proptest::prelude::*;
 use publictransport::{
-    DeparturesQuery, Error, Header, HttpRequest, HttpResponse, Location, LocationKind,
-    LocationQuery, Method, Network, Place, Protocol, TripsQuery,
+    DeparturesQuery, Error, GlobalId, Header, HttpRequest, HttpResponse, IdScheme, Location,
+    LocationKind, LocationQuery, Method, Network, Place, Protocol, TripsQuery,
 };
 
 const VVO: &[u8] = include_bytes!("fixtures/efa/vvo-stopfinder.json");
@@ -25,20 +25,27 @@ fn parse(protocol: Protocol, status: u16, body: &[u8]) -> Result<Vec<Location>, 
     })
 }
 
+fn ifopt(value: &str) -> GlobalId {
+    GlobalId {
+        scheme: IdScheme::Ifopt,
+        value: value.to_owned(),
+    }
+}
+
 type Fields<'a> = (
     &'a str,
-    Option<&'a str>,
+    Vec<GlobalId>,
     LocationKind,
     &'a str,
     Option<&'a str>,
     Option<(f64, f64)>,
 );
 
-/// Id, global id, kind, name, locality and coordinate of a location.
+/// Id, global ids, kind, name, locality and coordinate of a location.
 fn fields(location: &Location) -> Fields<'_> {
     (
         &location.id,
-        location.global_id.as_deref(),
+        location.global_ids.clone(),
         location.kind,
         &location.name,
         location.locality.as_deref(),
@@ -184,7 +191,7 @@ fn efa_splits_the_locality_from_the_name() {
         fields(&locations[0]),
         (
             "de:14612:28",
-            Some("de:14612:28"),
+            vec![ifopt("de:14612:28")],
             LocationKind::Stop,
             "Hauptbahnhof",
             Some("Dresden"),
@@ -209,7 +216,7 @@ fn efa_ambiguous_search_lists_every_match_best_first() {
     );
     let poi = &locations[1];
     assert_eq!(poi.kind, LocationKind::Poi);
-    assert_eq!(poi.global_id, None);
+    assert_eq!(poi.global_ids, []);
     assert!(poi.id.starts_with("poiID:302375:"), "{}", poi.id);
     assert_eq!(poi.locality.as_deref(), Some("Düsseldorf"));
 }
@@ -251,12 +258,12 @@ fn efa_maps_types_to_kinds_and_tolerates_missing_optional_fields() {
             LocationKind::Other,
         ]
     );
-    assert_eq!(locations[0].global_id, None);
+    assert_eq!(locations[0].global_ids, []);
     assert_eq!(
         fields(&locations[4]),
         (
             "placeID:14612000:1",
-            None,
+            Vec::new(),
             LocationKind::Other,
             "Dresden",
             None,
@@ -272,7 +279,7 @@ fn motis_takes_the_locality_from_the_default_area_and_the_global_id_from_the_id(
         fields(&locations[0]),
         (
             "de-DELFI_de:14612:28",
-            Some("de:14612:28"),
+            vec![ifopt("de:14612:28")],
             LocationKind::Stop,
             "Dresden Hauptbahnhof",
             Some("Dresden"),
@@ -280,14 +287,14 @@ fn motis_takes_the_locality_from_the_default_area_and_the_global_id_from_the_id(
         )
     );
     assert_eq!(
-        locations[1].global_id.as_deref(),
-        Some("de:14612:32:1:1"),
+        locations[1].global_ids,
+        [ifopt("de:14612:32:1:1")],
         "a platform"
     );
     let place = &locations[2];
     assert_eq!(place.kind, LocationKind::Poi);
     assert_eq!(place.id, "node/2675542513");
-    assert_eq!(place.global_id, None);
+    assert_eq!(place.global_ids, []);
     assert_eq!(place.timezone.as_deref(), Some("Europe/Berlin"));
 }
 
@@ -300,10 +307,10 @@ fn motis_maps_types_to_kinds_and_tolerates_a_missing_default_area() {
     ]"#;
     let locations = parse(Protocol::Motis, 200, body).unwrap();
     assert_eq!(locations[0].kind, LocationKind::Address);
-    assert_eq!(locations[0].global_id, None);
+    assert_eq!(locations[0].global_ids, []);
     assert_eq!(locations[1].kind, LocationKind::Poi);
     assert_eq!(locations[1].locality, None);
-    assert_eq!(locations[2].global_id, None, "not an IFOPT identifier");
+    assert_eq!(locations[2].global_ids, [], "not an IFOPT identifier");
 }
 
 #[test]

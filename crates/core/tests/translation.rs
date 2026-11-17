@@ -1,7 +1,9 @@
 //! Where a location came from, and how it translates to another network.
 
 use proptest::prelude::*;
-use publictransport::{Coordinate, HttpResponse, Location, LocationKind, Network, Place, Protocol};
+use publictransport::{
+    Coordinate, GlobalId, HttpResponse, IdScheme, Location, LocationKind, Network, Place, Protocol,
+};
 
 const PROTOCOLS: [Protocol; 4] = [
     Protocol::Efa,
@@ -119,7 +121,13 @@ proptest! {
     ) {
         let mut location = location();
         location.id.clone_from(&id);
-        location.global_id = global_id.map(|platform| format!("{station}{platform}"));
+        location.global_ids = global_id
+            .map(|platform| GlobalId {
+                scheme: IdScheme::Ifopt,
+                value: format!("{station}{platform}"),
+            })
+            .into_iter()
+            .collect();
         location.coordinate = coordinate.map(|(latitude, longitude)| Coordinate {
             latitude,
             longitude,
@@ -162,5 +170,5 @@ fn a_stop_number_of_the_server_is_no_global_id() {
         .unwrap()
         .remove(0);
     assert_eq!(location.id, "8503000");
-    assert_eq!(location.global_id, None);
+    assert_eq!(location.global_ids, []);
 }

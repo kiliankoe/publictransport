@@ -12,9 +12,9 @@ use quick_xml::escape::escape;
 use serde::Deserialize;
 
 use crate::{
-    Coordinate, Departure, DeparturesQuery, Error, Header, HttpRequest, HttpResponse, Leg, LegEnd,
-    LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, Network, Place, Protocol,
-    Stopover, Timestamp, Trip, TripTime, TripsQuery, model::is_global_id, time::WireTime,
+    Coordinate, Departure, DeparturesQuery, Error, GlobalId, Header, HttpRequest, HttpResponse,
+    Leg, LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, Network,
+    Place, Protocol, Stopover, Timestamp, Trip, TripTime, TripsQuery, time::WireTime,
 };
 
 /// How the two protocols write a request.
@@ -603,30 +603,45 @@ struct GeoPosition {
 impl WireLocation {
     /// `None` for a place of a kind this crate does not know.
     fn into_location(self, network: &Network, ojp: bool) -> Option<Location> {
-        let (kind, id, name, global_id) = if let Some(stop) = self.stop_point {
+        let (kind, id, name, global_ids) = if let Some(stop) = self.stop_point {
             let id = stop.stop_point_ref.trim().to_owned();
             (
                 LocationKind::Stop,
                 id.clone(),
                 text(stop.stop_point_name),
                 // Some servers number stops of their own.
-                Some(id).filter(|id| is_global_id(id)),
+                GlobalId::ifopt(&id).into_iter().collect(),
             )
         } else if let Some(poi) = self.point_of_interest {
             let name = text(poi.point_of_interest_name);
-            (LocationKind::Poi, poi.point_of_interest_code, name, None)
+            (
+                LocationKind::Poi,
+                poi.point_of_interest_code,
+                name,
+                Vec::new(),
+            )
         } else if let Some(address) = self.address {
             let name = text(address.address_name);
-            (LocationKind::Address, address.address_code, name, None)
+            (
+                LocationKind::Address,
+                address.address_code,
+                name,
+                Vec::new(),
+            )
         } else {
             let locality = self.locality?;
             let name = text(locality.locality_name);
-            (LocationKind::Other, locality.locality_code, name, None)
+            (
+                LocationKind::Other,
+                locality.locality_code,
+                name,
+                Vec::new(),
+            )
         };
         let location_name = text(self.location_name);
         Some(Location {
             id,
-            global_id,
+            global_ids,
             kind,
             name: name.or_else(|| location_name.clone()).unwrap_or_default(),
             locality: if ojp {
@@ -784,7 +799,11 @@ impl Call {
             scheduled_platform,
             cancelled: self.not_serviced_stop,
             stop: Location {
-                global_id: stop.clone().filter(|id| is_global_id(id)),
+                global_ids: stop
+                    .as_deref()
+                    .and_then(GlobalId::ifopt)
+                    .into_iter()
+                    .collect(),
                 kind: if stop.is_some() {
                     LocationKind::Stop
                 } else {

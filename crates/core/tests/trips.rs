@@ -2,8 +2,8 @@
 
 use proptest::prelude::*;
 use publictransport::{
-    Coordinate, Error, HttpRequest, HttpResponse, Leg, LegEnd, LegKind, Method, Mode, Network,
-    Place, Protocol, Stopover, Timestamp, Trip, TripsQuery,
+    Coordinate, Error, GlobalId, HttpRequest, HttpResponse, IdScheme, Leg, LegEnd, LegKind, Method,
+    Mode, Network, Place, Protocol, Stopover, Timestamp, Trip, TripsQuery,
 };
 
 const VVO: &[u8] = include_bytes!("fixtures/efa/vvo-trip.json");
@@ -15,6 +15,13 @@ type Fixture = (Protocol, &'static [u8], &'static [&'static [&'static str]]);
 
 fn network(protocol: Protocol) -> Network {
     Network::new("test", "Test", "https://example.org/base", protocol)
+}
+
+fn ifopt(value: &str) -> GlobalId {
+    GlobalId {
+        scheme: IdScheme::Ifopt,
+        value: value.to_owned(),
+    }
 }
 
 fn parse(protocol: Protocol, body: &[u8]) -> Result<Vec<Trip>, Error> {
@@ -317,7 +324,7 @@ fn efa_reads_a_ride_with_its_calls_and_a_walk() {
 
     let stop = &train.departure.stop;
     assert_eq!(stop.id, "de:14612:28:8:Gleis19");
-    assert_eq!(stop.global_id.as_deref(), Some("de:14612:28:8:Gleis19"));
+    assert_eq!(stop.global_ids, [ifopt("de:14612:28:8:Gleis19")]);
     assert_eq!(stop.name, "Hauptbahnhof");
     assert_eq!(stop.locality.as_deref(), Some("Dresden"));
     assert_eq!(stop.timezone.as_deref(), Some("Europe/Berlin"));
@@ -573,7 +580,7 @@ fn motis_reads_a_ride_with_its_calls_and_a_walk_without_predictions() {
 
     let stop = &train.departure.stop;
     assert_eq!(stop.id, "de-DELFI_de:14612:28:8:Gleis19");
-    assert_eq!(stop.global_id.as_deref(), Some("de:14612:28:8:Gleis19"));
+    assert_eq!(stop.global_ids, [ifopt("de:14612:28:8:Gleis19")]);
     assert_eq!(stop.name, "Dresden Hauptbahnhof");
     assert_eq!(stop.timezone.as_deref(), Some("Europe/Berlin"));
     assert_eq!(
@@ -680,7 +687,7 @@ fn both_protocols_describe_the_same_ride_alike() {
         };
         let end = |end: &LegEnd| {
             (
-                end.stop.global_id.clone(),
+                end.stop.global_ids.clone(),
                 end.scheduled_time,
                 end.scheduled_platform.clone(),
                 end.realtime_platform.clone(),
@@ -691,7 +698,7 @@ fn both_protocols_describe_the_same_ride_alike() {
             .iter()
             .map(|call| {
                 (
-                    call.stop.global_id.clone(),
+                    call.stop.global_ids.clone(),
                     call.scheduled_arrival,
                     call.scheduled_departure,
                     call.scheduled_platform.clone(),
@@ -720,7 +727,7 @@ fn both_protocols_describe_the_same_ride_alike() {
     assert_eq!(
         departure,
         (
-            platform("de:14612:28:2:3"),
+            vec![ifopt("de:14612:28:2:3")],
             utc(13, 29),
             platform("3"),
             platform("3")
@@ -729,7 +736,7 @@ fn both_protocols_describe_the_same_ride_alike() {
     assert_eq!(
         arrival,
         (
-            platform("de:14612:13:1:2"),
+            vec![ifopt("de:14612:13:1:2")],
             utc(13, 42),
             platform("2"),
             platform("2")
@@ -752,9 +759,9 @@ fn both_protocols_describe_the_same_transfer_alike() {
             .map(|leg| {
                 (
                     label(leg).to_owned(),
-                    leg.departure.stop.global_id.clone(),
+                    leg.departure.stop.global_ids.clone(),
                     leg.departure.scheduled_time,
-                    leg.arrival.stop.global_id.clone(),
+                    leg.arrival.stop.global_ids.clone(),
                 )
             })
             .collect();

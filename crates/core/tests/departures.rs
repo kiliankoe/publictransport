@@ -2,8 +2,8 @@
 
 use proptest::prelude::*;
 use publictransport::{
-    Departure, DeparturesQuery, Error, HttpRequest, HttpResponse, LocationKind, Method, Mode,
-    Network, Protocol, Timestamp,
+    Departure, DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, IdScheme, LocationKind,
+    Method, Mode, Network, Protocol, Timestamp,
 };
 
 const VVO: &[u8] = include_bytes!("fixtures/efa/vvo-departures.json");
@@ -24,6 +24,13 @@ fn parse(protocol: Protocol, body: &[u8]) -> Result<Vec<Departure>, Error> {
         headers: Vec::new(),
         body: body.to_vec(),
     })
+}
+
+fn ifopt(value: &str) -> GlobalId {
+    GlobalId {
+        scheme: IdScheme::Ifopt,
+        value: value.to_owned(),
+    }
 }
 
 /// A time of day on 2026-11-16 in UTC, the day the fixtures were recorded.
@@ -207,7 +214,7 @@ fn efa_names_a_platform_after_its_station() {
 
     let bus = departures.iter().find(|d| d.line.name == "360").unwrap();
     assert_eq!(bus.stop.id, "de:14612:28:2:6");
-    assert_eq!(bus.stop.global_id.as_deref(), Some("de:14612:28:2:6"));
+    assert_eq!(bus.stop.global_ids, [ifopt("de:14612:28:2:6")]);
     assert_eq!(bus.stop.kind, LocationKind::Stop);
     assert_eq!(bus.stop.name, "Hauptbahnhof");
     assert_eq!(bus.stop.locality.as_deref(), Some("Dresden"));
@@ -308,8 +315,8 @@ fn efa_reads_cancellations_and_tolerates_missing_optional_fields() {
 
     let departure = &departures[2];
     assert_eq!(departure.stop.id, "33000028");
-    assert_eq!(departure.stop.global_id, None);
-    assert_eq!(departure.stop.station_id(), None);
+    assert_eq!(departure.stop.global_ids, []);
+    assert_eq!(departure.stop.station_ids(), []);
     assert_eq!(departure.stop.kind, LocationKind::Stop);
     assert_eq!(departure.line.mode, Mode::Other);
     assert_eq!(departure.line.operator, None);
@@ -330,7 +337,7 @@ fn motis_orders_by_expected_time_and_reads_the_stop_from_the_place() {
         .find(|d| d.direction.as_deref() == Some("MESSE DRESDEN"))
         .unwrap();
     assert_eq!(tram.stop.id, "de-DELFI_de:14612:28:3:2");
-    assert_eq!(tram.stop.global_id.as_deref(), Some("de:14612:28:3:2"));
+    assert_eq!(tram.stop.global_ids, [ifopt("de:14612:28:3:2")]);
     assert_eq!(tram.stop.kind, LocationKind::Stop);
     assert_eq!(tram.stop.name, "Dresden Hauptbahnhof");
     assert_eq!(tram.stop.locality, None);
@@ -390,7 +397,7 @@ fn motis_reads_cancellations_modes_and_departures_without_realtime() {
 
     let departure = &departures[0];
     assert_eq!(departure.line.name, "RJ 1", "no displayName");
-    assert_eq!(departure.stop.global_id, None, "not an IFOPT identifier");
+    assert_eq!(departure.stop.global_ids, [], "not an IFOPT identifier");
     assert_eq!(departure.scheduled_platform, None);
     assert_eq!(departure.realtime_platform, None);
 }
@@ -406,7 +413,7 @@ fn both_protocols_describe_the_same_departure_alike() {
             bus.line.mode,
             bus.scheduled_platform.clone(),
             bus.realtime_platform.clone(),
-            bus.stop.station_id().map(str::to_owned),
+            bus.stop.station_ids(),
         )
     };
     let efa = shared(Protocol::Efa, VVO);
@@ -418,21 +425,38 @@ fn both_protocols_describe_the_same_departure_alike() {
             Mode::Bus,
             Some("5".into()),
             Some("5".into()),
-            Some("de:14612:28".into()),
+            vec![ifopt("de:14612:28")],
         )
     );
 }
 
 #[test]
-fn station_id_of_a_station_is_its_global_id() {
+fn a_station_is_its_own_station_and_each_global_id_names_one() {
     let body = br#"{"version":"11.0.6.72","locations":[{"id":"de:14612:28","isGlobalId":true,"name":"Dresden, Hauptbahnhof","type":"stop"}]}"#;
     let response = HttpResponse {
         status: 200,
         headers: Vec::new(),
         body: body.to_vec(),
     };
-    let locations = network(Protocol::Efa).parse_locations(&response).unwrap();
-    assert_eq!(locations[0].station_id(), Some("de:14612:28"));
+    let mut station = network(Protocol::Efa)
+        .parse_locations(&response)
+        .unwrap()
+        .remove(0);
+    assert_eq!(station.station_ids(), [ifopt("de:14612:28")]);
+
+    let mut platform = station.clone();
+    platform.global_ids = vec![ifopt("de:14612:28:2:3")];
+    assert!(station.same_station(&platform) && platform.same_station(&station));
+    platform.global_ids = vec![ifopt("de:14612:281")];
+    assert!(!station.same_station(&platform), "another station");
+    platform.global_ids = Vec::new();
+    assert!(!platform.same_station(&platform), "nothing to compare");
+
+    station.global_ids.push(ifopt("de:14612:13:1:2"));
+    assert_eq!(
+        station.station_ids(),
+        [ifopt("de:14612:28"), ifopt("de:14612:13")]
+    );
 }
 
 /// The id of a place without a stop would be of no use in a query.

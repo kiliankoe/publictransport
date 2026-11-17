@@ -3,9 +3,9 @@
 use serde::Deserialize;
 
 use crate::{
-    Coordinate, Departure, DeparturesQuery, Error, HttpRequest, HttpResponse, Leg, LegEnd, LegKind,
-    Line, Location, LocationKind, LocationQuery, Mode, Network, Place, Stopover, Timestamp, Trip,
-    TripTime, TripsQuery, time::WireTime,
+    Coordinate, Departure, DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, Leg,
+    LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Mode, Network, Place, Stopover,
+    Timestamp, Trip, TripTime, TripsQuery, time::WireTime,
 };
 
 /// Parameters of every request.
@@ -454,7 +454,10 @@ impl WireLocation {
             // The server sends no time zone.
             timezone: network.timezone.clone(),
             network: None,
-            global_id: (wire.is_global_id == Some(true)).then(|| wire.id.clone()),
+            global_ids: GlobalId::ifopt(&wire.id)
+                .filter(|_| wire.is_global_id == Some(true))
+                .into_iter()
+                .collect(),
             id: wire.id,
             kind,
             name: name

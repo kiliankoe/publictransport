@@ -64,8 +64,9 @@ mod trias;
 pub use error::Error;
 pub use http::{Header, HttpRequest, HttpResponse, Method};
 pub use model::{
-    Coordinate, Departure, DeparturesQuery, Leg, LegEnd, LegKind, Line, Location, LocationKind,
-    LocationQuery, Mode, Place, Stopover, Timestamp, Trip, TripTime, TripsQuery,
+    Coordinate, Departure, DeparturesQuery, GlobalId, IdScheme, Leg, LegEnd, LegKind, Line,
+    Location, LocationKind, LocationQuery, Mode, Place, Stopover, Timestamp, Trip, TripTime,
+    TripsQuery,
 };
 pub use network::{Network, Protocol};
 pub use registry::{

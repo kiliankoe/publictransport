@@ -7,6 +7,8 @@ from publictransport import (
     Coordinate,
     DeparturesQuery,
     Error,
+    GlobalId,
+    IdScheme,
     LegEnd,
     Location,
     LocationKind,
@@ -25,7 +27,7 @@ MOTIS = Network(
 def leg_end(time: datetime) -> LegEnd:
     stop = Location(
         id="a",
-        global_id="de:14612:28:3:2",
+        global_ids=[GlobalId(scheme=IdScheme.IFOPT, value="de:14612:28:3:2")],
         kind=LocationKind.STOP,
         name="A",
         locality=None,
@@ -82,8 +84,10 @@ def test_kinds_of_a_location_query_are_optional_and_reach_the_request() -> None:
     assert "type=STOP" in stops.url
 
 
-def test_station_id_is_shared_by_a_station_and_its_platforms() -> None:
-    assert leg_end(datetime.now(timezone.utc)).stop.station_id() == "de:14612:28"
+def test_station_ids_are_shared_by_a_station_and_its_platforms() -> None:
+    assert leg_end(datetime.now(timezone.utc)).stop.station_ids() == [
+        GlobalId(scheme=IdScheme.IFOPT, value="de:14612:28")
+    ]
 
 
 def test_registry_finds_the_bundled_networks_that_cover_a_position() -> None:

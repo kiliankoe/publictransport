@@ -3,7 +3,7 @@
 
 use std::time::{Duration, SystemTime};
 
-use crate::{Error, LegEnd, Location, Network, Timestamp, Trip};
+use crate::{Error, GlobalId, LegEnd, Location, Network, Timestamp, Trip};
 
 /// The name of [`Timestamp`] in the bindings. The Python generator of `UniFFI` uses
 /// the name `Timestamp` itself, and type checkers lose the type of every
@@ -43,12 +43,19 @@ uniffi::custom_type!(UtcTime, SystemTime, {
 
 #[uniffi::export]
 impl Location {
-    /// The station this location belongs to: the first three parts of the
-    /// global ID. A station and its platforms share it, so it tells whether
+    /// The stations this location belongs to, one for each of its global
+    /// IDs. A station and its platforms share them, so they tell whether
     /// two networks mean the same station.
-    #[uniffi::method(name = "station_id")]
-    fn ffi_station_id(&self) -> Option<String> {
-        self.station_id().map(str::to_owned)
+    #[uniffi::method(name = "station_ids")]
+    fn ffi_station_ids(&self) -> Vec<GlobalId> {
+        self.station_ids()
+    }
+
+    /// Whether the two locations are the same station or parts of it, by
+    /// their station IDs. `false` if either has no global ID.
+    #[uniffi::method(name = "same_station")]
+    fn ffi_same_station(&self, other: &Self) -> bool {
+        self.same_station(other)
     }
 }
 

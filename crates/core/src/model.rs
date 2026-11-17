@@ -54,10 +54,9 @@ pub struct Location {
     /// Identifies the location on the network that returned it. Other
     /// networks do not understand it.
     pub id: String,
-    /// An identifier shared across networks, in the layout of the German
-    /// DHID: `de:14612:28` for a station, `de:14612:28:3:2` for one of its
-    /// platforms.
-    pub global_id: Option<String>,
+    /// The identifiers of the location that are shared across networks.
+    /// Empty if the server sends none in a scheme this crate knows.
+    pub global_ids: Vec<GlobalId>,
     /// What kind of place this is.
     pub kind: LocationKind,
     /// The name, without the locality where the server tells them apart.
@@ -81,34 +80,84 @@ pub struct Location {
 }
 
 impl Location {
-    /// The station this location belongs to: the first three parts of
-    /// [`Location::global_id`]. A station and its platforms share it, so it
-    /// tells whether two networks mean the same station.
+    /// The stations this location belongs to, one for each of
+    /// [`Location::global_ids`]. A station and its platforms share them, so
+    /// they tell whether two networks mean the same station.
     #[must_use]
-    pub fn station_id(&self) -> Option<&str> {
-        let id = self.global_id.as_deref()?;
-        let end = id
-            .match_indices(':')
-            .nth(2)
-            .map_or(id.len(), |(index, _)| index);
-        id.get(..end)
+    pub fn station_ids(&self) -> Vec<GlobalId> {
+        self.global_ids.iter().map(GlobalId::station).collect()
+    }
+
+    /// Whether the two locations are the same station or parts of it, by
+    /// their [`Location::station_ids`]. `false` if either has no global ID,
+    /// even for two stops of one network.
+    #[must_use]
+    pub fn same_station(&self, other: &Self) -> bool {
+        let stations = other.station_ids();
+        self.station_ids().iter().any(|id| stations.contains(id))
     }
 }
 
-/// Whether `id` has the layout of a [`Location::global_id`]: `de:14612:28` or `de:14612:28:3:2`: a country
-/// code, two numbers, then up to two more parts for area and platform.
-pub(crate) fn is_global_id(id: &str) -> bool {
-    let parts: Vec<&str> = id.split(':').collect();
-    let [country, region, stop, rest @ ..] = parts.as_slice() else {
-        return false;
-    };
-    let is_number = |part: &str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
-    country.len() == 2
-        && country.bytes().all(|b| b.is_ascii_lowercase())
-        && is_number(region)
-        && is_number(stop)
-        && rest.len() <= 2
-        && rest.iter().all(|part| !part.is_empty())
+/// An identifier of a stop that is shared across networks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+pub struct GlobalId {
+    /// The scheme that gives the value its meaning.
+    pub scheme: IdScheme,
+    /// The identifier.
+    pub value: String,
+}
+
+/// A scheme of identifiers for stops that several networks use.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+pub enum IdScheme {
+    /// IFOPT, the European standard for the identification of fixed
+    /// objects in public transport: a country code, then parts separated by
+    /// colons. The German DHID follows it: `de:14612:28` for a station,
+    /// `de:14612:28:3:2` for one of its platforms.
+    Ifopt,
+}
+
+impl GlobalId {
+    /// `id` as an IFOPT ID, if it has the layout of one: a country code, two
+    /// numbers, then up to two more parts for area and platform.
+    pub(crate) fn ifopt(id: &str) -> Option<Self> {
+        let parts: Vec<&str> = id.split(':').collect();
+        let [country, region, stop, rest @ ..] = parts.as_slice() else {
+            return None;
+        };
+        let is_number = |part: &str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
+        let valid = country.len() == 2
+            && country.bytes().all(|b| b.is_ascii_lowercase())
+            && is_number(region)
+            && is_number(stop)
+            && rest.len() <= 2
+            && rest.iter().all(|part| !part.is_empty());
+        valid.then(|| Self {
+            scheme: IdScheme::Ifopt,
+            value: id.to_owned(),
+        })
+    }
+
+    /// The station the stop belongs to, in the same scheme.
+    fn station(&self) -> Self {
+        let parts = match self.scheme {
+            IdScheme::Ifopt => 3,
+        };
+        let end = self
+            .value
+            .match_indices(':')
+            .nth(parts - 1)
+            .map_or(self.value.len(), |(index, _)| index);
+        Self {
+            scheme: self.scheme,
+            value: self.value.get(..end).unwrap_or(&self.value).to_owned(),
+        }
+    }
 }
 
 /// The kind of a [`Location`].
@@ -197,7 +246,7 @@ impl DeparturesQuery {
 pub struct Departure {
     /// Where the vehicle leaves from. Servers name the platform here where
     /// they have one in their data and the station otherwise, so compare
-    /// stops by [`Location::station_id`].
+    /// stops by [`Location::station_ids`].
     pub stop: Location,
     /// The line the vehicle runs on.
     pub line: Line,

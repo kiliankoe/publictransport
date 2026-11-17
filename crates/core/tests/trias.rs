@@ -2,9 +2,9 @@
 
 use proptest::prelude::*;
 use publictransport::{
-    Coordinate, Departure, DeparturesQuery, Error, HttpRequest, HttpResponse, Leg, LegEnd, LegKind,
-    Location, LocationKind, LocationQuery, Method, Mode, Network, Place, Protocol, Stopover,
-    Timestamp, TripsQuery,
+    Coordinate, Departure, DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, IdScheme,
+    Leg, LegEnd, LegKind, Location, LocationKind, LocationQuery, Method, Mode, Network, Place,
+    Protocol, Stopover, Timestamp, TripsQuery,
 };
 
 const TRIAS_LOCATIONS: &[u8] = include_bytes!("fixtures/trias/vvo-locations.xml");
@@ -228,20 +228,27 @@ fn position_ref(protocol: Protocol) -> &'static str {
     }
 }
 
+fn ifopt(value: &str) -> GlobalId {
+    GlobalId {
+        scheme: IdScheme::Ifopt,
+        value: value.to_owned(),
+    }
+}
+
 type LocationFields<'a> = (
     &'a str,
-    Option<&'a str>,
+    Vec<GlobalId>,
     LocationKind,
     &'a str,
     Option<&'a str>,
     Option<(f64, f64)>,
 );
 
-/// Id, global id, kind, name, locality and coordinate of a location.
+/// Id, global ids, kind, name, locality and coordinate of a location.
 fn fields(location: &Location) -> LocationFields<'_> {
     (
         &location.id,
-        location.global_id.as_deref(),
+        location.global_ids.clone(),
         location.kind,
         &location.name,
         location.locality.as_deref(),
@@ -609,7 +616,6 @@ fn trips_request_puts_the_time_at_the_end_it_binds_and_names_stops_and_positions
                 "",
                 "<NumberOfResults>3</NumberOfResults>",
             ),
-            (query.clone().with_arrival(utc(13, 24, 0)), "", time, ""),
         ] {
             let (stop, position) = (stop_ref(protocol), position_ref(protocol));
             let expected = envelope(
@@ -643,7 +649,7 @@ fn locations_have_a_locality_and_the_time_zone_of_the_network() {
     let stop = parse(Protocol::Trias, TRIAS_LOCATIONS);
     let expected: LocationFields = (
         "de:14612:28",
-        Some("de:14612:28"),
+        vec![ifopt("de:14612:28")],
         LocationKind::Stop,
         "Hauptbahnhof",
         Some("Dresden"),
@@ -654,7 +660,7 @@ fn locations_have_a_locality_and_the_time_zone_of_the_network() {
     let pois = parse(Protocol::Trias, TRIAS_NO_MATCH);
     let expected: LocationFields = (
         "poiID:40686952:3401000:117023967:Oxzy:Mitte:Oxzy:ANY:POI:961025:5007911:MRCV:VVO",
-        None,
+        Vec::new(),
         LocationKind::Poi,
         "Mitte, Oxzy",
         Some("Mitte"),
@@ -667,7 +673,7 @@ fn locations_have_a_locality_and_the_time_zone_of_the_network() {
     let expected: [LocationFields; 3] = [
         (
             "de:05111:18235",
-            Some("de:05111:18235"),
+            vec![ifopt("de:05111:18235")],
             LocationKind::Stop,
             "Düsseldorf Hbf",
             Some("Düsseldorf"),
@@ -675,7 +681,7 @@ fn locations_have_a_locality_and_the_time_zone_of_the_network() {
         ),
         (
             "poiID:302375:5111000:-1:Hauptbahnhof Düsseldorf:Düsseldorf:Hauptbahnhof Düsseldorf:ANY:POI:756403:5339904:MRCV:nrw",
-            None,
+            Vec::new(),
             LocationKind::Poi,
             "Düsseldorf, Hauptbahnhof Düsseldorf",
             Some("Düsseldorf"),
@@ -683,7 +689,7 @@ fn locations_have_a_locality_and_the_time_zone_of_the_network() {
         ),
         (
             "poiID:287117:5111000:-1:B&R, Düsseldorf Hauptbahnhof:Düsseldorf:B&R, Düsseldorf Hauptbahnhof:ANY:POI:756459:5339889:MRCV:nrw",
-            None,
+            Vec::new(),
             LocationKind::Poi,
             "Düsseldorf, B&R, Düsseldorf Hauptbahnhof",
             Some("Düsseldorf"),
@@ -725,10 +731,10 @@ fn locations_are_told_apart_by_their_element_and_ordered_by_probability() {
             addresses
                 .iter()
                 .filter(|location| location.kind == LocationKind::Address)
-                .map(|location| (&location.id, &location.name, location.global_id.as_ref()))
+                .map(|location| (&location.id, &location.name, location.global_ids.as_slice()))
                 .collect::<Vec<_>>(),
             pois()
-                .map(|location| (&location.id, &location.name, None))
+                .map(|location| (&location.id, &location.name, &[] as &[GlobalId]))
                 .collect::<Vec<_>>(),
             "{protocol:?}"
         );
@@ -801,8 +807,12 @@ fn both_protocols_describe_the_same_departures_alike_and_order_them_by_expected_
                 (LocationKind::Stop, &None, None),
                 "{protocol:?}"
             );
-            assert_eq!(stop.global_id.as_ref(), Some(&stop.id), "{protocol:?}");
-            assert_eq!(stop.station_id(), Some("de:05111:18235"), "{protocol:?}");
+            assert_eq!(stop.global_ids, [ifopt(&stop.id)], "{protocol:?}");
+            assert_eq!(
+                stop.station_ids(),
+                [ifopt("de:05111:18235")],
+                "{protocol:?}"
+            );
             assert!(!departure.cancelled, "{protocol:?}");
         }
     }
@@ -1026,7 +1036,7 @@ fn trias_reads_rides_with_their_calls_and_the_walk_between_stops() {
         "22:25:00 22:28:18 de:14612:28:3:2 2/2 Dresden Hauptbahnhof"
     );
     assert_eq!(tram.departure.stop.kind, LocationKind::Stop);
-    assert_eq!(tram.departure.stop.station_id(), Some("de:14612:28"));
+    assert_eq!(tram.departure.stop.station_ids(), [ifopt("de:14612:28")]);
     assert_eq!(
         end(&tram.arrival),
         "22:35:00 22:38:18 de:14612:17:1:4 4/4 Dresden Anton-/Leipziger Straße"

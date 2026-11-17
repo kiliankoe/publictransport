@@ -3,9 +3,9 @@
 use serde::Deserialize;
 
 use crate::{
-    Coordinate, Departure, DeparturesQuery, Error, HttpRequest, HttpResponse, Leg, LegKind, Line,
-    Location, LocationKind, LocationQuery, Mode, Network, Place, Stopover, Trip, TripTime,
-    TripsQuery, model::is_global_id, time::WireTime,
+    Coordinate, Departure, DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, Leg,
+    LegKind, Line, Location, LocationKind, LocationQuery, Mode, Network, Place, Stopover, Trip,
+    TripTime, TripsQuery, time::WireTime,
 };
 
 pub(crate) fn locations_request(
@@ -83,9 +83,11 @@ impl From<Match> for Location {
         };
         Self {
             // Other kinds carry OpenStreetMap identifiers.
-            global_id: (kind == LocationKind::Stop)
-                .then(|| global_id(&wire.id).map(str::to_owned))
-                .flatten(),
+            global_ids: (kind == LocationKind::Stop)
+                .then(|| global_id(&wire.id))
+                .flatten()
+                .into_iter()
+                .collect(),
             id: wire.id,
             kind,
             name: wire.name,
@@ -107,10 +109,10 @@ impl From<Match> for Location {
 /// The IFOPT identifier inside a stop ID of the form `<feed>_<id in feed>`.
 /// Feed names and IFOPT identifiers may both contain underscores, so every
 /// split is tried.
-fn global_id(id: &str) -> Option<&str> {
+fn global_id(id: &str) -> Option<GlobalId> {
     id.match_indices('_')
         .filter_map(|(index, _)| id.get(index + 1..))
-        .find(|candidate| is_global_id(candidate))
+        .find_map(GlobalId::ifopt)
 }
 
 pub(crate) fn departures_request(
@@ -222,6 +224,7 @@ struct StopTimesResponse {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct PlanResponse {
     /// Trips without public transport, such as a walk all the way.
     #[serde(default)]
@@ -314,11 +317,12 @@ impl WirePlace {
             realtime_platform: non_empty(self.track),
             cancelled: self.cancelled,
             stop: Location {
-                global_id: self
+                global_ids: self
                     .stop_id
                     .as_deref()
                     .and_then(global_id)
-                    .map(str::to_owned),
+                    .into_iter()
+                    .collect(),
                 kind: if self.stop_id.is_some() {
                     LocationKind::Stop
                 } else {
