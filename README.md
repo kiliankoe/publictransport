@@ -37,7 +37,7 @@ cargo deny check
 
 A Python package in `packages/python` wraps the library through [UniFFI](https://mozilla.github.io/uniffi-rs/); see its README. The crate in `bindings/uniffi` builds the shared library for it.
 
-The tests replay responses recorded from real servers. `crates/core/tests/fixtures/record.sh` records them again. `scripts/validate-xml-requests.sh` checks the TRIAS and OJP requests that the library builds against the official schemas, which it fetches from the VDV repositories.
+The tests replay responses recorded from real servers. `crates/core/tests/fixtures/record.sh` records them again. `cargo run --example check` asks every bundled network's live server for stops, departures and trips, to see which still work. `scripts/validate-xml-requests.sh` checks the TRIAS and OJP requests that the library builds against the official schemas, which it fetches from the VDV repositories.
 
 `CONTRIBUTING.md` describes the commit message format and how the changelog is made.
 
