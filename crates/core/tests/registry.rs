@@ -114,6 +114,7 @@ fn reads_an_entry() {
     assert_eq!(network.requestor_ref, None);
     assert_eq!(network.unsupported, Vec::new());
     assert!(!network.requires_key);
+    assert_eq!(network.terms, None);
 
     let attribution = network.attribution.expect("an attribution");
     assert_eq!(attribution.name, "Example Transit");
@@ -230,6 +231,21 @@ fn reads_the_key_options() {
     assert_eq!(network.requestor_ref.as_deref(), Some("OpenService"));
     assert!(network.requires_key);
     assert_eq!(network.unsupported, Vec::new());
+}
+
+#[test]
+fn reads_the_usage_terms() {
+    let network = Network::from_json(
+        "example",
+        r#"{
+            "name": "Example",
+            "type": { "motis": true },
+            "usageTerms": "https://example.org/terms",
+            "options": { "endpoint": "https://example.org/" }
+        }"#,
+    )
+    .unwrap();
+    assert_eq!(network.terms.as_deref(), Some("https://example.org/terms"));
 }
 
 /// For every choice of provided services: the missing ones are unsupported
@@ -414,4 +430,17 @@ fn bundled_networks_are_usable() {
     for id in ["vrr-efa", "vrr-trias", "vrr-ojp"] {
         assert!(duesseldorf.iter().any(|d| d == id), "{id} in Düsseldorf");
     }
+}
+
+#[test]
+fn bundled_transitous_alone_names_usage_terms() {
+    let terms: Vec<(String, String)> = Registry::bundled()
+        .networks()
+        .into_iter()
+        .filter_map(|network| Some((network.id, network.terms?)))
+        .collect();
+    assert!(
+        matches!(terms.as_slice(), [(id, terms)] if id == "transitous" && !terms.is_empty()),
+        "{terms:?}"
+    );
 }

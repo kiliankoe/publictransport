@@ -154,8 +154,9 @@ impl Network {
     /// [transport-apis](https://github.com/public-transport/transport-apis)
     /// repository. `id` is the name of the entry's file without `.json`.
     ///
-    /// The crate reads three fields that repository does not have: the type
-    /// `ojp` with `options.ojpVersion`, and `options.requestorRef`. For
+    /// The crate reads four fields that repository does not have: the type
+    /// `ojp` with `options.ojpVersion`, `options.requestorRef`, and
+    /// `usageTerms` for [`Network::terms`]. For
     /// MOTIS the entry names the root of the server, and the endpoint gets
     /// `api` appended unless it ends in it.
     ///
@@ -255,6 +256,7 @@ impl Network {
             }),
             unsupported,
             requires_key: xml && options.requires_sign_up,
+            terms: entry.usage_terms.filter(|terms| !terms.is_empty()),
         })
     }
 }
@@ -268,6 +270,8 @@ struct Entry {
     options: Options,
     timezone: Option<String>,
     attribution: Option<WireAttribution>,
+    #[serde(rename = "usageTerms")]
+    usage_terms: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -393,6 +397,10 @@ pub struct Registry {
     networks: Vec<Network>,
 }
 
+/// The usage terms of bundled networks whose entries come from
+/// transport-apis, which has no field for them.
+const TERMS: [(&str, &str); 1] = [("transitous", "https://transitous.org/api/")];
+
 #[cfg_attr(feature = "uniffi", uniffi::export)]
 impl Registry {
     /// The networks that ship with the crate. Each was checked against its
@@ -404,6 +412,12 @@ impl Registry {
         let networks = BUNDLED
             .iter()
             .filter_map(|(id, json)| Network::from_json(id, json).ok())
+            .map(|mut network| {
+                if let Some((_, terms)) = TERMS.iter().find(|(id, _)| *id == network.id) {
+                    network.terms = Some((*terms).to_owned());
+                }
+                network
+            })
             .collect();
         Self { networks }
     }

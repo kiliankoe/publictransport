@@ -49,6 +49,11 @@ pub struct Network {
     /// [`Network::requestor_ref`].
     #[cfg_attr(feature = "uniffi", uniffi(default = false))]
     pub requires_key: bool,
+    /// A link to usage terms that restrict who may use the server, for
+    /// example to non-commercial projects. `None` if anyone may. The library
+    /// does not enforce them: read them before using the network.
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub terms: Option<String>,
 }
 
 /// The protocol a [`Network`] speaks.
@@ -86,6 +91,7 @@ impl Network {
             attribution: None,
             unsupported: Vec::new(),
             requires_key: false,
+            terms: None,
         }
     }
 
