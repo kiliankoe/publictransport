@@ -604,39 +604,33 @@ pub struct Registry {
     networks: Vec<Network>,
 }
 
-/// Where the servers of bundled networks have moved to since their entries
-/// in transport-apis were written. An entry leaves this list when
-/// transport-apis has the new address.
-const MOVED: [(&str, &str); 8] = [
-    ("mobiliteit-lu-hafas", "https://cdt.hafas.de/gate"),
-    ("ooevv-hafas", "https://app.verkehrsauskunft.at/hamm/gate"),
-    (
-        "salzburg-hafas",
-        "https://verkehrsauskunft.salzburg.gv.at/hamm/gate",
-    ),
-    (
-        "stv-hafas",
-        "https://verkehrsauskunft.verbundlinie.at/hamm/gate",
-    ),
-    (
-        "svv-hafas",
-        "https://fahrplan.salzburg-verkehr.at/hamm/gate",
-    ),
-    (
-        "vkg-hafas",
-        "https://routenplaner.kaerntner-linien.at/hamm/gate",
-    ),
-    ("vor-hafas", "https://anachb.vor.at/hamm/gate"),
-    ("vvv-hafas", "https://fahrplan.vmobil.at/hamm/gate"),
-];
-
-/// The time zones of bundled networks whose entries in transport-apis name
-/// a wrong one. An entry leaves this list when transport-apis is right.
-const TIME_ZONES: [(&str, &str); 1] = [("dart-hafas", "America/Chicago")];
-
-/// The usage terms of bundled networks whose entries come from
-/// transport-apis, which has no field for them.
-const TERMS: [(&str, &str); 1] = [("transitous", "https://transitous.org/api/")];
+/// What the entries of bundled networks in transport-apis lack or have
+/// wrong. A line leaves this function when transport-apis has the value.
+fn corrected(mut network: Network) -> Network {
+    // The address a server has moved to.
+    let moved = match network.id.as_str() {
+        "mobiliteit-lu-hafas" => Some("https://cdt.hafas.de/gate"),
+        "ooevv-hafas" => Some("https://app.verkehrsauskunft.at/hamm/gate"),
+        "salzburg-hafas" => Some("https://verkehrsauskunft.salzburg.gv.at/hamm/gate"),
+        "stv-hafas" => Some("https://verkehrsauskunft.verbundlinie.at/hamm/gate"),
+        "svv-hafas" => Some("https://fahrplan.salzburg-verkehr.at/hamm/gate"),
+        "vkg-hafas" => Some("https://routenplaner.kaerntner-linien.at/hamm/gate"),
+        "vor-hafas" => Some("https://anachb.vor.at/hamm/gate"),
+        "vvv-hafas" => Some("https://fahrplan.vmobil.at/hamm/gate"),
+        _ => None,
+    };
+    if let Some(endpoint) = moved {
+        endpoint.clone_into(&mut network.endpoint);
+    }
+    match network.id.as_str() {
+        // The entry names the time zone of Berlin for a server in Iowa.
+        "dart-hafas" => network.timezone = Some("America/Chicago".to_owned()),
+        // The format has no field for usage terms.
+        "transitous" => network.terms = Some("https://transitous.org/api/".to_owned()),
+        _ => {}
+    }
+    network
+}
 
 #[cfg_attr(feature = "uniffi", uniffi::export)]
 impl Registry {
@@ -649,18 +643,7 @@ impl Registry {
         let networks = BUNDLED
             .iter()
             .filter_map(|(id, json)| Network::from_json(id, json).ok())
-            .map(|mut network| {
-                if let Some((_, terms)) = TERMS.iter().find(|(id, _)| *id == network.id) {
-                    network.terms = Some((*terms).to_owned());
-                }
-                if let Some((_, endpoint)) = MOVED.iter().find(|(id, _)| *id == network.id) {
-                    (*endpoint).clone_into(&mut network.endpoint);
-                }
-                if let Some((_, zone)) = TIME_ZONES.iter().find(|(id, _)| *id == network.id) {
-                    network.timezone = Some((*zone).to_owned());
-                }
-                network
-            })
+            .map(corrected)
             .collect();
         Self { networks }
     }
