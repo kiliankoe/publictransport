@@ -5,7 +5,7 @@ use serde::Deserialize;
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, HttpRequest, HttpResponse, Leg, LegKind, Line,
     Location, LocationKind, LocationQuery, Mode, Network, Place, Stopover, Trip, TripTime,
-    TripsQuery, time::WireTime,
+    TripsQuery, model::is_global_id, time::WireTime,
 };
 
 pub(crate) fn locations_request(
@@ -99,6 +99,7 @@ impl From<Match> for Location {
                 longitude: wire.lon,
             }),
             timezone: wire.tz,
+            network: None,
         }
     }
 }
@@ -109,23 +110,7 @@ impl From<Match> for Location {
 fn global_id(id: &str) -> Option<&str> {
     id.match_indices('_')
         .filter_map(|(index, _)| id.get(index + 1..))
-        .find(|candidate| is_ifopt(candidate))
-}
-
-/// Whether `id` looks like `de:14612:28` or `de:14612:28:3:2`: a country
-/// code, two numbers, then up to two more parts for area and platform.
-fn is_ifopt(id: &str) -> bool {
-    let parts: Vec<&str> = id.split(':').collect();
-    let [country, region, stop, rest @ ..] = parts.as_slice() else {
-        return false;
-    };
-    let is_number = |part: &str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
-    country.len() == 2
-        && country.bytes().all(|b| b.is_ascii_lowercase())
-        && is_number(region)
-        && is_number(stop)
-        && rest.len() <= 2
-        && rest.iter().all(|part| !part.is_empty())
+        .find(|candidate| is_global_id(candidate))
 }
 
 pub(crate) fn departures_request(
@@ -344,6 +329,7 @@ impl WirePlace {
                 locality: None,
                 coordinate: Some(coordinate),
                 timezone: self.tz,
+                network: None,
             },
         }
     }

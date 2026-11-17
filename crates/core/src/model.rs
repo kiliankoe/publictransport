@@ -70,6 +70,14 @@ pub struct Location {
     /// `Europe/Berlin`, for showing times there. MOTIS sends it; on the other
     /// protocols it is [`Network::timezone`](crate::Network::timezone).
     pub timezone: Option<String>,
+    /// The [`Network::id`](crate::Network::id) of the network that returned
+    /// the location. Its `id` belongs to that network;
+    /// [`Network::place`](crate::Network::place) and
+    /// [`Network::stop_id`](crate::Network::stop_id) translate the location
+    /// for another one. A location without a network, such as one an
+    /// application built itself, is treated as one from another network.
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub network: Option<String>,
 }
 
 impl Location {
@@ -85,6 +93,22 @@ impl Location {
             .map_or(id.len(), |(index, _)| index);
         id.get(..end)
     }
+}
+
+/// Whether `id` has the layout of a [`Location::global_id`]: `de:14612:28` or `de:14612:28:3:2`: a country
+/// code, two numbers, then up to two more parts for area and platform.
+pub(crate) fn is_global_id(id: &str) -> bool {
+    let parts: Vec<&str> = id.split(':').collect();
+    let [country, region, stop, rest @ ..] = parts.as_slice() else {
+        return false;
+    };
+    let is_number = |part: &str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
+    country.len() == 2
+        && country.bytes().all(|b| b.is_ascii_lowercase())
+        && is_number(region)
+        && is_number(stop)
+        && rest.len() <= 2
+        && rest.iter().all(|part| !part.is_empty())
 }
 
 /// The kind of a [`Location`].
@@ -128,6 +152,8 @@ pub struct Timestamp {
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub struct DeparturesQuery {
     /// The [`Location::id`] of a stop, from the same network.
+    /// [`Network::stop_id`](crate::Network::stop_id) gives it for any
+    /// location.
     pub stop_id: String,
     /// The time from which on departures are wanted. `None` means now.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
@@ -333,7 +359,9 @@ impl Place {
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub enum Place {
-    /// A [`Location::id`] from the same network.
+    /// A [`Location::id`] from the same network, or another ID the network
+    /// understands. [`Network::place`](crate::Network::place) picks the
+    /// variant for any location.
     Id(String),
     /// A position, such as where the user is.
     Coordinate(Coordinate),

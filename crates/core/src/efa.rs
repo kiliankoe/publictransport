@@ -453,6 +453,7 @@ impl WireLocation {
         Location {
             // The server sends no time zone.
             timezone: network.timezone.clone(),
+            network: None,
             global_id: (wire.is_global_id == Some(true)).then(|| wire.id.clone()),
             id: wire.id,
             kind,

@@ -14,7 +14,7 @@ use serde::Deserialize;
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, Header, HttpRequest, HttpResponse, Leg, LegEnd,
     LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, Network, Place, Protocol,
-    Stopover, Timestamp, Trip, TripTime, TripsQuery, time::WireTime,
+    Stopover, Timestamp, Trip, TripTime, TripsQuery, model::is_global_id, time::WireTime,
 };
 
 /// How the two protocols write a request.
@@ -609,7 +609,8 @@ impl WireLocation {
                 LocationKind::Stop,
                 id.clone(),
                 text(stop.stop_point_name),
-                Some(id),
+                // Some servers number stops of their own.
+                Some(id).filter(|id| is_global_id(id)),
             )
         } else if let Some(poi) = self.point_of_interest {
             let name = text(poi.point_of_interest_name);
@@ -640,6 +641,7 @@ impl WireLocation {
                 longitude: position.longitude,
             }),
             timezone: network.timezone.clone(),
+            network: None,
         })
     }
 }
@@ -782,7 +784,7 @@ impl Call {
             scheduled_platform,
             cancelled: self.not_serviced_stop,
             stop: Location {
-                global_id: stop.clone(),
+                global_id: stop.clone().filter(|id| is_global_id(id)),
                 kind: if stop.is_some() {
                     LocationKind::Stop
                 } else {
@@ -801,6 +803,7 @@ impl Call {
                 locality: None,
                 coordinate,
                 timezone: network.timezone.clone(),
+                network: None,
             },
         }
     }

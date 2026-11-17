@@ -1,6 +1,6 @@
 use crate::{
     Attribution, Coverage, Departure, DeparturesQuery, Error, HttpRequest, HttpResponse, Location,
-    LocationQuery, Operation, Trip, TripsQuery, efa, motis, trias,
+    LocationKind, LocationQuery, Operation, Place, Trip, TripsQuery, efa, motis, trias,
 };
 
 /// One server that answers public transport queries.
@@ -9,7 +9,9 @@ use crate::{
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub struct Network {
-    /// A short identifier, e.g. `vvo-efa`.
+    /// A short identifier, e.g. `vvo-efa`. It has to be unique among the
+    /// networks an application uses, because a [`Location`] names its
+    /// network by it.
     pub id: String,
     /// The name to show to users.
     pub name: String,
@@ -101,6 +103,26 @@ impl Network {
         self
     }
 
+    /// Records this network as the origin of a parsed location.
+    fn mark(&self, location: &mut Location) {
+        location.network = Some(self.id.clone());
+    }
+
+    /// Whether this network returned the location.
+    fn returned(&self, location: &Location) -> bool {
+        location.network.as_deref() == Some(self.id.as_str())
+    }
+
+    /// Whether the protocol takes a global ID where it takes a stop ID. The
+    /// German EFA, TRIAS and OJP servers do; that every server of these
+    /// protocols does is an assumption. MOTIS IDs carry the name of a feed.
+    fn takes_global_ids(&self) -> bool {
+        matches!(
+            self.protocol,
+            Protocol::Efa | Protocol::Trias | Protocol::Ojp1
+        )
+    }
+
     fn check(&self, operation: Operation) -> Result<(), Error> {
         if self.unsupported.contains(&operation) {
             let requests = match operation {
@@ -118,6 +140,48 @@ impl Network {
 
 #[cfg_attr(feature = "uniffi", uniffi::export)]
 impl Network {
+    /// The location as the stop of a departures query on this network, for
+    /// [`DeparturesQuery::stop_id`].
+    ///
+    /// For a stop this network returned, that is its ID. For a stop from
+    /// another network, or one without a network, it is the global ID of
+    /// its station where the protocol takes one. A platform then becomes
+    /// its whole station, and the server may still not know the stop.
+    ///
+    /// `None` if the location is not a stop, or if this network could only
+    /// find it with a search by name, as MOTIS for a stop from another
+    /// network.
+    #[must_use]
+    pub fn stop_id(&self, location: &Location) -> Option<String> {
+        if location.kind != LocationKind::Stop {
+            return None;
+        }
+        if self.returned(location) {
+            return Some(location.id.clone());
+        }
+        location
+            .station_id()
+            .filter(|_| self.takes_global_ids())
+            .map(str::to_owned)
+    }
+
+    /// The location as an end of a trip on this network, for
+    /// [`TripsQuery`]: the stop as for [`Network::stop_id`], otherwise the
+    /// coordinate. A trip planned from a coordinate starts with a walk to
+    /// a stop nearby.
+    ///
+    /// `None` if the location has neither and is not from this network.
+    #[must_use]
+    pub fn place(&self, location: &Location) -> Option<Place> {
+        self.stop_id(location)
+            .map(Place::Id)
+            .or_else(|| location.coordinate.map(Place::Coordinate))
+            .or_else(|| {
+                (self.returned(location) && !location.id.is_empty())
+                    .then(|| Place::Id(location.id.clone()))
+            })
+    }
+
     /// Builds the request that searches for locations by name.
     ///
     /// # Errors
@@ -143,11 +207,15 @@ impl Network {
     /// Returns an error if the status code reports a failure or if the body
     /// is not what the protocol defines.
     pub fn parse_locations(&self, response: &HttpResponse) -> Result<Vec<Location>, Error> {
-        match self.protocol {
+        let mut locations = match self.protocol {
             Protocol::Efa => efa::parse_locations(self, response),
             Protocol::Motis => motis::parse_locations(response),
             Protocol::Trias | Protocol::Ojp1 => trias::parse_locations(self, response),
+        }?;
+        for location in &mut locations {
+            self.mark(location);
         }
+        Ok(locations)
     }
 
     /// Builds the request for the next departures at a stop.
@@ -182,11 +250,15 @@ impl Network {
     /// built on EFA answer an unknown stop with an internal error, which is
     /// an [`Error::Server`].
     pub fn parse_departures(&self, response: &HttpResponse) -> Result<Vec<Departure>, Error> {
-        match self.protocol {
+        let mut departures = match self.protocol {
             Protocol::Efa => efa::parse_departures(self, response),
             Protocol::Motis => motis::parse_departures(response),
             Protocol::Trias | Protocol::Ojp1 => trias::parse_departures(self, response),
+        }?;
+        for departure in &mut departures {
+            self.mark(&mut departure.stop);
         }
+        Ok(departures)
     }
 
     /// Builds the request for trips between two places.
@@ -223,10 +295,18 @@ impl Network {
     /// or may no longer work out because a vehicle is late; that is for the
     /// application to check against its clock.
     pub fn parse_trips(&self, response: &HttpResponse) -> Result<Vec<Trip>, Error> {
-        match self.protocol {
+        let mut trips = match self.protocol {
             Protocol::Efa => efa::parse_trips(self, response),
             Protocol::Motis => motis::parse_trips(response),
             Protocol::Trias | Protocol::Ojp1 => trias::parse_trips(self, response),
+        }?;
+        for leg in trips.iter_mut().flat_map(|trip| &mut trip.legs) {
+            self.mark(&mut leg.departure.stop);
+            self.mark(&mut leg.arrival.stop);
+            for stopover in &mut leg.intermediate_stops {
+                self.mark(&mut stopover.stop);
+            }
         }
+        Ok(trips)
     }
 }
