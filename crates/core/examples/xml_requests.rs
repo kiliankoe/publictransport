@@ -54,8 +54,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             ),
             (
                 "trips-to-stop",
-                network
-                    .trips_request(&TripsQuery::new(position.clone(), stop()).with_arrival(time))?,
+                network.trips_request(
+                    &TripsQuery::new(position.clone(), stop())
+                        .with_arrival(time)
+                        .with_limit(3),
+                )?,
             ),
         ];
         for (kind, HttpRequest { body, .. }) in requests {

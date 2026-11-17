@@ -6,6 +6,10 @@
 # The library leaves out RequestTimestamp, which the schemas require (see
 # crates/core/src/trias.rs). This script adds the element before it validates,
 # so that everything else is still checked.
+#
+# A trip request asks for no trips on one side of the time with a count of
+# zero, which the servers take and the schema of TRIAS does not allow. This
+# script turns the zero into a one for TRIAS.
 set -euo pipefail
 cd "${0:A:h}/.."
 
@@ -23,7 +27,7 @@ for request in "$work"/requests/*.xml; do
   case ${request:t} in
     trias-*)
       schema=$(print -l "$work"/trias/**/Trias.xsd | head -1)
-      sed -i.bak "s|<siri:RequestorRef>|<siri:$timestamp""siri:RequestTimestamp><siri:RequestorRef>|" "$request"
+      sed -i.bak -E "s|<siri:RequestorRef>|<siri:$timestamp""siri:RequestTimestamp><siri:RequestorRef>|; s|(<NumberOfResults[A-Za-z]+>)0<|\\11<|g" "$request"
       ;;
     ojp-*)
       schema=$(print -l "$work"/ojp/**/OJP.xsd | head -1)

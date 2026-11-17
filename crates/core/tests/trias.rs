@@ -616,15 +616,15 @@ fn trips_request_puts_the_time_at_the_end_it_binds_and_names_stops_and_positions
                 query.clone().with_departure(utc(13, 24, 0)).with_limit(3),
                 time,
                 "",
-                "<NumberOfResultsAfter>3</NumberOfResultsAfter>",
+                "<NumberOfResultsBefore>0</NumberOfResultsBefore><NumberOfResultsAfter>3</NumberOfResultsAfter>",
             ),
             // A plain `NumberOfResults` makes the servers add a trip from
-            // the other side of the time.
+            // the other side of the time. The schemas want both counts.
             (
                 query.clone().with_arrival(utc(13, 24, 0)).with_limit(3),
                 "",
                 time,
-                "<NumberOfResultsBefore>3</NumberOfResultsBefore>",
+                "<NumberOfResultsBefore>3</NumberOfResultsBefore><NumberOfResultsAfter>0</NumberOfResultsAfter>",
             ),
         ] {
             let (stop, position) = (stop_ref(protocol), position_ref(protocol));

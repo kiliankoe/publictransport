@@ -231,14 +231,16 @@ pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<Htt
         arrival.as_deref(),
     );
     // A plain `NumberOfResults` makes the server add a trip from the other
-    // side of the time.
-    let count = if arrival.is_some() {
-        "NumberOfResultsBefore"
-    } else {
-        "NumberOfResultsAfter"
-    };
+    // side of the time. The schemas want both counts, and the servers take
+    // a zero, which the schema of TRIAS does not allow.
     let count = query.limit.map_or_else(String::new, |limit| {
-        dialect.element(count, &limit.to_string())
+        let (before, after) = if arrival.is_some() {
+            (limit, 0)
+        } else {
+            (0, limit)
+        };
+        dialect.element("NumberOfResultsBefore", &before.to_string())
+            + &dialect.element("NumberOfResultsAfter", &after.to_string())
     });
     let parameters = dialect.element(
         "Params",
