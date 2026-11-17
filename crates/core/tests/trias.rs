@@ -81,7 +81,9 @@ fn count(protocol: Protocol, kind: &str, body: &[u8]) -> Result<usize, Error> {
     match kind {
         "LocationInformation" => network.parse_locations(&response).map(|list| list.len()),
         "StopEvent" => network.parse_departures(&response).map(|list| list.len()),
-        _ => network.parse_trips(&response).map(|list| list.len()),
+        _ => network
+            .parse_trips(&response)
+            .map(|found| found.trips.len()),
     }
 }
 
@@ -614,7 +616,15 @@ fn trips_request_puts_the_time_at_the_end_it_binds_and_names_stops_and_positions
                 query.clone().with_departure(utc(13, 24, 0)).with_limit(3),
                 time,
                 "",
-                "<NumberOfResults>3</NumberOfResults>",
+                "<NumberOfResultsAfter>3</NumberOfResultsAfter>",
+            ),
+            // A plain `NumberOfResults` makes the servers add a trip from
+            // the other side of the time.
+            (
+                query.clone().with_arrival(utc(13, 24, 0)).with_limit(3),
+                "",
+                time,
+                "<NumberOfResultsBefore>3</NumberOfResultsBefore>",
             ),
         ] {
             let (stop, position) = (stop_ref(protocol), position_ref(protocol));
@@ -1002,7 +1012,8 @@ fn error_without_results_is_an_empty_list_not_found_or_a_server_error() {
 fn trias_reads_rides_with_their_calls_and_the_walk_between_stops() {
     let trips = network(Protocol::Trias)
         .parse_trips(&response(TRIAS_TRIP))
-        .unwrap();
+        .unwrap()
+        .trips;
     let legs: Vec<Vec<_>> = trips
         .iter()
         .map(|trip| trip.legs.iter().map(label).collect())
@@ -1070,7 +1081,8 @@ fn trias_reads_rides_with_their_calls_and_the_walk_between_stops() {
 fn ojp_reads_rides_with_their_calls_operator_and_missing_platforms() {
     let trips = network(Protocol::Ojp1)
         .parse_trips(&response(OJP_TRIP))
-        .unwrap();
+        .unwrap()
+        .trips;
     let legs: Vec<Vec<_>> = trips
         .iter()
         .map(|trip| trip.legs.iter().map(label).collect())
@@ -1145,7 +1157,8 @@ fn leg_without_a_vehicle_is_a_walk_only_if_its_mode_says_so() {
                 let body = trips_with_leg(protocol, leg, mode, value);
                 let trips = network(protocol)
                     .parse_trips(&response(body.as_bytes()))
-                    .unwrap();
+                    .unwrap()
+                    .trips;
                 let added = trips.last().unwrap().legs.last().unwrap();
                 assert_eq!(added.kind, kind, "{protocol:?} {leg} {value}");
                 assert_eq!(

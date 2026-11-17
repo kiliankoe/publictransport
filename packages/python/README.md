@@ -36,6 +36,8 @@ with Client(user_agent="my-app/1.0 (+https://example.org)") as client:
 
 Times are timezone-aware `datetime` objects in UTC, and `Location.timezone` names the zone to show them in. A time in a query has to be timezone-aware too, in any zone. An EFA network needs its `timezone` to send a query time. A TRIAS or OJP network needs a `requestor_ref`, which public servers document, e.g. `OpenService`. A server that wants a key in an HTTP header gets it through `Network(headers=[Header(...)])`.
 
+`trips` returns a `Trips` record: the list is in `trips`, and `earlier` and `later` are references for more. Pass one as `page` in the same query to continue the search.
+
 Failures that the server or the query cause are raised as subclasses of `publictransport.Error`, such as `Error.NotFound` or `Error.RateLimited`. Failures of the HTTP exchange are raised as httpx raises them. An answer above 16 MB raises `ResponseTooLarge`.
 
 A client can be built on an httpx client of your own, `Client(http_client=...)`, for example to use a proxy. That client has to set the `User-Agent` itself and must not follow redirects.

@@ -5,7 +5,7 @@ use serde::Deserialize;
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, Leg,
     LegKind, Line, Location, LocationKind, LocationQuery, Mode, Network, Place, Stopover, Trip,
-    TripTime, TripsQuery, time::WireTime,
+    TripTime, Trips, TripsQuery, time::WireTime,
 };
 
 pub(crate) fn locations_request(
@@ -162,13 +162,22 @@ pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<Htt
 
     let mut parameters = vec![("fromPlace", from.as_str()), ("toPlace", to.as_str())];
     if let Some(limit) = &limit {
-        parameters.push(("numItineraries", limit));
+        // The first is the least number of trips. A page would hold all the
+        // trips of two hours without the second.
+        parameters.extend([
+            ("numItineraries", limit.as_str()),
+            ("maxItineraries", limit),
+        ]);
     }
     if let Some(time) = &time {
         parameters.push(("time", time));
     }
     if arrive_by {
         parameters.push(("arriveBy", "true"));
+    }
+    // The server asks for the cursor on top of the request it answered.
+    if let Some(page) = &query.page {
+        parameters.push(("pageCursor", page));
     }
     Ok(HttpRequest::get(&network.endpoint, "v6/plan", parameters))
 }
@@ -185,7 +194,7 @@ fn coordinate_id(coordinate: Coordinate) -> String {
     format!("{},{}", coordinate.latitude, coordinate.longitude)
 }
 
-pub(crate) fn parse_trips(response: &HttpResponse) -> Result<Vec<Trip>, Error> {
+pub(crate) fn parse_trips(response: &HttpResponse) -> Result<Trips, Error> {
     let response: PlanResponse = json(response)?;
     let mut trips = Vec::new();
     for itinerary in response.direct.into_iter().chain(response.itineraries) {
@@ -198,7 +207,11 @@ pub(crate) fn parse_trips(response: &HttpResponse) -> Result<Vec<Trip>, Error> {
             trips.push(Trip { legs });
         }
     }
-    Ok(trips)
+    Ok(Trips {
+        trips,
+        earlier: response.previous_page_cursor,
+        later: response.next_page_cursor,
+    })
 }
 
 /// Parses a response. The server answers an unknown stop with status 404
@@ -230,6 +243,8 @@ struct PlanResponse {
     #[serde(default)]
     direct: Vec<Itinerary>,
     itineraries: Vec<Itinerary>,
+    previous_page_cursor: Option<String>,
+    next_page_cursor: Option<String>,
 }
 
 #[derive(Deserialize)]

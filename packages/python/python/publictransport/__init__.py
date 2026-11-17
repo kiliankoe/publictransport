@@ -40,6 +40,7 @@ from publictransport._uniffi import (
     Registry,
     Stopover,
     Trip,
+    Trips,
     TripsQuery,
     TripTime,
     network_from_json,
@@ -82,6 +83,7 @@ __all__ = [
     "Stopover",
     "Trip",
     "TripTime",
+    "Trips",
     "TripsQuery",
     "network_from_json",
 ]

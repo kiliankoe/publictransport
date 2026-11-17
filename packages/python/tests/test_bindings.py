@@ -8,14 +8,17 @@ from publictransport import (
     DeparturesQuery,
     Error,
     GlobalId,
+    HttpResponse,
     IdScheme,
     LegEnd,
     Location,
     LocationKind,
     LocationQuery,
     Network,
+    Place,
     Protocol,
     Registry,
+    TripsQuery,
     network_from_json,
 )
 
@@ -82,6 +85,25 @@ def test_kinds_of_a_location_query_are_optional_and_reach_the_request() -> None:
 
     assert "type=" not in every_kind.url
     assert "type=STOP" in stops.url
+
+
+def test_page_of_a_trips_answer_continues_the_query() -> None:
+    body = (
+        b'{"direct":[],"itineraries":[],"previousPageCursor":"a","nextPageCursor":"b"}'
+    )
+
+    found = MOTIS.parse_trips(HttpResponse(status=200, headers=[], body=body))
+    request = MOTIS.trips_request(
+        # The generated `Place.ID` is not typed as a `Place`.
+        TripsQuery(
+            origin=Place.ID("x"),  # pyright: ignore[reportArgumentType]
+            destination=Place.ID("y"),  # pyright: ignore[reportArgumentType]
+            page=found.later,
+        )
+    )
+
+    assert (found.trips, found.earlier, found.later) == ([], "a", "b")
+    assert "pageCursor=b" in request.url
 
 
 def test_station_ids_are_shared_by_a_station_and_its_platforms() -> None:

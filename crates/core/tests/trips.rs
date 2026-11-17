@@ -3,18 +3,36 @@
 use proptest::prelude::*;
 use publictransport::{
     Coordinate, Error, GlobalId, HttpRequest, HttpResponse, IdScheme, Leg, LegEnd, LegKind, Method,
-    Mode, Network, Place, Protocol, Stopover, Timestamp, Trip, TripsQuery,
+    Mode, Network, Place, Protocol, Stopover, Timestamp, Trip, Trips, TripsQuery,
 };
 
 const VVO: &[u8] = include_bytes!("fixtures/efa/vvo-trip.json");
 const VRR: &[u8] = include_bytes!("fixtures/efa/vrr-trip.json");
 const TRANSITOUS: &[u8] = include_bytes!("fixtures/motis/transitous-plan.json");
+const TRIAS: &[u8] = include_bytes!("fixtures/trias/vvo-trip.xml");
+const OJP: &[u8] = include_bytes!("fixtures/ojp/vrr-trip.xml");
 
 /// A protocol, a recorded response and the legs of each of its trips.
 type Fixture = (Protocol, &'static [u8], &'static [&'static [&'static str]]);
 
 fn network(protocol: Protocol) -> Network {
     Network::new("test", "Test", "https://example.org/base", protocol)
+}
+
+/// A network that can build every request: EFA needs the time zone, TRIAS
+/// and OJP the requestor reference.
+fn complete_network(protocol: Protocol) -> Network {
+    network(protocol)
+        .with_timezone("Europe/Berlin")
+        .with_requestor_ref("OpenService")
+}
+
+fn parse(protocol: Protocol, body: &[u8]) -> Result<Trips, Error> {
+    complete_network(protocol).parse_trips(&HttpResponse {
+        status: 200,
+        headers: Vec::new(),
+        body: body.to_vec(),
+    })
 }
 
 fn ifopt(value: &str) -> GlobalId {
@@ -24,14 +42,12 @@ fn ifopt(value: &str) -> GlobalId {
     }
 }
 
-fn parse(protocol: Protocol, body: &[u8]) -> Result<Vec<Trip>, Error> {
-    network(protocol)
-        .with_timezone("Europe/Berlin")
-        .parse_trips(&HttpResponse {
-            status: 200,
-            headers: Vec::new(),
-            body: body.to_vec(),
-        })
+/// Every query parameter, decoded.
+fn parameters(request: &HttpRequest) -> Vec<(String, String)> {
+    let query = request.url.split_once('?').map_or("", |(_, query)| query);
+    form_urlencoded::parse(query.as_bytes())
+        .into_owned()
+        .collect()
 }
 
 /// A time of day on 2026-11-16 in UTC, the day the fixtures were recorded.
@@ -43,10 +59,10 @@ fn utc(hour: i64, minute: i64) -> Timestamp {
 
 /// The decoded values of every query parameter called `name`.
 fn parameter(request: &HttpRequest, name: &str) -> Vec<String> {
-    let query = request.url.split_once('?').map_or("", |(_, query)| query);
-    form_urlencoded::parse(query.as_bytes())
+    parameters(request)
+        .into_iter()
         .filter(|(key, _)| key == name)
-        .map(|(_, value)| value.into_owned())
+        .map(|(_, value)| value)
         .collect()
 }
 
@@ -155,6 +171,28 @@ proptest! {
         }
     }
 
+    /// MOTIS wants the cursor next to the request that it answered.
+    #[test]
+    fn motis_sends_the_page_as_the_cursor_and_keeps_the_rest_of_the_query(
+        page in ".+",
+        arrival in prop::option::of(any::<bool>()),
+    ) {
+        let query = TripsQuery::new(Place::Id("a".into()), Place::Id("b".into())).with_limit(3);
+        let query = match arrival {
+            Some(true) => query.with_arrival(utc(13, 24)),
+            Some(false) => query.with_departure(utc(13, 24)),
+            None => query,
+        };
+        let network = network(Protocol::Motis);
+        let without = network.trips_request(&query).unwrap();
+        let with = network.trips_request(&query.with_page(page.clone())).unwrap();
+
+        prop_assert_eq!(parameter(&with, "pageCursor"), [page]);
+        let mut rest = parameters(&with);
+        rest.retain(|(name, _)| name != "pageCursor");
+        prop_assert_eq!(rest, parameters(&without));
+    }
+
     #[test]
     fn parsing_never_panics(
         status in 200_u16..300,
@@ -187,6 +225,8 @@ fn efa_request_sends_the_local_time_with_its_meaning_and_omits_what_the_query_le
         ("outputFormat", "rapidJSON"),
         ("coordOutputFormat", "WGS84[dd.ddddd]"),
         ("useRealtime", "1"),
+        // Without it the server adds a trip from the other side of the time.
+        ("calcOneDirection", "1"),
     ] {
         assert_eq!(parameter(&request, name), [value], "{name}");
     }
@@ -233,7 +273,7 @@ fn motis_request_sends_the_time_in_utc_and_marks_only_an_arrival_time() {
         Place::Id("de-DELFI_de:14612:13".into()),
     );
     let request = network.trips_request(&query).unwrap();
-    for name in ["numItineraries", "time", "arriveBy"] {
+    for name in ["numItineraries", "maxItineraries", "time", "arriveBy"] {
         assert_eq!(parameter(&request, name), Vec::<String>::new(), "{name}");
     }
 
@@ -243,7 +283,10 @@ fn motis_request_sends_the_time_in_utc_and_marks_only_an_arrival_time() {
     let request = network
         .trips_request(&query.clone().with_departure(time).with_limit(3))
         .unwrap();
+    // The first alone is the least number: a page holds every trip of
+    // two hours without the second.
     assert_eq!(parameter(&request, "numItineraries"), ["3"]);
+    assert_eq!(parameter(&request, "maxItineraries"), ["3"]);
     assert_eq!(parameter(&request, "time"), ["2026-11-16T13:24:00Z"]);
     assert_eq!(parameter(&request, "arriveBy"), Vec::<String>::new());
 
@@ -285,7 +328,7 @@ fn trips_keep_the_servers_order_and_run_forward_in_time() {
         ),
     ];
     for (protocol, body, expected) in fixtures {
-        let trips = parse(protocol, body).unwrap();
+        let trips = parse(protocol, body).unwrap().trips;
         let labels: Vec<Vec<&str>> = trips
             .iter()
             .map(|trip| trip.legs.iter().map(label).collect())
@@ -310,7 +353,7 @@ fn trips_keep_the_servers_order_and_run_forward_in_time() {
 
 #[test]
 fn efa_reads_a_ride_with_its_calls_and_a_walk() {
-    let trips = parse(Protocol::Efa, VVO).unwrap();
+    let trips = parse(Protocol::Efa, VVO).unwrap().trips;
     let [train, walk] = trips[1].legs.as_slice() else {
         panic!("{:?}", trips[1]);
     };
@@ -377,7 +420,7 @@ fn efa_reads_a_ride_with_its_calls_and_a_walk() {
 /// RE1 is two minutes late, and its platforms are known.
 #[test]
 fn efa_turns_the_footpath_after_a_ride_into_a_walk_to_the_next_leg() {
-    let trips = parse(Protocol::Efa, VVO).unwrap();
+    let trips = parse(Protocol::Efa, VVO).unwrap().trips;
     let [train, walk, tram] = trips[0].legs.as_slice() else {
         panic!("{:?}", trips[0]);
     };
@@ -400,7 +443,7 @@ fn efa_turns_the_footpath_after_a_ride_into_a_walk_to_the_next_leg() {
 /// The VRR trains wait at their calls, and the ICE has no predictions.
 #[test]
 fn efa_tells_the_arrival_at_a_call_from_the_departure() {
-    let trips = parse(Protocol::Efa, VRR).unwrap();
+    let trips = parse(Protocol::Efa, VRR).unwrap().trips;
     let calls = |trip: usize| -> Vec<_> {
         trips[trip].legs[0]
             .intermediate_stops
@@ -478,7 +521,7 @@ fn efa_reads_cancelled_legs_platform_changes_and_legs_without_optional_fields() 
             r#","realtimeStatus":["MONITORED"],"footPathInfo":[{"position":"AFTER","duration":60}]"#
         ),
     );
-    let trips = parse(Protocol::Efa, body.as_bytes()).unwrap();
+    let trips = parse(Protocol::Efa, body.as_bytes()).unwrap().trips;
     let [changed, cancelled, walk] = trips[0].legs.as_slice() else {
         panic!("{trips:?}");
     };
@@ -505,7 +548,7 @@ fn efa_adds_no_transfer_walk_that_overlaps_its_neighbors() {
             r#"{{"version":"11.0.6.72","journeys":[{{"legs":[{}]}}]}}"#,
             legs.join(",")
         );
-        let trips = parse(Protocol::Efa, body.as_bytes()).unwrap();
+        let trips = parse(Protocol::Efa, body.as_bytes()).unwrap().trips;
         trips[0]
             .legs
             .iter()
@@ -533,7 +576,7 @@ fn efa_adds_no_transfer_walk_that_overlaps_its_neighbors() {
 #[test]
 fn motis_takes_a_missing_scheduled_time_at_an_end_from_the_leg() {
     let body = br#"{"itineraries":[{"legs":[{"mode":"WALK","scheduledStartTime":"2026-11-16T13:20:00Z","scheduledEndTime":"2026-11-16T13:30:00Z","from":{"name":"START","lat":51.04,"lon":13.73},"to":{"name":"END","lat":51.05,"lon":13.74}}]}]}"#;
-    let trips = parse(Protocol::Motis, body).unwrap();
+    let trips = parse(Protocol::Motis, body).unwrap().trips;
     let leg = &trips[0].legs[0];
     assert_eq!(leg.departure.scheduled_time, utc(13, 20));
     assert_eq!(leg.arrival.scheduled_time, utc(13, 30));
@@ -565,7 +608,7 @@ fn leg_without_a_scheduled_time_at_one_end_is_a_parse_error() {
 
 #[test]
 fn motis_reads_a_ride_with_its_calls_and_a_walk_without_predictions() {
-    let trips = parse(Protocol::Motis, TRANSITOUS).unwrap();
+    let trips = parse(Protocol::Motis, TRANSITOUS).unwrap().trips;
     let [train, walk] = trips[1].legs.as_slice() else {
         panic!("{:?}", trips[1]);
     };
@@ -637,7 +680,7 @@ fn motis_reads_coordinate_ends_other_modes_cancellations_and_platform_changes() 
         {"mode":"BIKE","from":{"name":"START","lat":51.04,"lon":13.73,"tz":"Europe/Berlin","departure":"2026-11-16T13:20:00Z","scheduledDeparture":"2026-11-16T13:20:00Z","vertexType":"START"},"to":{"name":"Dresden Hauptbahnhof","stopId":"de-DELFI_de:14612:28:2:3","lat":51.03975,"lon":13.733516,"tz":"Europe/Berlin","arrival":"2026-11-16T13:25:00Z","scheduledArrival":"2026-11-16T13:25:00Z","vertexType":"TRANSIT"},"duration":300,"startTime":"2026-11-16T13:20:00Z","endTime":"2026-11-16T13:25:00Z","scheduledStartTime":"2026-11-16T13:20:00Z","scheduledEndTime":"2026-11-16T13:25:00Z","realTime":false,"scheduled":false,"distance":900},
         {"mode":"TRAM","from":{"name":"Dresden Hauptbahnhof","stopId":"de-DELFI_de:14612:28:2:3","lat":51.03975,"lon":13.733516,"tz":"Europe/Berlin","departure":"2026-11-16T13:31:00Z","scheduledDeparture":"2026-11-16T13:29:00Z","scheduledTrack":"3","track":"4","vertexType":"TRANSIT","cancelled":false},"to":{"name":"Dresden Albertplatz","stopId":"de-DELFI_de:14612:13:1:2","lat":51.063164,"lon":13.746515,"tz":"Europe/Berlin","arrival":"2026-11-16T13:40:00Z","scheduledArrival":"2026-11-16T13:42:00Z","scheduledTrack":"2","track":"2","vertexType":"TRANSIT","cancelled":false},"duration":540,"startTime":"2026-11-16T13:31:00Z","endTime":"2026-11-16T13:40:00Z","scheduledStartTime":"2026-11-16T13:29:00Z","scheduledEndTime":"2026-11-16T13:42:00Z","realTime":true,"scheduled":true,"headsign":"Wilder Mann","agencyName":"DVB","routeShortName":"3","cancelled":true}
     ]}],"previousPageCursor":"a","nextPageCursor":"b"}"#;
-    let trips = parse(Protocol::Motis, body).unwrap();
+    let trips = parse(Protocol::Motis, body).unwrap().trips;
     let [bike, tram] = trips[0].legs.as_slice() else {
         panic!("{trips:?}");
     };
@@ -676,7 +719,7 @@ fn motis_reads_coordinate_ends_other_modes_cancellations_and_platform_changes() 
 #[test]
 fn both_protocols_describe_the_same_ride_alike() {
     let shared = |protocol, body| {
-        let trips = parse(protocol, body).unwrap();
+        let trips = parse(protocol, body).unwrap().trips;
         let tram = trips
             .iter()
             .flat_map(|trip| &trip.legs)
@@ -750,7 +793,7 @@ fn both_protocols_describe_the_same_ride_alike() {
 #[test]
 fn both_protocols_describe_the_same_transfer_alike() {
     let shared = |protocol, body, index: usize| {
-        let trip = parse(protocol, body).unwrap().swap_remove(index);
+        let trip = parse(protocol, body).unwrap().trips.swap_remove(index);
         let ends = [trip.departure(), trip.arrival()].map(|end| end.unwrap().scheduled_time);
         assert_eq!(ends, [utc(13, 30), utc(13, 43)]);
         let legs: Vec<_> = trip
@@ -776,20 +819,112 @@ fn both_protocols_describe_the_same_transfer_alike() {
     assert_eq!(labels, ["S1", "walk", "11"]);
 }
 
-/// A successful EFA response carries a warning, which is no failure.
+/// A successful EFA response carries a warning, which is no failure. Only the
+/// cursors of MOTIS can continue a search that found nothing.
 #[test]
-fn response_without_trips_is_an_empty_list() {
-    for (protocol, body) in [
+fn response_without_trips_is_an_empty_list_with_the_cursors_the_server_sent() {
+    for (protocol, body, earlier, later) in [
         (
             Protocol::Efa,
             br#"{"version":"11.0.6.72","systemMessages":[{"type":"warning","module":"BROKER","code":-10015,"text":"itp","subType":"itp-monomodal"}]}"#.as_slice(),
+            None,
+            None,
         ),
         (
             Protocol::Motis,
-            br#"{"direct":[],"itineraries":[],"previousPageCursor":"a","nextPageCursor":"b"}"#,
+            br#"{"direct":[],"itineraries":[],"previousPageCursor":"a","nextPageCursor":"b"}"#.as_slice(),
+            Some("a"),
+            Some("b"),
         ),
     ] {
-        assert_eq!(parse(protocol, body), Ok(Vec::new()));
+        let found = parse(protocol, body).unwrap();
+        assert_eq!(
+            (found.trips, found.earlier.as_deref(), found.later.as_deref()),
+            (Vec::new(), earlier, later),
+            "{protocol:?}"
+        );
+    }
+}
+
+/// EFA, TRIAS and OJP 1.0 have no cursors. The trips of the second response
+/// are out of order, and only their predicted times tell which one leaves
+/// last and which one arrives first.
+#[test]
+fn reference_of_a_server_without_cursors_continues_the_search_past_the_trips_at_hand() {
+    let journey = |departure: [&str; 2], arrival: [&str; 2]| {
+        let ([departure, expected_departure], [arrival, expected_arrival]) = (departure, arrival);
+        format!(
+            r#"{{"legs":[{{"origin":{{"id":"de:14612:28","isGlobalId":true,"name":"Dresden Hauptbahnhof","type":"stop","departureTimePlanned":"2026-11-16T{departure}:00Z","departureTimeEstimated":"2026-11-16T{expected_departure}:00Z"}},"destination":{{"id":"de:14612:13","isGlobalId":true,"name":"Dresden Albertplatz","type":"stop","arrivalTimePlanned":"2026-11-16T{arrival}:00Z","arrivalTimeEstimated":"2026-11-16T{expected_arrival}:00Z"}},"transportation":{{"number":"3","product":{{"class":4,"name":"x"}}}},"realtimeStatus":["MONITORED"]}}]}}"#
+        )
+    };
+    let out_of_order = format!(
+        r#"{{"version":"11.0.6.72","journeys":[{},{}]}}"#,
+        journey(["13:10", "13:50"], ["14:40", "14:40"]),
+        journey(["13:20", "13:20"], ["14:50", "14:30"]),
+    );
+    let query = TripsQuery::new(
+        Place::Id("de:14612:28".into()),
+        Place::Id("de:14612:13".into()),
+    )
+    .with_limit(3);
+    // The time of the query that is continued does not count.
+    let continued = query.clone().with_arrival(utc(13, 24));
+    let after = |time: Timestamp, seconds: i64| Timestamp {
+        unix_seconds: time.unix_seconds + seconds,
+    };
+
+    for (protocol, body) in [
+        (Protocol::Efa, VVO),
+        (Protocol::Efa, out_of_order.as_bytes()),
+        (Protocol::Trias, TRIAS),
+        (Protocol::Ojp1, OJP),
+    ] {
+        let found = parse(protocol, body).unwrap();
+        let latest_departure = found
+            .trips
+            .iter()
+            .filter_map(Trip::departure)
+            .map(LegEnd::expected_time)
+            .max()
+            .unwrap();
+        let earliest_arrival = found
+            .trips
+            .iter()
+            .filter_map(Trip::arrival)
+            .map(LegEnd::expected_time)
+            .min()
+            .unwrap();
+        let request = |query: TripsQuery| complete_network(protocol).trips_request(&query).unwrap();
+
+        assert_eq!(
+            request(continued.clone().with_page(found.later.unwrap())),
+            request(query.clone().with_departure(after(latest_departure, 60))),
+            "{protocol:?} later"
+        );
+        assert_eq!(
+            request(continued.clone().with_page(found.earlier.unwrap())),
+            request(query.clone().with_arrival(after(earliest_arrival, -60))),
+            "{protocol:?} earlier"
+        );
+    }
+}
+
+#[test]
+fn page_that_the_core_did_not_build_is_an_invalid_query_without_cursors() {
+    let cursors = parse(Protocol::Motis, TRANSITOUS).unwrap();
+    for page in [
+        cursors.earlier.unwrap(),
+        cursors.later.unwrap(),
+        "not a reference".to_owned(),
+    ] {
+        let query = TripsQuery::new(Place::Id("a".into()), Place::Id("b".into())).with_page(page);
+        for protocol in [Protocol::Efa, Protocol::Trias, Protocol::Ojp1] {
+            let result = complete_network(protocol).trips_request(&query);
+            assert!(
+                matches!(result, Err(Error::InvalidQuery { .. })),
+                "{protocol:?}: {result:?}"
+            );
+        }
     }
 }
 
@@ -797,7 +932,7 @@ fn response_without_trips_is_an_empty_list() {
 /// leg it has no real-time data for.
 #[test]
 fn efa_leg_without_realtime_data_has_no_predictions() {
-    let trips = parse(Protocol::Efa, VRR).unwrap();
+    let trips = parse(Protocol::Efa, VRR).unwrap().trips;
     let ice = trips
         .iter()
         .flat_map(|trip| &trip.legs)
@@ -824,7 +959,7 @@ fn motis_keeps_direct_walks_unknown_transit_modes_and_cancelled_stops() {
         ),
         place("B", r#","scheduledArrival":"2026-11-16T13:30:00Z""#),
     );
-    let trips = parse(Protocol::Motis, body.as_bytes()).unwrap();
+    let trips = parse(Protocol::Motis, body.as_bytes()).unwrap().trips;
     let [walk, ride] = trips.as_slice() else {
         panic!("{trips:?}");
     };
@@ -875,7 +1010,10 @@ fn unknown_place_is_not_found() {
 
     // An error that is not about matching a place means there is no trip.
     let body = br#"{"version":"11.0.6.72","systemMessages":[{"type":"error","module":"PT_KERNEL","code":-4007,"text":"origin too close to destination"}]}"#;
-    assert_eq!(parse(Protocol::Efa, body), Ok(Vec::new()));
+    assert_eq!(
+        parse(Protocol::Efa, body).map(|found| found.trips),
+        Ok(Vec::new())
+    );
 
     let response = HttpResponse {
         status: 404,

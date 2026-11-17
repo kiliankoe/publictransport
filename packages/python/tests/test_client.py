@@ -128,7 +128,8 @@ def test_sends_the_library_request_and_returns_the_parsed_answer(
     expected = getattr(network, f"parse_{operation}")(
         HttpResponse(status=200, headers=[], body=body)
     )
-    assert expected
+    # A trips answer holds its trips next to the paging references.
+    assert getattr(expected, "trips", expected)
     sent: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:

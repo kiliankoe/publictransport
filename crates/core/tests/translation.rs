@@ -89,7 +89,7 @@ fn every_parsed_location_names_the_network_that_returned_it() {
         );
 
         let legs = || {
-            let trips = network.parse_trips(&response(trips)).unwrap();
+            let trips = network.parse_trips(&response(trips)).unwrap().trips;
             trips.into_iter().flat_map(|trip| trip.legs)
         };
         check(

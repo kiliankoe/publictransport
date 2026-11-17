@@ -149,13 +149,26 @@ impl Client {
     }
 
     /// Plans trips between two places. See [`Network::parse_trips`] for the
-    /// result.
+    /// result. Its references continue the search:
+    ///
+    /// ```no_run
+    /// # use publictransport_client::{Client, Error, Network, TripsQuery};
+    /// # async fn example(client: Client, network: Network, query: TripsQuery) -> Result<(), Error> {
+    /// let mut found = client.trips(&network, &query).await?;
+    /// if let Some(later) = found.later.clone() {
+    ///     let more = client.trips(&network, &query.clone().with_page(later)).await?;
+    ///     found.trips.extend(more.trips);
+    ///     found.later = more.later;
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Errors
     ///
     /// Returns [`Error::Transport`] if the request got no answer and
     /// [`Error::Api`] for everything the server or the query got wrong.
-    pub async fn trips(&self, network: &Network, query: &TripsQuery) -> Result<Vec<Trip>, Error> {
+    pub async fn trips(&self, network: &Network, query: &TripsQuery) -> Result<Trips, Error> {
         let response = self.send(network.trips_request(query)?).await?;
         Ok(network.parse_trips(&response)?)
     }

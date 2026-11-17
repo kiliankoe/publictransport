@@ -14,7 +14,7 @@ use serde::Deserialize;
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, GlobalId, Header, HttpRequest, HttpResponse,
     Leg, LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, Network,
-    Place, Protocol, Stopover, Timestamp, Trip, TripTime, TripsQuery, time::WireTime,
+    Place, Protocol, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery, time::WireTime,
 };
 
 /// How the two protocols write a request.
@@ -219,7 +219,7 @@ pub(crate) fn departures_request(
 
 pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<HttpRequest, Error> {
     let dialect = Dialect::of(network);
-    let (departure, arrival) = match query.time {
+    let (departure, arrival) = match query.paged_time()? {
         Some(TripTime::DepartAt(time)) => (Some(utc(time)?), None),
         Some(TripTime::ArriveBy(time)) => (None, Some(utc(time)?)),
         None => (None, None),
@@ -230,10 +230,19 @@ pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<Htt
         place_text(&query.destination)?,
         arrival.as_deref(),
     );
+    // A plain `NumberOfResults` makes the server add a trip from the other
+    // side of the time.
+    let count = if arrival.is_some() {
+        "NumberOfResultsBefore"
+    } else {
+        "NumberOfResultsAfter"
+    };
+    let count = query.limit.map_or_else(String::new, |limit| {
+        dialect.element(count, &limit.to_string())
+    });
     let parameters = dialect.element(
         "Params",
-        &(dialect.number_of_results(query.limit)
-            + &dialect.element("IncludeIntermediateStops", "true")),
+        &(count + &dialect.element("IncludeIntermediateStops", "true")),
     );
     let request = dialect.request("TripRequest", &(origin + &destination + &parameters));
     dialect.post(network, &request)
@@ -270,7 +279,7 @@ pub(crate) fn parse_departures(
     Ok(departures)
 }
 
-pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<Vec<Trip>, Error> {
+pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<Trips, Error> {
     let (answers, failure) = answers(network, response)?;
     let answer = answer(answers.trips, &failure, response.status)?;
     let results = answer.results(
@@ -290,7 +299,7 @@ pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<
             trips.push(Trip { legs });
         }
     }
-    Ok(trips)
+    Ok(Trips::paged_by_time(trips))
 }
 
 /// The answers in a response, from where the dialect of the network puts

@@ -1,6 +1,6 @@
 use crate::{
     Attribution, Coverage, Departure, DeparturesQuery, Error, Header, HttpRequest, HttpResponse,
-    IdScheme, Location, LocationKind, LocationQuery, Operation, Place, Trip, TripsQuery, efa,
+    IdScheme, Location, LocationKind, LocationQuery, Operation, Place, Trips, TripsQuery, efa,
     motis, trias,
 };
 
@@ -314,7 +314,8 @@ impl Network {
     /// Returns [`Error::InvalidNetwork`] if the query has a time and the
     /// network needs a time zone for it but has none or an unknown one, or
     /// if a TRIAS or OJP network has no requestor reference, and
-    /// [`Error::InvalidQuery`] if the time is outside the supported range.
+    /// [`Error::InvalidQuery`] if the time is outside the supported range
+    /// or the page is not a reference from this network.
     pub fn trips_request(&self, query: &TripsQuery) -> Result<HttpRequest, Error> {
         self.check(Operation::Trips)?;
         let request = match self.protocol {
@@ -329,6 +330,13 @@ impl Network {
     /// the order the server ranks them. No connection between the two places
     /// gives an empty list.
     ///
+    /// [`Trips::earlier`] and [`Trips::later`] continue the search. MOTIS
+    /// sends such references. For the other protocols the crate makes them
+    /// from the times of the trips: later trips leave at least a minute
+    /// after the last of these, earlier ones arrive at least a minute
+    /// before the first. A trip within that minute is missed. On TRIAS and
+    /// OJP a search without [`TripsQuery::limit`] repeats one trip.
+    ///
     /// # Errors
     ///
     /// Returns [`Error::NotFound`] if the network does not know one of the
@@ -338,13 +346,13 @@ impl Network {
     /// The trips are as the server planned them. Some may have left already
     /// or may no longer work out because a vehicle is late; that is for the
     /// application to check against its clock.
-    pub fn parse_trips(&self, response: &HttpResponse) -> Result<Vec<Trip>, Error> {
+    pub fn parse_trips(&self, response: &HttpResponse) -> Result<Trips, Error> {
         let mut trips = match self.protocol {
             Protocol::Efa => efa::parse_trips(self, response),
             Protocol::Motis => motis::parse_trips(response),
             Protocol::Trias | Protocol::Ojp1 => trias::parse_trips(self, response),
         }?;
-        for leg in trips.iter_mut().flat_map(|trip| &mut trip.legs) {
+        for leg in trips.trips.iter_mut().flat_map(|trip| &mut trip.legs) {
             self.mark(&mut leg.departure.stop);
             self.mark(&mut leg.arrival.stop);
             for stopover in &mut leg.intermediate_stops {

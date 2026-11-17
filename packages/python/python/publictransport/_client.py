@@ -15,7 +15,7 @@ from publictransport._uniffi import (
     Location,
     LocationQuery,
     Network,
-    Trip,
+    Trips,
     TripsQuery,
 )
 
@@ -123,7 +123,7 @@ class Client:
         response = self._send(network.departures_request(query))
         return network.parse_departures(response)
 
-    def trips(self, network: Network, query: TripsQuery) -> list[Trip]:
+    def trips(self, network: Network, query: TripsQuery) -> Trips:
         """Plan trips between two places, in the order the server ranks them."""
         response = self._send(network.trips_request(query))
         return network.parse_trips(response)
@@ -193,7 +193,7 @@ class AsyncClient:
         response = await self._send(network.departures_request(query))
         return network.parse_departures(response)
 
-    async def trips(self, network: Network, query: TripsQuery) -> list[Trip]:
+    async def trips(self, network: Network, query: TripsQuery) -> Trips:
         """Plan trips between two places, in the order the server ranks them."""
         response = await self._send(network.trips_request(query))
         return network.parse_trips(response)

@@ -350,7 +350,18 @@ pub struct TripsQuery {
     /// return more or fewer. `None` leaves the number to the server.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub limit: Option<u32>,
+    /// Continues an earlier search: [`Trips::earlier`] or [`Trips::later`]
+    /// of its result, set on the query that led to it. On every protocol
+    /// but MOTIS the page takes the place of [`TripsQuery::time`]. A
+    /// reference is only good for the network it came from, and its text
+    /// has no meaning to rely on.
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub page: Option<String>,
 }
+
+/// What the references that [`Trips::paged_by_time`] makes start with.
+const LATER: &str = "departure:";
+const EARLIER: &str = "arrival:";
 
 impl TripsQuery {
     /// Trips from `origin` to `destination` that leave now.
@@ -361,7 +372,38 @@ impl TripsQuery {
             destination,
             time: None,
             limit: None,
+            page: None,
         }
+    }
+
+    /// Sets [`TripsQuery::page`].
+    #[must_use]
+    pub fn with_page(mut self, reference: impl Into<String>) -> Self {
+        self.page = Some(reference.into());
+        self
+    }
+
+    /// The time to search at on a protocol without page references of its
+    /// own: the one a reference of [`Trips::paged_by_time`] holds, otherwise
+    /// the one of the query.
+    pub(crate) fn paged_time(&self) -> Result<Option<TripTime>, crate::Error> {
+        let Some(page) = &self.page else {
+            return Ok(self.time);
+        };
+        let time = |text: &str| {
+            text.parse()
+                .ok()
+                .map(|unix_seconds| Timestamp { unix_seconds })
+        };
+        let later = page.strip_prefix(LATER).and_then(time);
+        let earlier = page.strip_prefix(EARLIER).and_then(time);
+        later
+            .map(TripTime::DepartAt)
+            .or(earlier.map(TripTime::ArriveBy))
+            .map(Some)
+            .ok_or_else(|| crate::Error::InvalidQuery {
+                message: "the page is not a reference from this network".to_owned(),
+            })
     }
 
     /// Asks for trips that leave at `time` or later.
@@ -425,6 +467,43 @@ pub enum TripTime {
     DepartAt(Timestamp),
     /// Arrive at this time or earlier.
     ArriveBy(Timestamp),
+}
+
+/// The answer to a [`TripsQuery`].
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+pub struct Trips {
+    /// The trips, in the order the server ranks them.
+    pub trips: Vec<Trip>,
+    /// A reference for the trips before these, for [`TripsQuery::page`].
+    /// `None` if the server sent none or, on a protocol without references
+    /// of its own, if there are no trips to continue from. The trips of an
+    /// earlier page are in the same order as these, so they belong in
+    /// front of them as a whole.
+    pub earlier: Option<String>,
+    /// A reference for the trips after these, with the same rules.
+    pub later: Option<String>,
+}
+
+impl Trips {
+    /// The trips with references made from their times, for protocols that
+    /// have none: later trips leave after the last of these, earlier ones
+    /// arrive before the first. A minute apart, so that a server which
+    /// counts in minutes does not return the same trip again.
+    pub(crate) fn paged_by_time(trips: Vec<Trip>) -> Self {
+        let time = |end: Option<&LegEnd>| {
+            end.map(|end| end.realtime_time.unwrap_or(end.scheduled_time).unix_seconds)
+        };
+        let last = trips.iter().filter_map(|trip| time(trip.departure())).max();
+        let first = trips.iter().filter_map(|trip| time(trip.arrival())).min();
+        Self {
+            later: last.map(|time| format!("{LATER}{}", time.saturating_add(60))),
+            earlier: first.map(|time| format!("{EARLIER}{}", time.saturating_sub(60))),
+            trips,
+        }
+    }
 }
 
 /// One way to get from the start to the destination.

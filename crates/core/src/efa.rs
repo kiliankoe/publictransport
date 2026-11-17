@@ -5,7 +5,7 @@ use serde::Deserialize;
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, Leg,
     LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Mode, Network, Place, Stopover,
-    Timestamp, Trip, TripTime, TripsQuery, time::WireTime,
+    Timestamp, Trip, TripTime, Trips, TripsQuery, time::WireTime,
 };
 
 /// Parameters of every request.
@@ -100,7 +100,7 @@ pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<Htt
     let (from_type, from) = place(query.origin.checked()?);
     let (to_type, to) = place(query.destination.checked()?);
     let time = query
-        .time
+        .paged_time()?
         .map(|time| match time {
             TripTime::DepartAt(time) => local_time(network, time).map(|local| (local, "dep")),
             TripTime::ArriveBy(time) => local_time(network, time).map(|local| (local, "arr")),
@@ -114,6 +114,8 @@ pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<Htt
         ("type_destination", to_type),
         ("name_destination", to.as_str()),
         ("useRealtime", "1"),
+        // Without it the server adds a trip from the other side of the time.
+        ("calcOneDirection", "1"),
     ]);
     if let Some(limit) = &limit {
         parameters.push(("calcNumberOfTrips", limit));
@@ -200,7 +202,7 @@ fn local_time(network: &Network, time: Timestamp) -> Result<(String, String), Er
     ))
 }
 
-pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<Vec<Trip>, Error> {
+pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<Trips, Error> {
     let response: TripsResponse = response.json()?;
     let Some(journeys) = response.journeys else {
         // Without trips the server explains itself in `systemMessages`.
@@ -213,7 +215,7 @@ pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<
             Some(message) => Err(Error::NotFound {
                 message: message.text.unwrap_or_default(),
             }),
-            None => Ok(Vec::new()),
+            None => Ok(Trips::paged_by_time(Vec::new())),
         };
     };
     let mut trips = Vec::new();
@@ -236,7 +238,7 @@ pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<
             trips.push(Trip { legs });
         }
     }
-    Ok(trips)
+    Ok(Trips::paged_by_time(trips))
 }
 
 pub(crate) fn parse_departures(
