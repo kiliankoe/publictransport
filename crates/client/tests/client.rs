@@ -241,7 +241,8 @@ async fn caller_configured_http_client_is_used_as_it_is() {
     );
 }
 
-/// TRIAS is the protocol whose requests have a body and a header.
+/// TRIAS is the protocol whose requests have a body and a header of their
+/// own, next to the one of the network.
 #[tokio::test]
 async fn request_body_and_headers_arrive_as_the_core_built_them() {
     let fixture = include_bytes!("../../core/tests/fixtures/trias/vvo-locations.xml");
@@ -251,7 +252,8 @@ async fn request_body_and_headers_arrive_as_the_core_built_them() {
         .mount(&server)
         .await;
     let network = Network::new("test", "Test", server.uri() + "/trias", Protocol::Trias)
-        .with_requestor_ref("OpenService");
+        .with_requestor_ref("OpenService")
+        .with_header("X-Api-Key", "secret");
     let query = LocationQuery::new("Hauptbahnhof");
 
     let found = Client::new(USER_AGENT)

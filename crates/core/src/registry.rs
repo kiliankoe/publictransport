@@ -257,6 +257,7 @@ impl Network {
             unsupported,
             requires_key: xml && options.requires_sign_up,
             terms: entry.usage_terms.filter(|terms| !terms.is_empty()),
+            headers: Vec::new(),
         })
     }
 }

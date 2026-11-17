@@ -40,8 +40,9 @@ pub struct HttpResponse {
     pub body: Vec<u8>,
 }
 
-/// One HTTP header.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One HTTP header. Its debug output leaves the value out, because that can
+/// be a key and debug output ends up in logs.
+#[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub struct Header {
@@ -49,6 +50,15 @@ pub struct Header {
     pub name: String,
     /// The header value.
     pub value: String,
+}
+
+impl std::fmt::Debug for Header {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Header")
+            .field("name", &self.name)
+            .finish_non_exhaustive()
+    }
 }
 
 impl HttpRequest {

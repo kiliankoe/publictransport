@@ -1,6 +1,6 @@
 use crate::{
-    Attribution, Coverage, Departure, DeparturesQuery, Error, HttpRequest, HttpResponse, Location,
-    LocationKind, LocationQuery, Operation, Place, Trip, TripsQuery, efa, motis, trias,
+    Attribution, Coverage, Departure, DeparturesQuery, Error, Header, HttpRequest, HttpResponse,
+    Location, LocationKind, LocationQuery, Operation, Place, Trip, TripsQuery, efa, motis, trias,
 };
 
 /// One server that answers public transport queries.
@@ -54,6 +54,14 @@ pub struct Network {
     /// does not enforce them: read them before using the network.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub terms: Option<String>,
+    /// HTTP headers that every request to the server carries, for servers
+    /// that want a key or the name of the client in one. A header here
+    /// takes the place of one with the same name that the protocol or the
+    /// HTTP client would set, such as `User-Agent`. The crate does not
+    /// check names and values; the HTTP client rejects invalid ones. Debug
+    /// output leaves the values out.
+    #[cfg_attr(feature = "uniffi", uniffi(default = []))]
+    pub headers: Vec<Header>,
 }
 
 /// The protocol a [`Network`] speaks.
@@ -92,6 +100,7 @@ impl Network {
             unsupported: Vec::new(),
             requires_key: false,
             terms: None,
+            headers: Vec::new(),
         }
     }
 
@@ -107,6 +116,28 @@ impl Network {
     pub fn with_requestor_ref(mut self, requestor_ref: impl Into<String>) -> Self {
         self.requestor_ref = Some(requestor_ref.into());
         self
+    }
+
+    /// Adds one of the [`Network::headers`].
+    #[must_use]
+    pub fn with_header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+        self.headers.push(Header {
+            name: name.into(),
+            value: value.into(),
+        });
+        self
+    }
+
+    /// Adds the [`Network::headers`] to a request the protocol built. One
+    /// of them takes the place of a header of the protocol with its name.
+    fn sent(&self, mut request: HttpRequest) -> HttpRequest {
+        let replaced = |header: &Header| {
+            let same = |other: &Header| other.name.eq_ignore_ascii_case(&header.name);
+            self.headers.iter().any(same)
+        };
+        request.headers.retain(|header| !replaced(header));
+        request.headers.extend(self.headers.iter().cloned());
+        request
     }
 
     /// Records this network as the origin of a parsed location.
@@ -198,11 +229,12 @@ impl Network {
     /// the protocol cannot carry.
     pub fn locations_request(&self, query: &LocationQuery) -> Result<HttpRequest, Error> {
         self.check(Operation::Locations)?;
-        match self.protocol {
+        let request = match self.protocol {
             Protocol::Efa => Ok(efa::locations_request(self, query)),
             Protocol::Motis => motis::locations_request(self, query),
             Protocol::Trias | Protocol::Ojp1 => trias::locations_request(self, query),
-        }
+        }?;
+        Ok(self.sent(request))
     }
 
     /// Parses the response to a [`Network::locations_request`]. The best
@@ -238,11 +270,12 @@ impl Network {
     /// [`Error::InvalidQuery`] if the time is outside the supported range.
     pub fn departures_request(&self, query: &DeparturesQuery) -> Result<HttpRequest, Error> {
         self.check(Operation::Departures)?;
-        match self.protocol {
+        let request = match self.protocol {
             Protocol::Efa => efa::departures_request(self, query),
             Protocol::Motis => motis::departures_request(self, query),
             Protocol::Trias | Protocol::Ojp1 => trias::departures_request(self, query),
-        }
+        }?;
+        Ok(self.sent(request))
     }
 
     /// Parses the response to a [`Network::departures_request`]. The
@@ -280,11 +313,12 @@ impl Network {
     /// [`Error::InvalidQuery`] if the time is outside the supported range.
     pub fn trips_request(&self, query: &TripsQuery) -> Result<HttpRequest, Error> {
         self.check(Operation::Trips)?;
-        match self.protocol {
+        let request = match self.protocol {
             Protocol::Efa => efa::trips_request(self, query),
             Protocol::Motis => motis::trips_request(self, query),
             Protocol::Trias | Protocol::Ojp1 => trias::trips_request(self, query),
-        }
+        }?;
+        Ok(self.sent(request))
     }
 
     /// Parses the response to a [`Network::trips_request`]. The trips are in

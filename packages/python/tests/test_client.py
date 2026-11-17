@@ -21,6 +21,7 @@ from publictransport import (
     Client,
     DeparturesQuery,
     Error,
+    Header,
     HttpResponse,
     LocationQuery,
     Network,
@@ -292,13 +293,15 @@ def test_own_client_identifies_itself_and_does_not_follow_redirects() -> None:
 
 
 def test_request_body_and_headers_arrive_as_the_library_built_them(call: Call) -> None:
-    # TRIAS is the protocol whose requests have a body and a header.
+    # TRIAS is the protocol whose requests have a body and a header of their
+    # own, next to the one of the network.
     network = Network(
         id="trias",
         name="TRIAS",
         endpoint="https://trias.example/trias",
         protocol=Protocol.TRIAS,
         requestor_ref="OpenService",
+        headers=[Header(name="X-Api-Key", value="secret")],
     )
     built = network.locations_request(LOCATIONS)
     sent: list[httpx.Request] = []
@@ -312,4 +315,7 @@ def test_request_body_and_headers_arrive_as_the_library_built_them(call: Call) -
 
     assert isinstance(found, list)
     assert [(r.method, r.content) for r in sent] == [("POST", built.body)]
-    assert [sent[0].headers[h.name] for h in built.headers] == ["application/xml"]
+    assert sorted(sent[0].headers[h.name] for h in built.headers) == [
+        "application/xml",
+        "secret",
+    ]

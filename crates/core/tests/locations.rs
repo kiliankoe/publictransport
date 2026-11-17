@@ -2,8 +2,8 @@
 
 use proptest::prelude::*;
 use publictransport::{
-    Error, Header, HttpRequest, HttpResponse, Location, LocationKind, LocationQuery, Method,
-    Network, Protocol,
+    DeparturesQuery, Error, Header, HttpRequest, HttpResponse, Location, LocationKind,
+    LocationQuery, Method, Network, Place, Protocol, TripsQuery,
 };
 
 const VVO: &[u8] = include_bytes!("fixtures/efa/vvo-stopfinder.json");
@@ -304,6 +304,73 @@ fn motis_maps_types_to_kinds_and_tolerates_a_missing_default_area() {
     assert_eq!(locations[1].kind, LocationKind::Poi);
     assert_eq!(locations[1].locality, None);
     assert_eq!(locations[2].global_id, None, "not an IFOPT identifier");
+}
+
+#[test]
+fn every_request_carries_the_headers_of_the_network_after_those_of_the_protocol() {
+    let extra = [("X-Api-Key", "secret"), ("X-Client", "tests/1.0")];
+    let stop = || Place::Id("de:14612:28".into());
+    for protocol in [
+        Protocol::Efa,
+        Protocol::Motis,
+        Protocol::Trias,
+        Protocol::Ojp1,
+    ] {
+        let plain =
+            || network(protocol, "https://example.org/base").with_requestor_ref("OpenService");
+        let with_headers = extra.iter().fold(plain(), |network, (name, value)| {
+            network.with_header(*name, *value)
+        });
+        let requests = |network: &Network| {
+            [
+                network.locations_request(&LocationQuery::new("Hauptbahnhof")),
+                network.departures_request(&DeparturesQuery::new("de:14612:28")),
+                network.trips_request(&TripsQuery::new(stop(), stop())),
+            ]
+            .map(Result::unwrap)
+        };
+        for (mut expected, with_headers) in
+            requests(&plain()).into_iter().zip(requests(&with_headers))
+        {
+            expected.headers.extend(extra.map(|(name, value)| Header {
+                name: name.to_owned(),
+                value: value.to_owned(),
+            }));
+            assert_eq!(with_headers, expected, "{protocol:?}");
+        }
+    }
+}
+
+/// A key in a header would otherwise end up in the logs of an application.
+#[test]
+fn debug_output_leaves_header_values_out() {
+    let network = network(Protocol::Efa, "https://example.org").with_header("X-Api-Key", "hunter2");
+    let request = network
+        .locations_request(&LocationQuery::new("Hauptbahnhof"))
+        .unwrap();
+    for text in [format!("{network:?}"), format!("{request:?}")] {
+        assert!(
+            text.contains("X-Api-Key") && !text.contains("hunter2"),
+            "{text}"
+        );
+    }
+}
+
+/// Two headers of one name would both be sent.
+#[test]
+fn header_of_the_network_takes_the_place_of_the_one_the_protocol_sets() {
+    let request = network(Protocol::Trias, "https://example.org/trias")
+        .with_requestor_ref("OpenService")
+        .with_header("content-type", "text/xml")
+        .locations_request(&LocationQuery::new("Hauptbahnhof"))
+        .unwrap();
+    let types: Vec<_> = request
+        .headers
+        .iter()
+        .filter(|header| header.name.eq_ignore_ascii_case("content-type"))
+        .map(|header| header.value.as_str())
+        .collect();
+    assert_eq!(types, ["text/xml"]);
 }
 
 #[test]
