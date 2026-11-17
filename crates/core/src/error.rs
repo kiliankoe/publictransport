@@ -10,8 +10,8 @@ pub enum Error {
         /// What is missing or wrong.
         message: String,
     },
-    /// The query holds a value no request can carry, such as a time outside
-    /// the supported range.
+    /// The query holds a value no request of the protocol can carry, such as
+    /// a time outside the supported range.
     #[error("the query is invalid: {message}")]
     InvalidQuery {
         /// What is wrong.
@@ -43,12 +43,16 @@ pub enum Error {
     /// The server failed (status 5xx).
     #[error("the server is unavailable")]
     Unavailable,
-    /// The server answered with any other failure.
-    #[error("the server answered with status {status}: {message}")]
+    /// The server reported any other failure: an HTTP status that no other
+    /// variant covers, or an error inside a successful response, as TRIAS
+    /// and OJP send them.
+    #[error("the server reported an error (HTTP status {status}): {message}")]
     Server {
-        /// The HTTP status code.
+        /// The HTTP status code. It is 200 for an error inside a successful
+        /// response.
         status: u16,
-        /// The start of the response body.
+        /// The start of the response body, or the error code or text the
+        /// server put into a successful response.
         message: String,
     },
     /// The response was not in the format the protocol defines.

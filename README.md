@@ -2,7 +2,12 @@
 
 A client library for public transport APIs. One shared model for stops, departures and trips covers several server types, so an application can query any supported network the same way.
 
-The project is at an early stage. It can search for locations by name, list the departures at a stop and plan trips between two places on servers that speak EFA (the JSON interface of MDV's journey planner, used by many German transport associations) or MOTIS (the routing engine behind [Transitous](https://transitous.org)).
+The project is at an early stage. It can search for locations by name, list the departures at a stop and plan trips between two places on servers that speak one of four protocols:
+
+- EFA, the JSON interface of MDV's journey planner, used by many German transport associations
+- MOTIS, the routing engine behind [Transitous](https://transitous.org)
+- TRIAS 1.2, the German XML standard VDV 431-2
+- OJP 1.0, its European successor
 
 ## Design
 
@@ -27,7 +32,7 @@ cargo deny check
 
 A Python package in `packages/python` wraps the library through [UniFFI](https://mozilla.github.io/uniffi-rs/); see its README. The crate in `bindings/uniffi` builds the shared library for it.
 
-The tests replay responses recorded from real servers. `crates/core/tests/fixtures/record.sh` records them again.
+The tests replay responses recorded from real servers. `crates/core/tests/fixtures/record.sh` records them again. `scripts/validate-xml-requests.sh` checks the TRIAS and OJP requests that the library builds against the official schemas, which it fetches from the VDV repositories.
 
 `CONTRIBUTING.md` describes the commit message format and how the changelog is made.
 

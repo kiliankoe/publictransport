@@ -26,6 +26,8 @@ jobs:
       - run: nix develop -c cargo clippy -p publictransport --all-targets -- -D warnings
       - run: nix develop -c cargo test -p publictransport
       - run: nix develop -c cargo deny check
+      # Fetches the TRIAS and OJP schemas from GitHub.
+      - run: nix develop -c scripts/validate-xml-requests.sh
 
   commits:
     runs-on: ubuntu-latest

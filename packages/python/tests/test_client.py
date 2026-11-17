@@ -289,3 +289,27 @@ def test_own_client_identifies_itself_and_does_not_follow_redirects() -> None:
             server.shutdown()
 
     assert seen == [("/api/v1/geocode", USER_AGENT)] * 2
+
+
+def test_request_body_and_headers_arrive_as_the_library_built_them(call: Call) -> None:
+    # TRIAS is the protocol whose requests have a body and a header.
+    network = Network(
+        id="trias",
+        name="TRIAS",
+        endpoint="https://trias.example/trias",
+        protocol=Protocol.TRIAS,
+        requestor_ref="OpenService",
+    )
+    built = network.locations_request(LOCATIONS)
+    sent: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        body = (FIXTURES / "trias/vvo-locations.xml").read_bytes()
+        return httpx.Response(200, content=body)
+
+    found = call(handler, "locations", network, LOCATIONS)
+
+    assert isinstance(found, list)
+    assert [(r.method, r.content) for r in sent] == [("POST", built.body)]
+    assert [sent[0].headers[h.name] for h in built.headers] == ["application/xml"]

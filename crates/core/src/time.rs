@@ -14,7 +14,7 @@ pub(crate) struct WireTime(pub(crate) Timestamp);
 impl<'de> Deserialize<'de> for WireTime {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let text = String::deserialize(deserializer)?;
-        let time: jiff::Timestamp = text.parse().map_err(serde::de::Error::custom)?;
+        let time: jiff::Timestamp = text.trim().parse().map_err(serde::de::Error::custom)?;
         let time = Timestamp {
             unix_seconds: time.as_second(),
         };

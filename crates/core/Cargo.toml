@@ -11,6 +11,7 @@ workspace = true
 
 [dev-dependencies]
 proptest = "1.12.0"
+roxmltree = "0.21.2"
 
 [features]
 # Exports the types and functions to other languages through UniFFI.
@@ -24,3 +25,4 @@ jiff = { version = "1.0.0", default-features = false, features = ["std", "tzdb-b
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 thiserror = "2.0.21"
+quick-xml = { version = "0.42.0", features = ["serialize", "overlapped-lists"] }

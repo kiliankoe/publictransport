@@ -240,3 +240,36 @@ async fn caller_configured_http_client_is_used_as_it_is() {
         "configured-by-the-caller/2.0"
     );
 }
+
+/// TRIAS is the protocol whose requests have a body and a header.
+#[tokio::test]
+async fn request_body_and_headers_arrive_as_the_core_built_them() {
+    let fixture = include_bytes!("../../core/tests/fixtures/trias/vvo-locations.xml");
+    let server = MockServer::start().await;
+    Mock::given(any())
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(fixture.as_slice()))
+        .mount(&server)
+        .await;
+    let network = Network::new("test", "Test", server.uri() + "/trias", Protocol::Trias)
+        .with_requestor_ref("OpenService");
+    let query = LocationQuery::new("Hauptbahnhof");
+
+    let found = Client::new(USER_AGENT)
+        .unwrap()
+        .locations(&network, &query)
+        .await
+        .unwrap();
+    assert_eq!(found.len(), 1);
+
+    let built = network.locations_request(&query).unwrap();
+    let received = server.received_requests().await.unwrap();
+    let [received] = received.as_slice() else {
+        panic!("{received:?}");
+    };
+    assert_eq!(received.method.as_str(), "POST");
+    assert_eq!(Some(&received.body), built.body.as_ref());
+    for header in &built.headers {
+        let value = received.headers.get(header.name.as_str()).unwrap();
+        assert_eq!(value.to_str().unwrap(), header.value);
+    }
+}

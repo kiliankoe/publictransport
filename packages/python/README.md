@@ -1,6 +1,6 @@
 # publictransport
 
-A Python client for public transport APIs. One shared model for stops, departures and trips covers several server types, so an application can query any supported network the same way. It supports servers that speak EFA (used by many German transport associations) and MOTIS (the routing engine behind [Transitous](https://transitous.org)).
+A Python client for public transport APIs. One shared model for stops, departures and trips covers several server types, so an application can query any supported network the same way. It supports servers that speak EFA (used by many German transport associations), MOTIS (the routing engine behind [Transitous](https://transitous.org)), TRIAS 1.2 and OJP 1.0.
 
 The package wraps the Rust library of the same name. The Rust code builds the requests and parses the answers, and [httpx](https://www.python-httpx.org) sends them.
 
@@ -23,7 +23,7 @@ with Client(user_agent="my-app/1.0 (+https://example.org)") as client:
 
 `AsyncClient` has the same methods as coroutines.
 
-Times are timezone-aware `datetime` objects in UTC, and `Location.timezone` names the zone to show them in. A time in a query has to be timezone-aware too, in any zone. An EFA network needs its `timezone` to send a query time.
+Times are timezone-aware `datetime` objects in UTC, and `Location.timezone` names the zone to show them in. A time in a query has to be timezone-aware too, in any zone. An EFA network needs its `timezone` to send a query time. A TRIAS or OJP network needs a `requestor_ref`, which public servers document, e.g. `OpenService`.
 
 Failures that the server or the query cause are raised as subclasses of `publictransport.Error`, such as `Error.NotFound` or `Error.RateLimited`. Failures of the HTTP exchange are raised as httpx raises them. An answer above 16 MB raises `ResponseTooLarge`.
 

@@ -1,6 +1,6 @@
 use crate::{
     Departure, DeparturesQuery, Error, HttpRequest, HttpResponse, Location, LocationQuery, Trip,
-    TripsQuery, efa, motis,
+    TripsQuery, efa, motis, trias,
 };
 
 /// One server that answers public transport queries.
@@ -13,17 +13,25 @@ pub struct Network {
     pub id: String,
     /// The name to show to users.
     pub name: String,
-    /// The base URL that the protocol's paths are appended to, e.g.
-    /// `https://efa.vvo-online.de/std3` or `https://api.transitous.org/api`.
-    /// A trailing slash is allowed.
+    /// The URL of the server. For EFA and MOTIS it is the base URL that the
+    /// protocol's paths are appended to, e.g.
+    /// `https://efa.vvo-online.de/std3` or `https://api.transitous.org/api`,
+    /// and a trailing slash is allowed. TRIAS and OJP have one URL for all
+    /// requests, e.g. `https://efa.vvo-online.de/std3/trias`.
     pub endpoint: String,
     /// The protocol the server speaks.
     pub protocol: Protocol,
     /// The IANA name of the time zone the server works in, e.g.
-    /// `Europe/Berlin`. EFA needs it for requests that carry a time, and the
-    /// locations of an EFA network get it as their time zone.
+    /// `Europe/Berlin`. EFA needs it for requests that carry a time. On every
+    /// protocol but MOTIS, which sends a time zone per stop, the locations
+    /// get it as their time zone.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub timezone: Option<String>,
+    /// Identifies the client to a TRIAS or OJP server, which refuses
+    /// requests without it. Public servers document a value such as
+    /// `OpenService`; others hand out a key.
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub requestor_ref: Option<String>,
 }
 
 /// The protocol a [`Network`] speaks.
@@ -36,6 +44,10 @@ pub enum Protocol {
     Efa,
     /// The MOTIS API, as served by Transitous.
     Motis,
+    /// TRIAS 1.2 (VDV 431-2), an XML interface.
+    Trias,
+    /// OJP 1.0 (CEN/TS 17118:2017), the European successor of TRIAS.
+    Ojp1,
 }
 
 impl Network {
@@ -52,6 +64,7 @@ impl Network {
             endpoint: endpoint.into(),
             protocol,
             timezone: None,
+            requestor_ref: None,
         }
     }
 
@@ -59,6 +72,13 @@ impl Network {
     #[must_use]
     pub fn with_timezone(mut self, timezone: impl Into<String>) -> Self {
         self.timezone = Some(timezone.into());
+        self
+    }
+
+    /// Sets [`Network::requestor_ref`].
+    #[must_use]
+    pub fn with_requestor_ref(mut self, requestor_ref: impl Into<String>) -> Self {
+        self.requestor_ref = Some(requestor_ref.into());
         self
     }
 }
@@ -69,11 +89,14 @@ impl Network {
     ///
     /// # Errors
     ///
-    /// Never fails today. It will once networks differ in what they support.
+    /// Returns [`Error::InvalidNetwork`] if a TRIAS or OJP network has no
+    /// requestor reference, and [`Error::InvalidQuery`] if the query holds
+    /// text the protocol cannot carry.
     pub fn locations_request(&self, query: &LocationQuery) -> Result<HttpRequest, Error> {
         match self.protocol {
             Protocol::Efa => Ok(efa::locations_request(self, query)),
             Protocol::Motis => Ok(motis::locations_request(self, query)),
+            Protocol::Trias | Protocol::Ojp1 => trias::locations_request(self, query),
         }
     }
 
@@ -88,6 +111,7 @@ impl Network {
         match self.protocol {
             Protocol::Efa => efa::parse_locations(self, response),
             Protocol::Motis => motis::parse_locations(response),
+            Protocol::Trias | Protocol::Ojp1 => trias::parse_locations(self, response),
         }
     }
 
@@ -100,12 +124,14 @@ impl Network {
     /// # Errors
     ///
     /// Returns [`Error::InvalidNetwork`] if the query has a time and the
-    /// network needs a time zone for it but has none or an unknown one, and
+    /// network needs a time zone for it but has none or an unknown one, or
+    /// if a TRIAS or OJP network has no requestor reference, and
     /// [`Error::InvalidQuery`] if the time is outside the supported range.
     pub fn departures_request(&self, query: &DeparturesQuery) -> Result<HttpRequest, Error> {
         match self.protocol {
             Protocol::Efa => efa::departures_request(self, query),
             Protocol::Motis => motis::departures_request(self, query),
+            Protocol::Trias | Protocol::Ojp1 => trias::departures_request(self, query),
         }
     }
 
@@ -114,13 +140,16 @@ impl Network {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::NotFound`] if the network does not know the stop,
-    /// and another error if the status code reports a failure or if the body
-    /// is not what the protocol defines.
+    /// Returns [`Error::NotFound`] if the network says that it does not know
+    /// the stop, and another error if the status code reports a failure or
+    /// if the body is not what the protocol defines. TRIAS and OJP servers
+    /// built on EFA answer an unknown stop with an internal error, which is
+    /// an [`Error::Server`].
     pub fn parse_departures(&self, response: &HttpResponse) -> Result<Vec<Departure>, Error> {
         match self.protocol {
             Protocol::Efa => efa::parse_departures(self, response),
             Protocol::Motis => motis::parse_departures(response),
+            Protocol::Trias | Protocol::Ojp1 => trias::parse_departures(self, response),
         }
     }
 
@@ -132,12 +161,14 @@ impl Network {
     /// # Errors
     ///
     /// Returns [`Error::InvalidNetwork`] if the query has a time and the
-    /// network needs a time zone for it but has none or an unknown one, and
+    /// network needs a time zone for it but has none or an unknown one, or
+    /// if a TRIAS or OJP network has no requestor reference, and
     /// [`Error::InvalidQuery`] if the time is outside the supported range.
     pub fn trips_request(&self, query: &TripsQuery) -> Result<HttpRequest, Error> {
         match self.protocol {
             Protocol::Efa => efa::trips_request(self, query),
             Protocol::Motis => motis::trips_request(self, query),
+            Protocol::Trias | Protocol::Ojp1 => trias::trips_request(self, query),
         }
     }
 
@@ -158,6 +189,7 @@ impl Network {
         match self.protocol {
             Protocol::Efa => efa::parse_trips(self, response),
             Protocol::Motis => motis::parse_trips(response),
+            Protocol::Trias | Protocol::Ojp1 => trias::parse_trips(self, response),
         }
     }
 }

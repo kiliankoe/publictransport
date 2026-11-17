@@ -4,6 +4,8 @@
 //! ```sh
 //! cargo run --example trip -- vvo "Dresden Hauptbahnhof" "Dresden Albertplatz"
 //! cargo run --example trip -- transitous "Dresden Hauptbahnhof" "Dresden Albertplatz"
+//! cargo run --example trip -- vvo-trias "Dresden Hauptbahnhof" "Dresden Albertplatz"
+//! cargo run --example trip -- vrr-ojp "Düsseldorf Hbf" "Essen Hbf"
 //! ```
 
 use std::error::Error;
@@ -23,7 +25,7 @@ const USER_AGENT: &str = concat!(
 async fn main() -> Result<(), Box<dyn Error>> {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let [network, from, to] = arguments.as_slice() else {
-        return Err("usage: trip <vvo|transitous> <from> <to>".into());
+        return Err("usage: trip <vvo|transitous|vvo-trias|vrr-ojp> <from> <to>".into());
     };
     let network = match network.as_str() {
         "vvo" => Network::new(
@@ -39,6 +41,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
             "https://api.transitous.org/api",
             Protocol::Motis,
         ),
+        "vvo-trias" => Network::new(
+            "vvo-trias",
+            "Verkehrsverbund Oberelbe",
+            "https://efa.vvo-online.de/std3/trias",
+            Protocol::Trias,
+        )
+        .with_timezone("Europe/Berlin")
+        .with_requestor_ref("OpenService"),
+        "vrr-ojp" => Network::new(
+            "vrr-ojp",
+            "Verkehrsverbund Rhein-Ruhr",
+            "https://efa.vrr.de/std3/ojp",
+            Protocol::Ojp1,
+        )
+        .with_timezone("Europe/Berlin")
+        .with_requestor_ref("OpenService"),
         other => return Err(format!("unknown network {other}").into()),
     };
     let client = Client::new(USER_AGENT)?;

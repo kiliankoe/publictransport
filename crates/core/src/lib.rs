@@ -1,4 +1,4 @@
-//! Client for public transport APIs such as EFA and MOTIS.
+//! Client for public transport APIs: EFA, MOTIS, TRIAS and OJP.
 //!
 //! This crate does no I/O. It builds HTTP requests and parses HTTP responses,
 //! so each platform can send them with its own HTTP stack. Every operation is
@@ -31,7 +31,8 @@
 //! Departures and trips work the same way, with
 //! [`Network::departures_request`] and [`Network::parse_departures`], and
 //! with [`Network::trips_request`] and [`Network::parse_trips`]. An EFA
-//! network needs [`Network::with_timezone`] for requests that carry a time.
+//! network needs [`Network::with_timezone`] for requests that carry a time,
+//! and a TRIAS or OJP network needs [`Network::with_requestor_ref`].
 //!
 //! The HTTP client has two duties:
 //!
@@ -53,6 +54,7 @@ mod model;
 mod motis;
 mod network;
 mod time;
+mod trias;
 
 pub use error::Error;
 pub use http::{Header, HttpRequest, HttpResponse, Method};

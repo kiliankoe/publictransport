@@ -50,8 +50,8 @@ pub struct Location {
     /// The position.
     pub coordinate: Option<Coordinate>,
     /// The IANA name of the time zone the location is in, e.g.
-    /// `Europe/Berlin`, for showing times there. MOTIS sends it; for EFA it
-    /// is [`Network::timezone`](crate::Network::timezone).
+    /// `Europe/Berlin`, for showing times there. MOTIS sends it; on the other
+    /// protocols it is [`Network::timezone`](crate::Network::timezone).
     pub timezone: Option<String>,
 }
 
