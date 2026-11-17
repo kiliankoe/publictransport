@@ -54,8 +54,9 @@
             pkgs.git-cliff
             # Finds OpenSSL for the native-tls feature of the client.
             pkgs.pkg-config
-            # xmllint, for scripts/validate-xml-requests.sh
+            # xmllint and the shell, for scripts/validate-xml-requests.sh
             pkgs.libxml2
+            pkgs.zsh
             # The Python package in packages/python
             pkgs.python3
             pkgs.uv
