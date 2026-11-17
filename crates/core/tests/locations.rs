@@ -55,7 +55,64 @@ fn parameter(request: &HttpRequest, name: &str) -> Vec<String> {
         .collect()
 }
 
+/// Any choice of kinds, in any order and with duplicates.
+fn kinds() -> impl Strategy<Value = Vec<LocationKind>> {
+    prop::collection::vec(
+        prop::sample::select(vec![
+            LocationKind::Stop,
+            LocationKind::Address,
+            LocationKind::Poi,
+            LocationKind::Other,
+        ]),
+        0..8,
+    )
+}
+
 proptest! {
+    #[test]
+    fn efa_filter_is_the_sum_of_the_bits_of_the_wanted_kinds(kinds in kinds()) {
+        let bits = |kind| match kind {
+            LocationKind::Stop => 2_u32,
+            LocationKind::Address => 12,
+            LocationKind::Poi => 32,
+            // `Other`; the enum is non-exhaustive.
+            _ => 81,
+        };
+        let sum = kinds.iter().fold(0, |sum, &kind| sum | bits(kind));
+        let expected = if sum == 0 { Vec::new() } else { vec![sum.to_string()] };
+        let query = LocationQuery::new("Hauptbahnhof").with_kinds(kinds);
+        let request = network(Protocol::Efa, "https://example.org/base")
+            .locations_request(&query)
+            .unwrap();
+        prop_assert_eq!(parameter(&request, "anyObjFilter_sf"), expected);
+    }
+
+    #[test]
+    fn motis_type_lists_each_wanted_kind_once_and_rejects_a_query_for_other_kinds_only(
+        kinds in kinds(),
+    ) {
+        let expected: std::collections::BTreeSet<_> = kinds
+            .iter()
+            .filter_map(|kind| match kind {
+                LocationKind::Stop => Some("STOP"),
+                LocationKind::Address => Some("ADDRESS"),
+                LocationKind::Poi => Some("PLACE"),
+                _ => None,
+            })
+            .collect();
+        let query = LocationQuery::new("Hauptbahnhof").with_kinds(kinds.clone());
+        let result = network(Protocol::Motis, "https://example.org/base").locations_request(&query);
+        if expected.is_empty() && !kinds.is_empty() {
+            prop_assert!(matches!(result, Err(Error::InvalidQuery { .. })), "{:?}", result);
+        } else {
+            let lists = parameter(&result.unwrap(), "type");
+            prop_assert_eq!(lists.len(), usize::from(!kinds.is_empty()), "{:?}", lists);
+            let mut values: Vec<_> = lists.iter().flat_map(|list| list.split(',')).collect();
+            values.sort_unstable();
+            prop_assert_eq!(values, expected.into_iter().collect::<Vec<_>>());
+        }
+    }
+
     #[test]
     fn search_text_reaches_the_server_intact(text: String, trailing_slash: bool) {
         let endpoint = if trailing_slash { "https://example.org/base/" } else { "https://example.org/base" };

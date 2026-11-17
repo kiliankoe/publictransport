@@ -6,7 +6,7 @@
 //! the other turns the [`HttpResponse`] into model types.
 //!
 //! ```
-//! use publictransport::{HttpResponse, LocationQuery, Network, Protocol};
+//! use publictransport::{HttpResponse, LocationKind, LocationQuery, Network, Protocol};
 //!
 //! # fn main() -> Result<(), publictransport::Error> {
 //! let network = Network::new(
@@ -15,7 +15,7 @@
 //!     "https://efa.vvo-online.de/std3",
 //!     Protocol::Efa,
 //! );
-//! let query = LocationQuery::new("Hauptbahnhof").with_limit(5);
+//! let query = LocationQuery::new("Hauptbahnhof").with_kinds([LocationKind::Stop]);
 //!
 //! let request = network.locations_request(&query)?;
 //! // Send `request` with an HTTP client and copy its answer into a response.

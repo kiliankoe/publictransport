@@ -168,9 +168,30 @@ pub(crate) fn locations_request(
     let dialect = Dialect::of(network);
     let text = query_text(&query.text)?;
     let input = dialect.element("InitialInput", &dialect.text("LocationName", text));
-    let restrictions = query.limit.map_or_else(String::new, |limit| {
-        dialect.element("Restrictions", &dialect.number_of_results(Some(limit)))
-    });
+    let types: String = [
+        (LocationKind::Stop, "stop"),
+        (LocationKind::Address, "address"),
+        (LocationKind::Poi, "poi"),
+        (
+            LocationKind::Other,
+            if dialect.ojp {
+                "topographicPlace"
+            } else {
+                "locality"
+            },
+        ),
+    ]
+    .into_iter()
+    .filter(|(kind, _)| query.kinds.contains(kind))
+    .map(|(_, name)| dialect.element("Type", name))
+    .collect();
+    // The schemas want the types before the number of results.
+    let restrictions = types + &dialect.number_of_results(query.limit);
+    let restrictions = if restrictions.is_empty() {
+        restrictions
+    } else {
+        dialect.element("Restrictions", &restrictions)
+    };
     let request = dialect.request("LocationInformationRequest", &(input + &restrictions));
     dialect.post(network, &request)
 }

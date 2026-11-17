@@ -121,12 +121,13 @@ async fn first_stop(
     network: &Network,
     text: &str,
 ) -> Result<Location, Box<dyn Error>> {
-    let query = LocationQuery::new(text).with_limit(5);
+    // Without a limit: some servers find nothing when one cuts the list.
+    let query = LocationQuery::new(text).with_kinds([LocationKind::Stop]);
     client
         .locations(network, &query)
         .await?
         .into_iter()
-        .find(|location| location.kind == LocationKind::Stop)
+        .next()
         .ok_or_else(|| format!("no stop found for {text}").into())
 }
 

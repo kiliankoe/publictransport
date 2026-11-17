@@ -8,13 +8,39 @@ use crate::{
     TripsQuery, time::WireTime,
 };
 
-pub(crate) fn locations_request(network: &Network, query: &LocationQuery) -> HttpRequest {
+pub(crate) fn locations_request(
+    network: &Network,
+    query: &LocationQuery,
+) -> Result<HttpRequest, Error> {
     let limit = query.limit.map(|limit| limit.to_string());
+    // The server has no type for the other kinds.
+    let types: Vec<&str> = [
+        (LocationKind::Stop, "STOP"),
+        (LocationKind::Address, "ADDRESS"),
+        (LocationKind::Poi, "PLACE"),
+    ]
+    .into_iter()
+    .filter(|(kind, _)| query.kinds.contains(kind))
+    .map(|(_, name)| name)
+    .collect();
+    if types.is_empty() && !query.kinds.is_empty() {
+        return Err(Error::InvalidQuery {
+            message: "MOTIS has no locations of the kinds asked for".to_owned(),
+        });
+    }
+    let types = types.join(",");
     let mut parameters = vec![("text", query.text.as_str())];
+    if !types.is_empty() {
+        parameters.push(("type", &types));
+    }
     if let Some(limit) = &limit {
         parameters.push(("numResults", limit));
     }
-    HttpRequest::get(&network.endpoint, "v1/geocode", parameters)
+    Ok(HttpRequest::get(
+        &network.endpoint,
+        "v1/geocode",
+        parameters,
+    ))
 }
 
 pub(crate) fn parse_locations(response: &HttpResponse) -> Result<Vec<Location>, Error> {

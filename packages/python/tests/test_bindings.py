@@ -8,6 +8,7 @@ from publictransport import (
     LegEnd,
     Location,
     LocationKind,
+    LocationQuery,
     Network,
     Protocol,
 )
@@ -67,6 +68,14 @@ def test_query_time_reaches_the_request() -> None:
     request = MOTIS.departures_request(DeparturesQuery(stop_id="a", time=time))
 
     assert "time=2026-11-16T13%3A24%3A00Z" in request.url
+
+
+def test_kinds_of_a_location_query_are_optional_and_reach_the_request() -> None:
+    every_kind = MOTIS.locations_request(LocationQuery(text="a"))
+    stops = MOTIS.locations_request(LocationQuery(text="a", kinds=[LocationKind.STOP]))
+
+    assert "type=" not in every_kind.url
+    assert "type=STOP" in stops.url
 
 
 def test_station_id_is_shared_by_a_station_and_its_platforms() -> None:

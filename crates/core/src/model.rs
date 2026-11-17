@@ -9,15 +9,30 @@ pub struct LocationQuery {
     /// The largest number of results wanted. Servers may return fewer.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub limit: Option<u32>,
+    /// The kinds of location wanted. Empty asks for every kind. The request
+    /// asks the server to filter, so `limit` counts only wanted locations.
+    /// MOTIS has no locations of the kind [`LocationKind::Other`]: it is
+    /// left out there, and a query for that kind alone is an
+    /// [`Error::InvalidQuery`](crate::Error::InvalidQuery).
+    #[cfg_attr(feature = "uniffi", uniffi(default = []))]
+    pub kinds: Vec<LocationKind>,
 }
 
 impl LocationQuery {
-    /// A search for `text` without a limit.
+    /// A search for `text` without a limit, for every kind of location.
     pub fn new(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
             limit: None,
+            kinds: Vec::new(),
         }
+    }
+
+    /// Sets [`LocationQuery::kinds`].
+    #[must_use]
+    pub fn with_kinds(mut self, kinds: impl IntoIterator<Item = LocationKind>) -> Self {
+        self.kinds = kinds.into_iter().collect();
+        self
     }
 
     /// Sets [`LocationQuery::limit`].

@@ -438,6 +438,36 @@ proptest! {
     }
 
     #[test]
+    fn locations_request_has_one_type_for_each_wanted_kind(
+        kinds in prop::collection::vec(
+            prop::sample::select(vec![
+                LocationKind::Stop,
+                LocationKind::Address,
+                LocationKind::Poi,
+                LocationKind::Other,
+            ]),
+            0..8,
+        ),
+    ) {
+        for (protocol, other) in [(Protocol::Trias, "locality"), (Protocol::Ojp1, "topographicPlace")] {
+            let expected: std::collections::BTreeSet<_> = kinds
+                .iter()
+                .map(|kind| match kind {
+                    LocationKind::Stop => "stop",
+                    LocationKind::Address => "address",
+                    LocationKind::Poi => "poi",
+                    _ => other,
+                })
+                .collect();
+            let query = LocationQuery::new("Hauptbahnhof").with_kinds(kinds.clone());
+            let request = network(protocol).locations_request(&query).unwrap();
+            let mut types = texts(&request, "Type").unwrap();
+            types.sort_unstable();
+            prop_assert_eq!(types, expected.into_iter().collect::<Vec<_>>(), "{:?}", protocol);
+        }
+    }
+
+    #[test]
     fn parsing_never_panics(
         body in prop_oneof![
             any::<Vec<u8>>(),
@@ -497,7 +527,7 @@ fn time_outside_the_calendar_is_an_invalid_query() {
 }
 
 #[test]
-fn locations_request_carries_the_text_and_only_a_limit_the_query_has() {
+fn locations_request_carries_the_text_and_only_the_restrictions_the_query_has() {
     let query = LocationQuery::new("Hauptbahnhof");
     for protocol in PROTOCOLS {
         for (query, restrictions) in [
@@ -505,6 +535,14 @@ fn locations_request_carries_the_text_and_only_a_limit_the_query_has() {
             (
                 query.clone().with_limit(5),
                 "<Restrictions><NumberOfResults>5</NumberOfResults></Restrictions>",
+            ),
+            (
+                query.clone().with_kinds([LocationKind::Stop]),
+                "<Restrictions><Type>stop</Type></Restrictions>",
+            ),
+            (
+                query.clone().with_limit(5).with_kinds([LocationKind::Stop]),
+                "<Restrictions><Type>stop</Type><NumberOfResults>5</NumberOfResults></Restrictions>",
             ),
         ] {
             let expected = envelope(

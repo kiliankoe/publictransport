@@ -90,12 +90,13 @@ impl Network {
     /// # Errors
     ///
     /// Returns [`Error::InvalidNetwork`] if a TRIAS or OJP network has no
-    /// requestor reference, and [`Error::InvalidQuery`] if the query holds
-    /// text the protocol cannot carry.
+    /// requestor reference, and [`Error::InvalidQuery`] if the query asks
+    /// only for kinds of location the protocol does not have or holds text
+    /// the protocol cannot carry.
     pub fn locations_request(&self, query: &LocationQuery) -> Result<HttpRequest, Error> {
         match self.protocol {
             Protocol::Efa => Ok(efa::locations_request(self, query)),
-            Protocol::Motis => Ok(motis::locations_request(self, query)),
+            Protocol::Motis => motis::locations_request(self, query),
             Protocol::Trias | Protocol::Ojp1 => trias::locations_request(self, query),
         }
     }

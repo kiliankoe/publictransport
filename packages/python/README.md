@@ -5,7 +5,14 @@ A Python client for public transport APIs. One shared model for stops, departure
 The package wraps the Rust library of the same name. The Rust code builds the requests and parses the answers, and [httpx](https://www.python-httpx.org) sends them.
 
 ```python
-from publictransport import Client, DeparturesQuery, LocationQuery, Network, Protocol
+from publictransport import (
+    Client,
+    DeparturesQuery,
+    LocationKind,
+    LocationQuery,
+    Network,
+    Protocol,
+)
 
 vvo = Network(
     id="vvo",
@@ -16,7 +23,9 @@ vvo = Network(
 )
 
 with Client(user_agent="my-app/1.0 (+https://example.org)") as client:
-    stops = client.locations(vvo, LocationQuery(text="Hauptbahnhof", limit=5))
+    stops = client.locations(
+        vvo, LocationQuery(text="Hauptbahnhof", kinds=[LocationKind.STOP])
+    )
     for departure in client.departures(vvo, DeparturesQuery(stop_id=stops[0].id)):
         print(departure.scheduled_time, departure.line.name, departure.direction)
 ```

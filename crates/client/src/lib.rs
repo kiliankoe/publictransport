@@ -6,14 +6,17 @@
 //! alone. The futures need a Tokio runtime, as all of `reqwest` does.
 //!
 //! ```no_run
-//! use publictransport_client::{Client, DeparturesQuery, LocationQuery, Network, Protocol};
+//! use publictransport_client::{
+//!     Client, DeparturesQuery, LocationKind, LocationQuery, Network, Protocol,
+//! };
 //!
 //! # async fn example() -> Result<(), publictransport_client::Error> {
 //! let client = Client::new("my-app/1.0 (+https://example.org)")?;
 //! let vvo = Network::new("vvo", "VVO", "https://efa.vvo-online.de/std3", Protocol::Efa)
 //!     .with_timezone("Europe/Berlin");
 //!
-//! let stops = client.locations(&vvo, &LocationQuery::new("Hauptbahnhof")).await?;
+//! let query = LocationQuery::new("Hauptbahnhof").with_kinds([LocationKind::Stop]);
+//! let stops = client.locations(&vvo, &query).await?;
 //! if let Some(stop) = stops.first() {
 //!     for departure in client.departures(&vvo, &DeparturesQuery::new(&stop.id)).await? {
 //!         println!("{} to {:?}", departure.line.name, departure.direction);

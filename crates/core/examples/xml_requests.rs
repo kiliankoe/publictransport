@@ -4,8 +4,8 @@
 use std::{error::Error, fs, path::PathBuf};
 
 use publictransport::{
-    Coordinate, DeparturesQuery, HttpRequest, LocationQuery, Network, Place, Protocol, Timestamp,
-    TripsQuery,
+    Coordinate, DeparturesQuery, HttpRequest, LocationKind, LocationQuery, Network, Place,
+    Protocol, Timestamp, TripsQuery,
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -25,7 +25,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         let requests = [
             (
                 "locations",
-                network.locations_request(&LocationQuery::new("Haupt & Bahnhof").with_limit(5))?,
+                network.locations_request(
+                    &LocationQuery::new("Haupt & Bahnhof")
+                        .with_kinds([
+                            LocationKind::Stop,
+                            LocationKind::Address,
+                            LocationKind::Poi,
+                            LocationKind::Other,
+                        ])
+                        .with_limit(5),
+                )?,
             ),
             (
                 "departures",
