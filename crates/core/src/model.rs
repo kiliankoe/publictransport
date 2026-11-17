@@ -6,7 +6,9 @@
 pub struct LocationQuery {
     /// The text to search for, as a user typed it.
     pub text: String,
-    /// The largest number of results wanted. Servers may return fewer.
+    /// The largest number of results wanted. Servers may return fewer. EFA
+    /// has no limit that works for every search, so the request carries
+    /// none there and the server returns every match.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub limit: Option<u32>,
     /// The kinds of location wanted. Empty asks for every kind. The request

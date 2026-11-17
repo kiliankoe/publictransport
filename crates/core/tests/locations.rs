@@ -158,7 +158,7 @@ fn motis_request_passes_the_limit() {
 }
 
 #[test]
-fn efa_request_asks_for_rapid_json_in_wgs84_and_passes_the_limit() {
+fn efa_request_asks_for_rapid_json_in_wgs84_and_sends_no_limit() {
     let network = network(Protocol::Efa, "https://efa.vvo-online.de/std3");
     let mut query = LocationQuery::new("Hauptbahnhof");
     query.limit = Some(7);
@@ -169,10 +169,7 @@ fn efa_request_asks_for_rapid_json_in_wgs84_and_passes_the_limit() {
         ["WGS84[dd.ddddd]"]
     );
     assert_eq!(parameter(&request, "type_sf"), ["any"]);
-    assert_eq!(parameter(&request, "anyMaxSizeHitList"), ["7"]);
-
-    query.limit = None;
-    let request = network.locations_request(&query).unwrap();
+    // The server's limit makes vague searches come back empty.
     assert_eq!(
         parameter(&request, "anyMaxSizeHitList"),
         Vec::<String>::new()

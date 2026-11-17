@@ -18,7 +18,8 @@ fn common() -> Vec<(&'static str, &'static str)> {
 }
 
 pub(crate) fn locations_request(network: &Network, query: &LocationQuery) -> HttpRequest {
-    let limit = query.limit.map(|limit| limit.to_string());
+    // No limit: `anyMaxSizeHitList` cuts the list before the server rates
+    // the matches on some servers, and a vague search then finds nothing.
     // A sum of bits: 1 localities, 2 stops, 4 streets, 8 addresses,
     // 16 crossings, 32 points of interest, 64 postcodes.
     let filter = query
@@ -37,9 +38,6 @@ pub(crate) fn locations_request(network: &Network, query: &LocationQuery) -> Htt
     parameters.extend([("type_sf", "any"), ("name_sf", query.text.as_str())]);
     if !query.kinds.is_empty() {
         parameters.push(("anyObjFilter_sf", &filter));
-    }
-    if let Some(limit) = &limit {
-        parameters.push(("anyMaxSizeHitList", limit));
     }
     HttpRequest::get(&network.endpoint, "XML_STOPFINDER_REQUEST", parameters)
 }
