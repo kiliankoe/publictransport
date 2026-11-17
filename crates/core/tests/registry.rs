@@ -38,10 +38,6 @@ fn area(regions: &[&str], polygons: Vec<Polygon>) -> Area {
     area
 }
 
-fn ids(networks: &[Network]) -> Vec<&str> {
-    networks.iter().map(|network| network.id.as_str()).collect()
-}
-
 /// Whether building the request for an operation is refused as unsupported.
 fn refuses(network: &Network, operation: Operation) -> bool {
     let result = match operation {
@@ -178,6 +174,19 @@ fn reads_the_protocol_and_its_endpoint() {
         assert_eq!(network.protocol, protocol, "{key}");
         assert_eq!(network.endpoint, endpoint, "{key}");
     }
+}
+
+/// Entries without a version exist, and a server rejects a request without
+/// one. Newer servers still answer the old version.
+#[test]
+fn hafas_entry_without_a_version_asks_for_an_old_one() {
+    let json = r#"{
+        "name": "Example",
+        "type": { "hafasMgate": true },
+        "options": { "endpoint": "https://example.org/", "client": {}, "auth": {} }
+    }"#;
+    let options = Network::from_json("example", json).unwrap().hafas;
+    assert_eq!(options.expect("HAFAS options").version, "1.16");
 }
 
 #[test]
@@ -452,25 +461,32 @@ fn registry_keeps_the_given_networks() {
 fn bundled_networks_are_usable() {
     let registry = Registry::bundled();
     let networks = registry.networks();
-    let mut found = ids(&networks);
-    found.sort_unstable();
-    assert_eq!(
-        found,
-        [
-            "transitous",
-            "vbb-hafas",
-            "vrr-efa",
-            "vrr-ojp",
-            "vrr-trias",
-            "vvo-efa",
-            "vvo-ojp",
-            "vvo-trias"
-        ]
-    );
+    // An entry that cannot be read would be left out silently.
+    assert_eq!(networks.len(), 42);
+    for id in ["vvo-efa", "vrr-ojp", "vbb-hafas", "transitous"] {
+        assert!(registry.get(id).is_some(), "{id}");
+    }
+    let stop = || Place::Id("1".into());
     for network in &networks {
         let request = network.locations_request(&LocationQuery::new("Hauptbahnhof"));
         assert!(request.is_ok(), "{}: {request:?}", network.id);
+        // What a request needs beyond the entry's options, such as the
+        // time zone, is there too.
+        if !network.unsupported.contains(&Operation::Departures) {
+            let request = network.departures_request(&DeparturesQuery::new("1"));
+            assert!(request.is_ok(), "{}: {request:?}", network.id);
+        }
+        if !network.unsupported.contains(&Operation::Trips) {
+            let request = network.trips_request(&TripsQuery::new(stop(), stop()));
+            assert!(request.is_ok(), "{}: {request:?}", network.id);
+        }
     }
+    // The entry in transport-apis names an address that redirects.
+    let moved = registry.get("ooevv-hafas").expect("ooevv-hafas");
+    assert_eq!(moved.endpoint, "https://app.verkehrsauskunft.at/hamm/gate");
+    // The entry of the server in Des Moines names the time zone of Berlin.
+    let dart = registry.get("dart-hafas").expect("dart-hafas");
+    assert_eq!(dart.timezone.as_deref(), Some("America/Chicago"));
 
     let vvo_ojp = registry.get("vvo-ojp").expect("vvo-ojp");
     assert!(refuses(&vvo_ojp, Operation::Departures));

@@ -322,11 +322,13 @@ impl Options {
             client: object(self.client.take(), "client")?,
             auth: object(self.auth.take(), "auth")?,
             ext: self.ext.take(),
+            // A server rejects a request without a version, and newer
+            // servers still answer this old one.
             version: self
                 .ver
                 .take()
                 .or_else(|| self.version.take())
-                .ok_or_else(|| invalid("ver"))?,
+                .unwrap_or_else(|| "1.16".to_owned()),
             language: languages
                 .into_iter()
                 .next()
@@ -442,7 +444,7 @@ pub struct CoveringNetwork {
 /// transport-apis repository, a submodule, where it has a usable entry.
 /// Those in `data/networks` are waiting to get there, or need the fields
 /// that only this crate reads.
-const BUNDLED: [(&str, &str); 8] = [
+const BUNDLED: [(&str, &str); 42] = [
     ("vvo-efa", include_str!("../data/networks/vvo-efa.json")),
     ("vvo-trias", include_str!("../data/networks/vvo-trias.json")),
     ("vvo-ojp", include_str!("../data/networks/vvo-ojp.json")),
@@ -450,8 +452,144 @@ const BUNDLED: [(&str, &str); 8] = [
     ("vrr-trias", include_str!("../data/networks/vrr-trias.json")),
     ("vrr-ojp", include_str!("../data/networks/vrr-ojp.json")),
     (
+        "oebb-hafas",
+        include_str!("../data/transport-apis/data/at/oebb-hafas-mgate.json"),
+    ),
+    (
+        "ooevv-hafas",
+        include_str!("../data/transport-apis/data/at/ooevv-hafas-mgate.json"),
+    ),
+    (
+        "salzburg-hafas",
+        include_str!("../data/transport-apis/data/at/salzburg-hafas-mgate.json"),
+    ),
+    (
+        "stv-hafas",
+        include_str!("../data/transport-apis/data/at/stv-hafas-mgate.json"),
+    ),
+    (
+        "svv-hafas",
+        include_str!("../data/transport-apis/data/at/svv-hafas-mgate.json"),
+    ),
+    (
+        "vkg-hafas",
+        include_str!("../data/transport-apis/data/at/vkg-hafas-mgate.json"),
+    ),
+    (
+        "vor-hafas",
+        include_str!("../data/transport-apis/data/at/vor-hafas-mgate.json"),
+    ),
+    (
+        "vvt-hafas",
+        include_str!("../data/transport-apis/data/at/vvt-hafas-mgate.json"),
+    ),
+    (
+        "vvv-hafas",
+        include_str!("../data/transport-apis/data/at/vvv-hafas-mgate.json"),
+    ),
+    (
+        "tpg-hafas",
+        include_str!("../data/transport-apis/data/ch/tpg-hafas-mgate.json"),
+    ),
+    (
+        "avv-hafas",
+        include_str!("../data/transport-apis/data/de/avv-hafas-mgate.json"),
+    ),
+    (
+        "bvg-hafas",
+        include_str!("../data/transport-apis/data/de/bvg-hafas-mgate.json"),
+    ),
+    (
+        "dart-hafas",
+        include_str!("../data/transport-apis/data/us/dart-hafas-mgate.json"),
+    ),
+    (
+        "db-busradar-nrw-hafas",
+        include_str!("../data/transport-apis/data/de/db-busradar-nrw-hafas-mgate.json"),
+    ),
+    (
+        "db-sbahn-muenchen-hafas",
+        include_str!("../data/transport-apis/data/de/db-sbahn-muenchen-hafas-mgate.json"),
+    ),
+    (
+        "db-smartrbl-hafas",
+        include_str!("../data/transport-apis/data/de/db-smartrbl-hafas-mgate.json"),
+    ),
+    (
+        "gvh-hafas",
+        include_str!("../data/transport-apis/data/de/gvh-hafas-mgate.json"),
+    ),
+    (
+        "invg-hafas",
+        include_str!("../data/transport-apis/data/de/invg-hafas-mgate.json"),
+    ),
+    (
+        "kvb-hafas",
+        include_str!("../data/transport-apis/data/de/kvb-hafas-mgate.json"),
+    ),
+    (
+        "nahsh-hafas",
+        include_str!("../data/transport-apis/data/de/nahsh-hafas-mgate.json"),
+    ),
+    (
+        "nasa-hafas",
+        include_str!("../data/transport-apis/data/de/nasa-hafas-mgate.json"),
+    ),
+    (
+        "nvv-hafas",
+        include_str!("../data/transport-apis/data/de/nvv-hafas-mgate.json"),
+    ),
+    (
+        "rmv-hafas",
+        include_str!("../data/transport-apis/data/de/rmv-hafas-mgate.json"),
+    ),
+    (
+        "rsag-hafas",
+        include_str!("../data/transport-apis/data/de/rsag-hafas-mgate.json"),
+    ),
+    (
+        "saarvv-hafas",
+        include_str!("../data/transport-apis/data/de/saarvv-hafas-mgate.json"),
+    ),
+    (
         "vbb-hafas",
         include_str!("../data/transport-apis/data/de/vbb-hafas-mgate.json"),
+    ),
+    (
+        "vbn-hafas",
+        include_str!("../data/transport-apis/data/de/vbn-hafas-mgate.json"),
+    ),
+    (
+        "vmt-hafas",
+        include_str!("../data/transport-apis/data/de/vmt-hafas-mgate.json"),
+    ),
+    (
+        "vos-hafas",
+        include_str!("../data/transport-apis/data/de/vos-hafas-mgate.json"),
+    ),
+    (
+        "vsn-hafas",
+        include_str!("../data/transport-apis/data/de/vsn-hafas-mgate.json"),
+    ),
+    (
+        "rejseplanen-hafas",
+        include_str!("../data/transport-apis/data/dk/rejseplanen-hafas-mgate.json"),
+    ),
+    (
+        "iarnrod-eireann-hafas",
+        include_str!("../data/transport-apis/data/ie/iarnrod-eireann-hafas-mgate.json"),
+    ),
+    (
+        "mobiliteit-lu-hafas",
+        include_str!("../data/transport-apis/data/lu/mobiliteit-lu-hafas-mgate.json"),
+    ),
+    (
+        "resrobot-hafas",
+        include_str!("../data/transport-apis/data/se/resrobot-hafas-mgate.json"),
+    ),
+    (
+        "bart-hafas",
+        include_str!("../data/transport-apis/data/us/bart-hafas-mgate.json"),
     ),
     (
         "transitous",
@@ -465,6 +603,36 @@ const BUNDLED: [(&str, &str); 8] = [
 pub struct Registry {
     networks: Vec<Network>,
 }
+
+/// Where the servers of bundled networks have moved to since their entries
+/// in transport-apis were written. An entry leaves this list when
+/// transport-apis has the new address.
+const MOVED: [(&str, &str); 8] = [
+    ("mobiliteit-lu-hafas", "https://cdt.hafas.de/gate"),
+    ("ooevv-hafas", "https://app.verkehrsauskunft.at/hamm/gate"),
+    (
+        "salzburg-hafas",
+        "https://verkehrsauskunft.salzburg.gv.at/hamm/gate",
+    ),
+    (
+        "stv-hafas",
+        "https://verkehrsauskunft.verbundlinie.at/hamm/gate",
+    ),
+    (
+        "svv-hafas",
+        "https://fahrplan.salzburg-verkehr.at/hamm/gate",
+    ),
+    (
+        "vkg-hafas",
+        "https://routenplaner.kaerntner-linien.at/hamm/gate",
+    ),
+    ("vor-hafas", "https://anachb.vor.at/hamm/gate"),
+    ("vvv-hafas", "https://fahrplan.vmobil.at/hamm/gate"),
+];
+
+/// The time zones of bundled networks whose entries in transport-apis name
+/// a wrong one. An entry leaves this list when transport-apis is right.
+const TIME_ZONES: [(&str, &str); 1] = [("dart-hafas", "America/Chicago")];
 
 /// The usage terms of bundled networks whose entries come from
 /// transport-apis, which has no field for them.
@@ -484,6 +652,12 @@ impl Registry {
             .map(|mut network| {
                 if let Some((_, terms)) = TERMS.iter().find(|(id, _)| *id == network.id) {
                     network.terms = Some((*terms).to_owned());
+                }
+                if let Some((_, endpoint)) = MOVED.iter().find(|(id, _)| *id == network.id) {
+                    (*endpoint).clone_into(&mut network.endpoint);
+                }
+                if let Some((_, zone)) = TIME_ZONES.iter().find(|(id, _)| *id == network.id) {
+                    network.timezone = Some((*zone).to_owned());
                 }
                 network
             })

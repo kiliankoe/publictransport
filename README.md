@@ -10,7 +10,7 @@ The project is at an early stage. It can search for locations by name, list the 
 - OJP 1.0, its European successor
 - HAFAS mgate, the JSON interface behind the apps of many operators.
 
-The library ships with a small registry of networks that were checked against their live servers, `Registry::bundled()`. Further networks can be described in code or read from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis). Each network says where it has coverage, so an application can pick the networks for a position.
+The library ships with a registry of networks that were checked against their live servers, `Registry::bundled()`: VVO, VRR, Transitous and the HAFAS servers of about 35 operators in Europe and the USA. Further networks can be described in code or read from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis). Each network says where it has coverage, so an application can pick the networks for a position.
 
 ## Design
 

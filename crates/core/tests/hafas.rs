@@ -4,7 +4,7 @@ use proptest::prelude::*;
 use publictransport::{
     Coordinate, DeparturesQuery, Error, GlobalId, HafasOptions, HafasProduct, HttpRequest,
     HttpResponse, IdScheme, LegKind, LocationKind, LocationQuery, Method, Mode, Network, Place,
-    Protocol, Timestamp, TripsQuery,
+    Protocol, Registry, Timestamp, TripsQuery,
 };
 use serde_json::{Value, json};
 
@@ -360,6 +360,47 @@ proptest! {
 
         let departures = vbb().parse_departures(&respond(answer)).unwrap();
         prop_assert_eq!(departures[0].line.mode, expected);
+    }
+}
+
+/// The mode of a line whose product has the given ID.
+fn mode_of(id: &str) -> Option<Mode> {
+    let product = HafasProduct {
+        id: id.to_owned(),
+        name: String::new(),
+        bitmasks: vec![8],
+    };
+    let network = bare(options().with_products([product])).with_timezone("Europe/Berlin");
+    let answer = departure_answer(8, "20261117", "201800").to_string();
+    let departures = network.parse_departures(&respond(answer)).ok()?;
+    departures.first().map(|departure| departure.line.mode)
+}
+
+/// The entries of transport-apis name the same kind of vehicle in many
+/// ways.
+#[test]
+fn product_ids_of_other_networks_have_a_mode() {
+    let cases = [
+        ("ice", Mode::HighSpeedTrain),
+        ("s-bahn", Mode::SuburbanTrain),
+        ("fernbus", Mode::Coach),
+        // Numbered where an operator has several products of a kind.
+        ("long-distance-train-2", Mode::LongDistanceTrain),
+        ("anrufSammelTaxi", Mode::OnDemand),
+        ("RE/RB", Mode::RegionalTrain),
+    ];
+    for (id, mode) in cases {
+        assert_eq!(mode_of(id), Some(mode), "{id}");
+    }
+
+    // A new ID in the entries shows up here.
+    let without = ["other", "car-shuttle-train", "tourismTrain", "train-direct"];
+    for network in Registry::bundled().networks() {
+        let products = network.hafas.map(|options| options.products);
+        for product in products.into_iter().flatten() {
+            let known = mode_of(&product.id) != Some(Mode::Other);
+            assert_ne!(known, without.contains(&&*product.id), "{}", product.id);
+        }
     }
 }
 

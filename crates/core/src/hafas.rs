@@ -115,16 +115,65 @@ pub struct HafasProduct {
     pub bitmasks: Vec<u32>,
 }
 
-/// The mode that lines of a product run in.
+/// The mode that lines of a product run in. The IDs are those of the
+/// entries in transport-apis, bundled or not. They have no common
+/// vocabulary: `express-train` is the high-speed train of most operators
+/// and the slower express of a few, so some lines get a mode that is close
+/// but not exact.
 fn mode(product: &str) -> Mode {
-    match product {
-        "suburban" => Mode::SuburbanTrain,
-        "subway" => Mode::Subway,
-        "tram" => Mode::Tram,
-        "bus" => Mode::Bus,
-        "ferry" => Mode::Ferry,
-        "express" => Mode::LongDistanceTrain,
-        "regional" => Mode::RegionalTrain,
+    let id = product.to_lowercase();
+    // Operators with several products of a kind number them.
+    let id = id.trim_end_matches(|last: char| last.is_ascii_digit());
+    match id.strip_suffix('-').unwrap_or(id) {
+        "ice" | "high-speed-train" | "highspeed" | "express-train" | "national-express"
+        | "nationalexpress" | "intercityexpress" | "tgv" => Mode::HighSpeedTrain,
+        "express"
+        | "ic-ec"
+        | "ec-ic"
+        | "long-distance-train"
+        | "national"
+        | "national-train"
+        | "intercity"
+        | "intercity-train"
+        | "ir"
+        | "ir-d"
+        | "d-zug"
+        | "interregional"
+        | "fernverkehr"
+        | "icl" => Mode::LongDistanceTrain,
+        "night-train" => Mode::NightTrain,
+        "regional"
+        | "regional-train"
+        | "regional-express"
+        | "regional-express-train"
+        | "regionalexpress"
+        | "regio-express"
+        | "re-rb"
+        | "re/rb"
+        | "local-train"
+        | "local"
+        | "region"
+        | "regionalverkehr"
+        | "akn"
+        | "rail"
+        | "oe"
+        | "trains"
+        | "bahn-s-bahn" => Mode::RegionalTrain,
+        "suburban" | "suburban-train" | "s-bahn" | "sbahn" | "s-tog" | "rapid-transit" | "dart"
+        | "commuter" | "urban-train" => Mode::SuburbanTrain,
+        "subway" | "u-bahn" | "ubahn" | "metro" | "bart" => Mode::Subway,
+        "tram" | "tramway" | "strassenbahn" | "stadtbahn" | "luas" | "regiotram" | "tram-metro" => {
+            Mode::Tram
+        }
+        "bus" | "city-bus" | "stadtbus" | "regional-bus" | "regionalbus" | "express-bus"
+        | "other-bus" | "added-bus" | "bus-taxi" | "rapid" => Mode::Bus,
+        "fernbus" | "long-distance-bus" => Mode::Coach,
+        "ferry" | "faehre" | "boat" | "schiff" | "watercraft" => Mode::Ferry,
+        "cable-car" | "gondola" | "aerial-lift" | "seilbahn-zahnradbahn" => Mode::CableCar,
+        "funicular" => Mode::Funicular,
+        "on-call" | "oncall" | "on-demand" | "dial-a-ride" | "anruf-sammel-taxi"
+        | "anrufsammeltaxi" | "ast" | "taxi" | "taxibus" => Mode::OnDemand,
+        "air" => Mode::Airplane,
         _ => Mode::Other,
     }
 }
