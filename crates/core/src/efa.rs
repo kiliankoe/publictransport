@@ -181,21 +181,7 @@ fn place(place: &Place) -> (&'static str, String) {
 /// The date and the time of day as the server wants them: wall-clock time
 /// in its own zone.
 fn local_time(network: &Network, time: Timestamp) -> Result<(String, String), Error> {
-    let zone = network
-        .timezone
-        .as_deref()
-        .ok_or_else(|| Error::InvalidNetwork {
-            message: "a request with a time needs the network's time zone".to_owned(),
-        })?;
-    let zone = jiff::tz::TimeZone::get(zone).map_err(|error| Error::InvalidNetwork {
-        message: error.to_string(),
-    })?;
-    let local = time.to_jiff()?.to_zoned_datetime(zone);
-    if !(1..=9999).contains(&local.year()) {
-        return Err(Error::InvalidQuery {
-            message: "the time is outside the years 1 to 9999".to_owned(),
-        });
-    }
+    let local = network.local(time)?;
     Ok((
         local.strftime("%Y%m%d").to_string(),
         local.strftime("%H%M").to_string(),

@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Deserializer};
 
-use crate::{Error, Timestamp};
+use crate::{Error, Network, Timestamp};
 
 /// The times every protocol can write down and every language can hold, in
 /// Unix seconds.
@@ -34,5 +34,32 @@ impl Timestamp {
             .ok_or_else(|| Error::InvalidQuery {
                 message: "the time is outside the years 1 to 9999".to_owned(),
             })
+    }
+}
+
+impl Network {
+    /// The time zone of the network, which the protocols with wall-clock
+    /// times need.
+    pub(crate) fn zone(&self) -> Result<jiff::tz::TimeZone, Error> {
+        let zone = self
+            .timezone
+            .as_deref()
+            .ok_or_else(|| Error::InvalidNetwork {
+                message: "local times need the network's time zone".to_owned(),
+            })?;
+        jiff::tz::TimeZone::get(zone).map_err(|error| Error::InvalidNetwork {
+            message: error.to_string(),
+        })
+    }
+
+    /// The time on a clock in the network's time zone.
+    pub(crate) fn local(&self, time: Timestamp) -> Result<jiff::ZonedDateTime, Error> {
+        let local = time.to_jiff()?.to_zoned_datetime(self.zone()?);
+        if !(1..=9999).contains(&local.year()) {
+            return Err(Error::InvalidQuery {
+                message: "the time is outside the years 1 to 9999".to_owned(),
+            });
+        }
+        Ok(local)
     }
 }
