@@ -44,7 +44,7 @@ pub struct HttpResponse {
 /// be a key and debug output ends up in logs.
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
-#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug, Display))]
 pub struct Header {
     /// The header name.
     pub name: String,
@@ -58,6 +58,14 @@ impl std::fmt::Debug for Header {
             .debug_struct("Header")
             .field("name", &self.name)
             .finish_non_exhaustive()
+    }
+}
+
+/// The same as the debug output, so that no way of printing a header in
+/// another language shows the value.
+impl std::fmt::Display for Header {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self, formatter)
     }
 }
 

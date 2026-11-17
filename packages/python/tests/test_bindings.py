@@ -10,6 +10,7 @@ from publictransport import (
     Error,
     GlobalId,
     HafasOptions,
+    Header,
     HttpResponse,
     IdScheme,
     LegEnd,
@@ -161,3 +162,11 @@ def test_hafas_network_builds_a_request_from_its_options() -> None:
     body = json.loads(request.body or b"")
     assert (body["client"], body["ver"], body["lang"]) == ({"id": "VBB"}, "1.33", "de")
     assert body["svcReqL"][0]["meth"] == "LocMatch"
+
+
+def test_printing_leaves_keys_out() -> None:
+    header = Header(name="X-Api-Key", value="hunter2")
+    options = HafasOptions(client="{}", auth='{"aid": "hunter2"}', version="1.33")
+
+    for text in (str(header), repr(header), str(options), repr(options)):
+        assert "hunter2" not in text
