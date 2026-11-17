@@ -2,15 +2,16 @@
 
 A client library for public transport APIs. One shared model for stops, departures and trips covers several server types, so an application can query any supported network the same way.
 
-The project is at an early stage. It can search for locations by name, list the departures at a stop and plan trips between two places on servers that speak one of five protocols:
+The project is at an early stage. It can search for locations by name, list the departures at a stop and plan trips between two places on servers that speak one of six protocols:
 
 - EFA, the JSON interface of MDV's journey planner, used by many German transport associations
 - MOTIS, the routing engine behind [Transitous](https://transitous.org)
 - TRIAS 1.2, the German XML standard VDV 431-2
 - OJP 1.0, its European successor
-- HAFAS mgate, the JSON interface behind the apps of many operators.
+- HAFAS mgate, the JSON interface behind the apps of many operators
+- OpenTripPlanner 2 with its Transmodel API
 
-The library ships with a registry of networks that were checked against their live servers, `Registry::bundled()`: VVO, VRR, Transitous and the HAFAS servers of about 35 operators in Europe and the USA. Further networks can be described in code or read from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis). Each network says where it has coverage, so an application can pick the networks for a position.
+The library ships with a registry of networks that were checked against their live servers, `Registry::bundled()`: VVO, VRR, Transitous, Entur and the HAFAS servers of about 35 operators in Europe and the USA. Further networks can be described in code or read from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis). Each network says where it has coverage, so an application can pick the networks for a position.
 
 ## Design
 

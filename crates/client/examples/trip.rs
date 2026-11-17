@@ -7,6 +7,7 @@
 //! cargo run --example trip -- vvo-trias "Dresden Hauptbahnhof" "Dresden Albertplatz"
 //! cargo run --example trip -- vrr-ojp "Düsseldorf Hbf" "Essen Hbf"
 //! cargo run --example trip -- vbb-hafas "S+U Alexanderplatz" "S+U Zoologischer Garten"
+//! cargo run --example trip -- entur "Oslo S" "Bergen stasjon"
 //! ```
 
 use std::error::Error;
@@ -36,6 +37,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .map(|network| network.id)
             .collect();
         return Err(format!("unknown network {id}, known are {}", ids.join(", ")).into());
+    };
+    // Entur asks every client for its name.
+    let network = if network.id == "entur" {
+        network.with_header("ET-Client-Name", "publictransport-example")
+    } else {
+        network
     };
     let client = Client::new(USER_AGENT)?;
 

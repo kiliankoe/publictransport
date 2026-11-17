@@ -1,4 +1,5 @@
-//! Client for public transport APIs: EFA, MOTIS, TRIAS, OJP and HAFAS.
+//! Client for public transport APIs: EFA, MOTIS, TRIAS, OJP, HAFAS and
+//! `OpenTripPlanner`.
 //!
 //! This crate does no I/O. It builds HTTP requests and parses HTTP responses,
 //! so each platform can send them with its own HTTP stack. Every operation is
@@ -33,7 +34,10 @@
 //! with [`Network::trips_request`] and [`Network::parse_trips`]. An EFA
 //! network needs [`Network::with_timezone`] for requests that carry a time,
 //! a TRIAS or OJP network needs [`Network::with_requestor_ref`], and a
-//! HAFAS network needs [`Network::with_hafas`] and a time zone.
+//! HAFAS network needs [`Network::with_hafas`] and a time zone. Entur
+//! asks every client for its name in the header `ET-Client-Name`
+//! (`company-application`) and limits clients without it, so add it with
+//! [`Network::with_header`].
 //!
 //! [`Registry::bundled`] has networks that were checked against their live
 //! servers, so that they need not be described by hand, and
@@ -59,6 +63,7 @@ mod http;
 mod model;
 mod motis;
 mod network;
+mod otp;
 mod registry;
 mod time;
 mod trias;

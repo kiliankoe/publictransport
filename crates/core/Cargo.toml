@@ -11,6 +11,7 @@ exclude = [
     "/data/transport-apis/**",
     "!/data/transport-apis/license",
     "!/data/transport-apis/data/un/transitous.json",
+    "!/data/transport-apis/data/no/entur-otp.json",
     "!/data/transport-apis/data/at/oebb-hafas-mgate.json",
     "!/data/transport-apis/data/at/ooevv-hafas-mgate.json",
     "!/data/transport-apis/data/at/salzburg-hafas-mgate.json",

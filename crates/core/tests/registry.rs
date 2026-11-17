@@ -176,6 +176,31 @@ fn reads_the_protocol_and_its_endpoint() {
     }
 }
 
+/// OTP entries do not name the API of their server. The Transmodel ones
+/// show by the version `entur` or by their address.
+#[test]
+fn reads_otp_entries_of_transmodel_servers_with_their_geocoder() {
+    let cases = [
+        (
+            r#""endpoint": "https://example.org/graphql", "apiVersion": "entur",
+               "geocoder": "https://example.org/geocoder""#,
+            Some("https://example.org/geocoder"),
+        ),
+        (
+            r#""endpoint": "https://example.org/otp/transmodel/v3""#,
+            None,
+        ),
+    ];
+    for (options, geocoder) in cases {
+        let json = format!(
+            r#"{{ "name": "Example", "type": {{ "otpGraphQl": true }}, "options": {{ {options} }} }}"#
+        );
+        let network = Network::from_json("example", &json).unwrap();
+        assert_eq!(network.protocol, Protocol::OtpTransmodel, "{options}");
+        assert_eq!(network.geocoder.as_deref(), geocoder, "{options}");
+    }
+}
+
 /// Entries without a version exist, and a server rejects a request without
 /// one. Newer servers still answer the old version.
 #[test]
@@ -203,7 +228,7 @@ fn rejects_entries_it_cannot_serve() {
     let cases = [
         ("no JSON", "<html></html>".to_owned()),
         ("no entry", "[1, 2]".to_owned()),
-        ("OTP", entry("otpGraphQl", "")),
+        ("OTP with the GTFS API", entry("otpGraphQl", "")),
         (
             "TRIAS with a header for the key",
             entry(
@@ -462,8 +487,8 @@ fn bundled_networks_are_usable() {
     let registry = Registry::bundled();
     let networks = registry.networks();
     // An entry that cannot be read would be left out silently.
-    assert_eq!(networks.len(), 42);
-    for id in ["vvo-efa", "vrr-ojp", "vbb-hafas", "transitous"] {
+    assert_eq!(networks.len(), 43);
+    for id in ["vvo-efa", "vrr-ojp", "vbb-hafas", "transitous", "entur"] {
         assert!(registry.get(id).is_some(), "{id}");
     }
     let stop = || Place::Id("1".into());
@@ -484,9 +509,20 @@ fn bundled_networks_are_usable() {
     // The entry in transport-apis names an address that redirects.
     let moved = registry.get("ooevv-hafas").expect("ooevv-hafas");
     assert_eq!(moved.endpoint, "https://app.verkehrsauskunft.at/hamm/gate");
+    // The entry of Entur names no time zone, which a searched stop needs.
+    let entur = registry.get("entur").expect("entur");
+    assert_eq!(entur.timezone.as_deref(), Some("Europe/Oslo"));
     // The entry of the server in Des Moines names the time zone of Berlin.
     let dart = registry.get("dart-hafas").expect("dart-hafas");
     assert_eq!(dart.timezone.as_deref(), Some("America/Chicago"));
+
+    // The entry in transport-apis names no geocoder.
+    let entur = registry.get("entur").expect("entur");
+    assert_eq!(entur.protocol, Protocol::OtpTransmodel);
+    assert_eq!(
+        entur.geocoder.as_deref(),
+        Some("https://api.entur.io/geocoder/v1")
+    );
 
     let vvo_ojp = registry.get("vvo-ojp").expect("vvo-ojp");
     assert!(refuses(&vvo_ojp, Operation::Departures));

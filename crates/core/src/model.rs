@@ -13,9 +13,12 @@ pub struct LocationQuery {
     pub limit: Option<u32>,
     /// The kinds of location wanted. Empty asks for every kind. The request
     /// asks the server to filter, so `limit` counts only wanted locations.
-    /// MOTIS and HAFAS cannot ask for the kind [`LocationKind::Other`]: it
-    /// is left out there, and a query for that kind alone is an
-    /// [`Error::InvalidQuery`](crate::Error::InvalidQuery).
+    /// MOTIS, HAFAS and the geocoder of an `OpenTripPlanner` network
+    /// cannot ask for the kind [`LocationKind::Other`]: it is left out
+    /// there, and a query for that kind alone is an
+    /// [`Error::InvalidQuery`](crate::Error::InvalidQuery). That geocoder
+    /// also has addresses and points of interest in one layer, so a search
+    /// for one of the two returns both.
     #[cfg_attr(feature = "uniffi", uniffi(default = []))]
     pub kinds: Vec<LocationKind>,
 }
@@ -66,8 +69,9 @@ pub struct Location {
     /// The position.
     pub coordinate: Option<Coordinate>,
     /// The IANA name of the time zone the location is in, e.g.
-    /// `Europe/Berlin`, for showing times there. MOTIS sends it; on the other
-    /// protocols it is [`Network::timezone`](crate::Network::timezone).
+    /// `Europe/Berlin`, for showing times there. MOTIS sends it, and
+    /// `OpenTripPlanner` for stops in departures and trips; otherwise it is
+    /// [`Network::timezone`](crate::Network::timezone).
     pub timezone: Option<String>,
     /// The [`Network::id`](crate::Network::id) of the network that returned
     /// the location. Its `id` belongs to that network;
@@ -352,8 +356,8 @@ pub struct TripsQuery {
     pub limit: Option<u32>,
     /// Continues an earlier search: [`Trips::earlier`] or [`Trips::later`]
     /// of its result, set on the query that led to it. On EFA, TRIAS and
-    /// OJP the page takes the place of [`TripsQuery::time`]; MOTIS and
-    /// HAFAS continue the search the reference came from. A
+    /// OJP the page takes the place of [`TripsQuery::time`]; the other
+    /// protocols continue the search the reference came from. A
     /// reference is only good for the network it came from, and its text
     /// has no meaning to rely on.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
@@ -484,7 +488,10 @@ pub struct Trips {
     /// earlier page are in the same order as these, so they belong in
     /// front of them as a whole.
     pub earlier: Option<String>,
-    /// A reference for the trips after these, with the same rules.
+    /// A reference for the trips after these, with the same rules. An
+    /// `OpenTripPlanner` server searches a window of an hour or two, so at
+    /// night its answer can have no trips and this reference: follow it,
+    /// a few times if need be, before telling a user that there are none.
     pub later: Option<String>,
 }
 

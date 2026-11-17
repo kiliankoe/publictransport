@@ -157,6 +157,11 @@ impl Network {
     /// The crate reads four fields that repository does not have: the type
     /// `ojp` with `options.ojpVersion`, `options.requestorRef`, and
     /// `usageTerms` for [`Network::terms`]. An entry of the type
+    /// `otpGraphQl` is read if it is a Transmodel server, which the entry
+    /// shows by `options.apiVersion` being `entur` or by `transmodel` in its
+    /// endpoint. The crate reads [`Network::geocoder`] from the field
+    /// `options.geocoder`, which that repository does not have, so its
+    /// entries give a network without one. An entry of the type
     /// `hafasMgate` gives a network with [`Network::hafas`] that asks in the
     /// first of the entry's `supportedLanguages`. Its salts for signed
     /// requests are not read: the crate does not sign, and no server that
@@ -190,9 +195,22 @@ impl Network {
             (Some("trias"), None) => Protocol::Trias,
             (Some("ojp"), None) => Protocol::Ojp1,
             (Some("hafasMgate"), None) => Protocol::HafasMgate,
+            // The type covers both APIs of OTP, and only Entur's entry
+            // says which one it is.
+            (Some("otpGraphQl"), None)
+                if options.api_version.as_deref() == Some("entur")
+                    || options.endpoint.contains("transmodel") =>
+            {
+                Protocol::OtpTransmodel
+            }
+            (Some("otpGraphQl"), None) => {
+                return Err(invalid(format!(
+                    "{id}: of OpenTripPlanner, only the Transmodel API is supported"
+                )));
+            }
             _ => {
                 return Err(invalid(format!(
-                    "{id}: needs exactly one of the types efa, motis, trias, ojp and hafasMgate"
+                    "{id}: needs exactly one of the types efa, motis, trias, ojp, hafasMgate and otpGraphQl"
                 )));
             }
         };
@@ -266,6 +284,7 @@ impl Network {
             requires_key: xml && options.requires_sign_up,
             terms: entry.usage_terms.filter(|terms| !terms.is_empty()),
             headers: Vec::new(),
+            geocoder: options.geocoder.filter(|url| !url.is_empty()),
             hafas,
         })
     }
@@ -296,6 +315,8 @@ struct Options {
     #[serde(default)]
     requires_sign_up: bool,
     provided_services: Option<Vec<String>>,
+    api_version: Option<String>,
+    geocoder: Option<String>,
     client: Option<serde_json::Value>,
     auth: Option<serde_json::Value>,
     ext: Option<String>,
@@ -444,7 +465,7 @@ pub struct CoveringNetwork {
 /// transport-apis repository, a submodule, where it has a usable entry.
 /// Those in `data/networks` are waiting to get there, or need the fields
 /// that only this crate reads.
-const BUNDLED: [(&str, &str); 42] = [
+const BUNDLED: [(&str, &str); 43] = [
     ("vvo-efa", include_str!("../data/networks/vvo-efa.json")),
     ("vvo-trias", include_str!("../data/networks/vvo-trias.json")),
     ("vvo-ojp", include_str!("../data/networks/vvo-ojp.json")),
@@ -592,6 +613,10 @@ const BUNDLED: [(&str, &str); 42] = [
         include_str!("../data/transport-apis/data/us/bart-hafas-mgate.json"),
     ),
     (
+        "entur",
+        include_str!("../data/transport-apis/data/no/entur-otp.json"),
+    ),
+    (
         "transitous",
         include_str!("../data/transport-apis/data/un/transitous.json"),
     ),
@@ -625,7 +650,12 @@ fn corrected(mut network: Network) -> Network {
     match network.id.as_str() {
         // The entry names the time zone of Berlin for a server in Iowa.
         "dart-hafas" => network.timezone = Some("America/Chicago".to_owned()),
-        // The format has no field for usage terms.
+        // The format has no field for a geocoder or for usage terms, and
+        // the entry names no time zone.
+        "entur" => {
+            network.geocoder = Some("https://api.entur.io/geocoder/v1".to_owned());
+            network.timezone = Some("Europe/Oslo".to_owned());
+        }
         "transitous" => network.terms = Some("https://transitous.org/api/".to_owned()),
         _ => {}
     }

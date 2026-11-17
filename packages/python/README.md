@@ -1,6 +1,6 @@
 # publictransport
 
-A Python client for public transport APIs. One shared model for stops, departures and trips covers several server types, so an application can query any supported network the same way. It supports servers that speak EFA (used by many German transport associations), MOTIS (the routing engine behind [Transitous](https://transitous.org)), TRIAS 1.2, OJP 1.0 and HAFAS mgate (the interface behind many operators' apps).
+A Python client for public transport APIs. One shared model for stops, departures and trips covers several server types, so an application can query any supported network the same way. It supports servers that speak EFA (used by many German transport associations), MOTIS (the routing engine behind [Transitous](https://transitous.org)), TRIAS 1.2, OJP 1.0, HAFAS mgate (the interface behind many operators' apps) and OpenTripPlanner 2 with its Transmodel API.
 
 The package wraps the Rust library of the same name. The Rust code builds the requests and parses the answers, and [httpx](https://www.python-httpx.org) sends them.
 
@@ -34,7 +34,7 @@ with Client(user_agent="my-app/1.0 (+https://example.org)") as client:
 
 `Registry.bundled()` holds the networks that ship with the package, so a `Network` does not have to be written by hand: `Registry.bundled().get("vvo-efa")` is the server above, and `covering(Coordinate(...))` lists the networks for a position, each with the tier of its coverage there. `network_from_json(id, json)` reads further ones from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis).
 
-Times are timezone-aware `datetime` objects in UTC, and `Location.timezone` names the zone to show them in. A time in a query has to be timezone-aware too, in any zone. An EFA network needs its `timezone` to send a query time. A TRIAS or OJP network needs a `requestor_ref`, which public servers document, e.g. `OpenService`. A HAFAS network needs `hafas=HafasOptions(...)` and its `timezone`; the bundled ones have both. A server that wants a key in an HTTP header gets it through `Network(headers=[Header(...)])`.
+Times are timezone-aware `datetime` objects in UTC, and `Location.timezone` names the zone to show them in. A time in a query has to be timezone-aware too, in any zone. An EFA network needs its `timezone` to send a query time. A TRIAS or OJP network needs a `requestor_ref`, which public servers document, e.g. `OpenService`. A HAFAS network needs `hafas=HafasOptions(...)` and its `timezone`; the bundled ones have both. Entur asks every client for its name in the header `ET-Client-Name` (`company-application`) and limits clients without it, so add it to the bundled network: `entur.headers.append(Header(name="ET-Client-Name", value="mycompany-myapp"))`. A network of that protocol searches for locations on the geocoder named in `geocoder=`, and its answer to `trips` can be empty at night and still have a `later` reference to follow. A server that wants a key in an HTTP header gets it through `Network(headers=[Header(...)])`.
 
 `trips` returns a `Trips` record: the list is in `trips`, and `earlier` and `later` are references for more. Pass one as `page` in the same query to continue the search.
 

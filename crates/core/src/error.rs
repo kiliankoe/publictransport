@@ -18,7 +18,10 @@ pub enum Error {
         message: String,
     },
     /// The network's server is known not to answer this kind of request,
-    /// see [`Network::unsupported`](crate::Network::unsupported).
+    /// see [`Network::unsupported`](crate::Network::unsupported), or the
+    /// network lacks what the request needs: an `OpenTripPlanner` network
+    /// without a [`Network::geocoder`](crate::Network::geocoder) cannot
+    /// search for locations.
     #[error("not supported: {message}")]
     Unsupported {
         /// What is not supported.

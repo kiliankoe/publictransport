@@ -94,3 +94,27 @@ hafas hafas/vbb-locations.json $vbb LocMatch '{"input":{"loc":{"type":"ALL","nam
 hafas hafas/vbb-departures.json $vbb StationBoard '{"type":"DEP","stbLoc":{"lid":"A=1@L=900100003@"},"maxJny":10}'
 hafas hafas/vbb-departures-unknown-stop.json $vbb StationBoard '{"type":"DEP","stbLoc":{"lid":"A=1@L=999999999@"},"maxJny":10}'
 hafas hafas/vbb-trip.json $vbb TripSearch '{"depLocL":[{"lid":"A=1@L=900100003@"}],"arrLocL":[{"lid":"A=1@L=900023201@"}],"outFrwd":true,"numF":3,"getPasslist":true}'
+
+# Oslo S to Oslo lufthavn on Entur: the stop search on its geocoder, the
+# rest on its OpenTripPlanner server (Transmodel API). The queries are those
+# of crates/core/src/otp.rs. Entur asks for the name of the client.
+entur_client='ET-Client-Name: kiliankoe-publictransport'
+mkdir -p otp
+curl --silent --show-error --fail --max-time 30 --user-agent "$user_agent" --header "$entur_client" \
+  --output otp/entur-geocode.json 'https://api.entur.io/geocoder/v1/autocomplete?text=Oslo+S&size=5'
+
+quay='fragment quay on Quay{id name publicCode latitude longitude timeZone stopPlace{name}}'
+line='fragment line on Line{publicCode name transportMode transportSubmode authority{name}}'
+call="fragment call on EstimatedCall{aimedArrivalTime expectedArrivalTime aimedDepartureTime expectedDepartureTime realtime cancellation destinationDisplay{frontText} quay{...quay} scheduledQuay{publicCode} serviceJourney{line{...line}}} $quay $line"
+departures="query(\$id:String!,\$limit:Int,\$start:DateTime){stopPlace(id:\$id){estimatedCalls(numberOfDepartures:\$limit,startTime:\$start,includeCancelledTrips:true){...call}}} $call"
+trips="query(\$from:Location!,\$to:Location!,\$time:DateTime,\$arriveBy:Boolean,\$limit:Int,\$page:String){trip(from:\$from,to:\$to,dateTime:\$time,arriveBy:\$arriveBy,numTripPatterns:\$limit,pageCursor:\$page){previousPageCursor nextPageCursor tripPatterns{legs{mode aimedStartTime expectedStartTime aimedEndTime expectedEndTime realtime fromPlace{...place} toPlace{...place} line{...line} fromEstimatedCall{...call} toEstimatedCall{...call} intermediateEstimatedCalls{...call}}}}} fragment place on Place{name latitude longitude quay{...quay}} $call"
+
+# otp <output file> <query> <variables>
+otp() {
+  curl --silent --show-error --fail --max-time 30 --user-agent "$user_agent" --header "$entur_client" \
+    --header 'Content-Type: application/json' --output "$1" https://api.entur.io/journey-planner/v3/graphql \
+    --data "{\"query\":\"$2\",\"variables\":$3}"
+}
+otp otp/entur-departures.json $departures '{"id":"NSR:StopPlace:59872","limit":10}'
+otp otp/entur-departures-unknown-stop.json $departures '{"id":"NSR:StopPlace:0"}'
+otp otp/entur-trip.json $trips '{"from":{"place":"NSR:StopPlace:59872"},"to":{"place":"NSR:StopPlace:58211"},"limit":3}'

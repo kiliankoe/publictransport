@@ -1,4 +1,4 @@
-"""Client for public transport APIs: EFA, MOTIS, TRIAS and OJP.
+"""Client for public transport APIs: EFA, MOTIS, TRIAS, OJP, HAFAS and OpenTripPlanner.
 
 `Client` and `AsyncClient` send requests with httpx. The model types and the
 functions that build requests and parse responses come from the Rust library

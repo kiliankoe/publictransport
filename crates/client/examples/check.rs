@@ -16,7 +16,7 @@ use std::path::Path;
 
 use publictransport_client::{
     Client, DeparturesQuery, LegKind, LocationKind, LocationQuery, Mode, Network, Operation, Place,
-    Registry, TripsQuery,
+    Registry, Trips, TripsQuery,
 };
 
 const USER_AGENT: &str = concat!(
@@ -68,7 +68,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let client = Client::new(USER_AGENT)?;
-    for network in &networks {
+    for network in networks {
+        // Entur asks every client for its name.
+        let network = &if network.id == "entur" {
+            network.with_header("ET-Client-Name", "publictransport-example")
+        } else {
+            network
+        };
         match check(&client, network).await {
             Ok(summary) => println!("{}: ok, {summary}", network.id),
             Err(error) => {
@@ -137,7 +143,19 @@ async fn check(client: &Client, network: &Network) -> Result<String, Box<dyn Err
         for to in &destinations {
             let query =
                 TripsQuery::new(Place::Id(from.id.clone()), Place::Id(to.id.clone())).with_limit(2);
-            outcome = match client.trips(network, &query).await {
+            let mut answer = client.trips(network, &query).await;
+            // OpenTripPlanner searches a window of time and answers with
+            // no trips and a reference if the window has none, as at night.
+            if let Ok(Trips {
+                trips,
+                later: Some(later),
+                ..
+            }) = &answer
+                && trips.is_empty()
+            {
+                answer = client.trips(network, &query.clone().with_page(later)).await;
+            }
+            outcome = match answer {
                 Ok(found) if found.trips.is_empty() => Err(format!("no trips to {}", to.name)),
                 Ok(found) => Ok((query, found, &to.name)),
                 Err(error) => Err(format!("trips to {}: {error}", to.name)),

@@ -8,7 +8,7 @@ use crate::{Error, Network, Timestamp};
 /// Unix seconds.
 const YEARS_1_TO_9999: std::ops::Range<i64> = -62_135_596_800..253_402_300_800;
 
-/// A time in RFC 3339 format, as both protocols send it.
+/// A time in RFC 3339 format, as MOTIS, EFA and `OpenTripPlanner` send it.
 pub(crate) struct WireTime(pub(crate) Timestamp);
 
 impl<'de> Deserialize<'de> for WireTime {

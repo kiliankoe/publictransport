@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "publictransport"
 version = "0.0.0"
-description = "Client for public transport APIs: EFA, MOTIS, TRIAS, OJP and HAFAS"
+description = "Client for public transport APIs: EFA, MOTIS, TRIAS, OJP, HAFAS and OpenTripPlanner"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
 requires-python = ">=3.10"
