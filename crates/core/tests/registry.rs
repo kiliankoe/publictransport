@@ -2,8 +2,8 @@
 
 use proptest::prelude::*;
 use publictransport::{
-    Area, Coordinate, Coverage, CoverageTier, DeparturesQuery, Error, LocationQuery, Network,
-    Operation, Place, Polygon, Protocol, Registry, TripsQuery,
+    Area, Coordinate, Coverage, CoverageTier, DeparturesQuery, Error, HafasProduct, LocationQuery,
+    Network, Operation, Place, Polygon, Protocol, Registry, TripsQuery,
 };
 
 /// The TRIAS and OJP service behind each operation.
@@ -115,6 +115,7 @@ fn reads_an_entry() {
     assert_eq!(network.unsupported, Vec::new());
     assert!(!network.requires_key);
     assert_eq!(network.terms, None);
+    assert_eq!(network.hafas, None);
 
     let attribution = network.attribution.expect("an attribution");
     assert_eq!(attribution.name, "Example Transit");
@@ -193,7 +194,6 @@ fn rejects_entries_it_cannot_serve() {
     let cases = [
         ("no JSON", "<html></html>".to_owned()),
         ("no entry", "[1, 2]".to_owned()),
-        ("HAFAS", entry("hafasMgate", "")),
         ("OTP", entry("otpGraphQl", "")),
         (
             "TRIAS with a header for the key",
@@ -203,12 +203,73 @@ fn rejects_entries_it_cannot_serve() {
             ),
         ),
         ("OJP 2.0", entry("ojp", r#", "ojpVersion": "2.0""#)),
+        (
+            "HAFAS with signed requests",
+            entry(
+                "hafasMgate",
+                r#", "client": {}, "auth": {}, "ver": "1.44", "checksumSalt": "abc""#,
+            ),
+        ),
     ];
     for (case, json) in cases {
         let result = Network::from_json("example", &json);
         assert!(
             matches!(result, Err(Error::InvalidNetwork { .. })),
             "{case}: {result:?}"
+        );
+    }
+}
+
+/// Entries name the version `ver` or `version`, and the language is the
+/// first one they support.
+#[test]
+fn reads_the_hafas_options() {
+    let cases = [
+        ("ver", r#""supportedLanguages": ["de", "en"],"#, "de"),
+        ("version", "", "en"),
+    ];
+    for (version_key, languages, language) in cases {
+        let json = format!(
+            r#"{{
+                "name": "Example",
+                "type": {{ "hafasMgate": true }},
+                {languages}
+                "timezone": "Europe/Berlin",
+                "options": {{
+                    "endpoint": "https://example.org/bin/mgate.exe",
+                    "client": {{ "type": "WEB", "id": "EXAMPLE" }},
+                    "auth": {{ "type": "AID", "aid": "secret" }},
+                    "ext": "EX.1",
+                    "{version_key}": "1.33",
+                    "products": [{{ "id": "bus", "bitmasks": [8, 16], "name": "Bus" }}]
+                }}
+            }}"#
+        );
+        let network = Network::from_json("example", &json).unwrap();
+        assert_eq!(network.protocol, Protocol::HafasMgate);
+        assert_eq!(network.endpoint, "https://example.org/bin/mgate.exe");
+        assert_eq!(network.timezone.as_deref(), Some("Europe/Berlin"));
+
+        let options = network.hafas.expect("HAFAS options");
+        let object = |text: &str| serde_json::from_str::<serde_json::Value>(text).unwrap();
+        assert_eq!(
+            object(&options.client),
+            serde_json::json!({ "type": "WEB", "id": "EXAMPLE" })
+        );
+        assert_eq!(
+            object(&options.auth),
+            serde_json::json!({ "type": "AID", "aid": "secret" })
+        );
+        assert_eq!(options.ext.as_deref(), Some("EX.1"));
+        assert_eq!(options.version, "1.33", "{version_key}");
+        assert_eq!(options.language, language);
+        assert_eq!(
+            options.products,
+            [HafasProduct {
+                id: "bus".to_owned(),
+                name: "Bus".to_owned(),
+                bitmasks: vec![8, 16],
+            }]
         );
     }
 }
@@ -402,6 +463,7 @@ fn bundled_networks_are_usable() {
         found,
         [
             "transitous",
+            "vbb-hafas",
             "vrr-efa",
             "vrr-ojp",
             "vrr-trias",

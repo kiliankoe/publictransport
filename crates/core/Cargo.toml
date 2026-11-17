@@ -11,6 +11,7 @@ exclude = [
     "/data/transport-apis/**",
     "!/data/transport-apis/license",
     "!/data/transport-apis/data/un/transitous.json",
+    "!/data/transport-apis/data/de/vbb-hafas-mgate.json",
 ]
 
 [lints]

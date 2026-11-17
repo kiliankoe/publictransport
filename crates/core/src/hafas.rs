@@ -1,0 +1,742 @@
+//! HAFAS mgate, the JSON interface behind the apps of many operators: one
+//! `POST` per request, with the method and its arguments in the body.
+
+use serde::Deserialize;
+use serde_json::{Value, json};
+
+use crate::{
+    Coordinate, Departure, DeparturesQuery, Error, GlobalId, Header, HttpRequest, HttpResponse,
+    Leg, LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, Network,
+    Place, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
+};
+
+/// What a HAFAS mgate server needs to answer, as the operator's own app
+/// sends it. The values come from that app; see
+/// [`Protocol::HafasMgate`](crate::Protocol::HafasMgate).
+#[derive(Clone, PartialEq, Eq)]
+#[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug, Display))]
+pub struct HafasOptions {
+    /// The description of the client, a JSON object as text. Its fields
+    /// differ from operator to operator, so the crate passes it on as it is.
+    pub client: String,
+    /// The credentials, a JSON object as text, passed on like the client.
+    /// Debug output leaves it out.
+    pub auth: String,
+    /// The name of the operator's extension of the interface.
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub ext: Option<String>,
+    /// The version of the interface to ask for, such as `1.33`.
+    pub version: String,
+    /// The language for names and remarks, such as `de`.
+    #[cfg_attr(feature = "uniffi", uniffi(default = "en"))]
+    pub language: String,
+    /// The operator's kinds of vehicles, which give a line its mode.
+    #[cfg_attr(feature = "uniffi", uniffi(default = []))]
+    pub products: Vec<HafasProduct>,
+}
+
+impl HafasOptions {
+    /// Options without an extension, in English, and without products, so
+    /// that every line has the mode [`Mode::Other`].
+    pub fn new(
+        client: impl Into<String>,
+        auth: impl Into<String>,
+        version: impl Into<String>,
+    ) -> Self {
+        Self {
+            client: client.into(),
+            auth: auth.into(),
+            ext: None,
+            version: version.into(),
+            language: "en".to_owned(),
+            products: Vec::new(),
+        }
+    }
+}
+
+impl HafasOptions {
+    /// Sets [`HafasOptions::ext`].
+    #[must_use]
+    pub fn with_ext(mut self, ext: impl Into<String>) -> Self {
+        self.ext = Some(ext.into());
+        self
+    }
+
+    /// Sets [`HafasOptions::language`].
+    #[must_use]
+    pub fn with_language(mut self, language: impl Into<String>) -> Self {
+        self.language = language.into();
+        self
+    }
+
+    /// Sets [`HafasOptions::products`].
+    #[must_use]
+    pub fn with_products(mut self, products: impl IntoIterator<Item = HafasProduct>) -> Self {
+        self.products = products.into_iter().collect();
+        self
+    }
+}
+
+impl std::fmt::Debug for HafasOptions {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("HafasOptions")
+            .field("client", &self.client)
+            .field("ext", &self.ext)
+            .field("version", &self.version)
+            .field("language", &self.language)
+            .field("products", &self.products)
+            .finish_non_exhaustive()
+    }
+}
+
+/// The same as the debug output, so that no way of printing the options
+/// in another language shows the credentials.
+impl std::fmt::Display for HafasOptions {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self, formatter)
+    }
+}
+
+/// One kind of vehicle of a HAFAS operator.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+pub struct HafasProduct {
+    /// A name for programs, such as `suburban`. It decides the
+    /// [`Mode`] of the lines; an ID the crate does not know gives
+    /// [`Mode::Other`].
+    pub id: String,
+    /// The name for people, such as `S-Bahn`.
+    pub name: String,
+    /// The bits that mark a line as this product in the server's answers.
+    pub bitmasks: Vec<u32>,
+}
+
+/// The mode that lines of a product run in.
+fn mode(product: &str) -> Mode {
+    match product {
+        "suburban" => Mode::SuburbanTrain,
+        "subway" => Mode::Subway,
+        "tram" => Mode::Tram,
+        "bus" => Mode::Bus,
+        "ferry" => Mode::Ferry,
+        "express" => Mode::LongDistanceTrain,
+        "regional" => Mode::RegionalTrain,
+        _ => Mode::Other,
+    }
+}
+
+fn request(network: &Network, method: &str, arguments: &Value) -> Result<HttpRequest, Error> {
+    let invalid = |message: &str| Error::InvalidNetwork {
+        message: message.to_owned(),
+    };
+    let options = network
+        .hafas
+        .as_ref()
+        .ok_or_else(|| invalid("a HAFAS network needs its options"))?;
+    let object_from = |text: &str, name: &str| {
+        serde_json::from_str::<Value>(text)
+            .ok()
+            .filter(Value::is_object)
+            .ok_or_else(|| invalid(&format!("the HAFAS {name} is not a JSON object")))
+    };
+    let body = object([
+        ("lang", Some(json!(options.language))),
+        ("client", Some(object_from(&options.client, "client")?)),
+        ("ext", options.ext.as_ref().map(|ext| json!(ext))),
+        ("ver", Some(json!(options.version))),
+        ("auth", Some(object_from(&options.auth, "auth")?)),
+        ("svcReqL", Some(json!([{"meth": method, "req": arguments}]))),
+    ]);
+    Ok(HttpRequest {
+        method: Method::Post,
+        url: network.endpoint.clone(),
+        headers: vec![Header {
+            name: "Content-Type".to_owned(),
+            value: "application/json".to_owned(),
+        }],
+        body: Some(body.to_string().into_bytes()),
+    })
+}
+
+/// A JSON object of the fields that have a value.
+fn object<const N: usize>(fields: [(&str, Option<Value>); N]) -> Value {
+    fields
+        .into_iter()
+        .filter_map(|(name, value)| Some((name.to_owned(), value?)))
+        .collect::<serde_json::Map<_, _>>()
+        .into()
+}
+
+/// A stop, address or point of interest by its ID. Only stops have a short
+/// one; the others are known by the server's full identifier.
+fn place_by_id(id: &str) -> Value {
+    if id.contains('@') {
+        json!({"lid": id})
+    } else {
+        json!({"lid": format!("A=1@L={id}@")})
+    }
+}
+
+fn place(place: &Place) -> Result<Value, Error> {
+    Ok(match place.checked()? {
+        Place::Id(id) => place_by_id(id),
+        Place::Coordinate(coordinate) => {
+            // On the globe, so the millionths fit.
+            #[expect(clippy::cast_possible_truncation)]
+            let millionths = |degrees: f64| (degrees * 1e6).round() as i64;
+            json!({"type": "C", "crd": {
+                "x": millionths(coordinate.longitude),
+                "y": millionths(coordinate.latitude),
+            }})
+        }
+    })
+}
+
+/// The date and the time of day as the server wants them: wall-clock time
+/// in its own zone.
+fn local_time(network: &Network, time: Timestamp) -> Result<(String, String), Error> {
+    let local = network.local(time)?;
+    Ok((
+        local.strftime("%Y%m%d").to_string(),
+        local.strftime("%H%M%S").to_string(),
+    ))
+}
+
+pub(crate) fn locations_request(
+    network: &Network,
+    query: &LocationQuery,
+) -> Result<HttpRequest, Error> {
+    let letters: String = [
+        (LocationKind::Stop, 'S'),
+        (LocationKind::Address, 'A'),
+        (LocationKind::Poi, 'P'),
+    ]
+    .into_iter()
+    .filter(|(kind, _)| query.kinds.contains(kind))
+    .map(|(_, letter)| letter)
+    .collect();
+    if letters.is_empty() && !query.kinds.is_empty() {
+        return Err(Error::InvalidQuery {
+            message: "HAFAS cannot search for the asked kinds of location alone".to_owned(),
+        });
+    }
+    let kinds = if letters.is_empty() { "ALL" } else { &letters };
+    let input = object([
+        // The question mark asks for names that are close to the text too.
+        (
+            "loc",
+            Some(json!({"type": kinds, "name": format!("{}?", query.text)})),
+        ),
+        ("maxLoc", query.limit.map(|limit| json!(limit))),
+        ("field", Some(json!("S"))),
+    ]);
+    request(network, "LocMatch", &json!({"input": input}))
+}
+
+pub(crate) fn departures_request(
+    network: &Network,
+    query: &DeparturesQuery,
+) -> Result<HttpRequest, Error> {
+    // The answer holds local times, so it could not be read without one.
+    network.zone()?;
+    let time = query
+        .time
+        .map(|time| local_time(network, time))
+        .transpose()?;
+    let (date, time) = time.unzip();
+    let arguments = object([
+        ("type", Some(json!("DEP"))),
+        ("stbLoc", Some(place_by_id(&query.stop_id))),
+        ("maxJny", query.limit.map(|limit| json!(limit))),
+        ("date", date.map(Value::String)),
+        ("time", time.map(Value::String)),
+    ]);
+    request(network, "StationBoard", &arguments)
+}
+
+pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<HttpRequest, Error> {
+    // The answer holds local times, so it could not be read without one.
+    network.zone()?;
+    // A page holds the time of the search it continues.
+    let time = match query.time.filter(|_| query.page.is_none()) {
+        Some(TripTime::DepartAt(time) | TripTime::ArriveBy(time)) => {
+            Some(local_time(network, time)?)
+        }
+        None => None,
+    };
+    let (date, time) = time.unzip();
+    let arguments = object([
+        ("depLocL", Some(json!([place(&query.origin)?]))),
+        ("arrLocL", Some(json!([place(&query.destination)?]))),
+        (
+            "outFrwd",
+            Some(json!(!matches!(query.time, Some(TripTime::ArriveBy(_))))),
+        ),
+        ("outDate", date.map(Value::String)),
+        ("outTime", time.map(Value::String)),
+        ("numF", query.limit.map(|limit| json!(limit))),
+        ("getPasslist", Some(json!(true))),
+        ("ctxScr", query.page.as_ref().map(|page| json!(page))),
+    ]);
+    request(network, "TripSearch", &arguments)
+}
+
+/// The result of the one method a request names. `None` if the server
+/// reports one of the `empty` codes, which stand for "nothing found".
+fn result<T: for<'a> Deserialize<'a>>(
+    response: &HttpResponse,
+    empty: &[&str],
+) -> Result<Option<T>, Error> {
+    let failed = |code: &str, text: Option<&str>| Error::Server {
+        status: 200,
+        message: text.map_or_else(|| code.to_owned(), |text| format!("{code}: {text}")),
+    };
+    let envelope: Envelope = response.json()?;
+    match envelope.err.as_deref() {
+        None | Some("OK") => {}
+        Some("AUTH") => return Err(Error::Unauthorized),
+        Some(code) => return Err(failed(code, envelope.err_txt.as_deref())),
+    }
+    let missing = || Error::Parse {
+        message: "the response has no result".to_owned(),
+    };
+    let service = envelope
+        .svc_res_l
+        .and_then(|services| services.into_iter().next())
+        .ok_or_else(missing)?;
+    match service.err.as_deref() {
+        // Only now, because the result of a failed call has any shape.
+        None | Some("OK") => serde_json::from_value(service.res.ok_or_else(missing)?)
+            .map(Some)
+            .map_err(|error| Error::Parse {
+                message: error.to_string(),
+            }),
+        Some("LOCATION") => Err(Error::NotFound {
+            message: service.err_txt.unwrap_or_else(|| "LOCATION".to_owned()),
+        }),
+        Some(code) if empty.contains(&code) => Ok(None),
+        Some(code) => Err(failed(code, service.err_txt.as_deref())),
+    }
+}
+
+pub(crate) fn parse_locations(
+    network: &Network,
+    response: &HttpResponse,
+) -> Result<Vec<Location>, Error> {
+    let Some(result) = result::<LocationsResult>(response, &["NO_MATCH"])? else {
+        return Ok(Vec::new());
+    };
+    Ok(result
+        .matches
+        .loc_l
+        .into_iter()
+        .map(|location| location.into_location(network))
+        .collect())
+}
+
+pub(crate) fn parse_departures(
+    network: &Network,
+    response: &HttpResponse,
+) -> Result<Vec<Departure>, Error> {
+    let Some(board) = result::<Board>(response, &[])? else {
+        return Ok(Vec::new());
+    };
+    let reader = Reader::new(network, &board.common);
+    let mut departures = board
+        .jny_l
+        .into_iter()
+        .map(|journey| {
+            let stop = journey.stb_stop.as_ref().ok_or_else(|| Error::Parse {
+                message: "a departure has no stop".to_owned(),
+            })?;
+            let end = reader.leg_end(&journey.date, stop, Side::Departure)?;
+            Ok(Departure {
+                stop: end.stop,
+                line: reader.line(journey.prod_x)?,
+                direction: journey.dir_txt,
+                scheduled_time: end.scheduled_time,
+                realtime_time: end.realtime_time,
+                scheduled_platform: end.scheduled_platform,
+                realtime_platform: end.realtime_platform,
+                cancelled: end.cancelled || journey.is_cncl,
+            })
+        })
+        .collect::<Result<Vec<_>, Error>>()?;
+    // The server orders them by scheduled time.
+    departures.sort_by_key(Departure::expected_time);
+    Ok(departures)
+}
+
+pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<Trips, Error> {
+    // H890 is a search that found no trip.
+    let Some(found) = result::<Connections>(response, &["H890"])? else {
+        return Ok(Trips {
+            trips: Vec::new(),
+            earlier: None,
+            later: None,
+        });
+    };
+    let reader = Reader::new(network, &found.common);
+    let trips = found
+        .out_con_l
+        .iter()
+        .map(|connection| {
+            let legs = connection
+                .sec_l
+                .iter()
+                .map(|section| reader.leg(&connection.date, section))
+                .collect::<Result<_, _>>()?;
+            Ok(Trip { legs })
+        })
+        .collect::<Result<_, Error>>()?;
+    Ok(Trips {
+        trips,
+        earlier: found.out_ctx_scr_b,
+        later: found.out_ctx_scr_f,
+    })
+}
+
+#[derive(Clone, Copy)]
+enum Side {
+    Departure,
+    Arrival,
+}
+
+/// Reads the parts of an answer that point into its shared lists.
+struct Reader<'a> {
+    network: &'a Network,
+    common: &'a Common,
+    /// An error if the network has none; only an answer with times needs it.
+    zone: Result<jiff::tz::TimeZone, Error>,
+}
+
+impl<'a> Reader<'a> {
+    fn new(network: &'a Network, common: &'a Common) -> Self {
+        Self {
+            network,
+            common,
+            zone: network.zone(),
+        }
+    }
+
+    fn location(&self, index: Option<usize>) -> Result<Location, Error> {
+        index
+            .and_then(|index| self.common.locations.get(index))
+            .map(|location| location.clone().into_location(self.network))
+            .ok_or_else(|| Error::Parse {
+                message: "a stop refers to a location the response does not list".to_owned(),
+            })
+    }
+
+    fn line(&self, index: Option<usize>) -> Result<Line, Error> {
+        let product = index
+            .and_then(|index| self.common.lines.get(index))
+            .ok_or_else(|| Error::Parse {
+                message: "a journey refers to a line the response does not list".to_owned(),
+            })?;
+        let products = self.network.hafas.as_ref().map(|options| &options.products);
+        let kind = products.into_iter().flatten().find(|kind| {
+            kind.bitmasks
+                .iter()
+                .any(|bits| bits & product.cls.unwrap_or(0) != 0)
+        });
+        Ok(Line {
+            name: product.name.clone().unwrap_or_default(),
+            mode: kind.map_or(Mode::Other, |kind| mode(&kind.id)),
+            product: product
+                .prod_ctx
+                .as_ref()
+                .and_then(|context| context.cat_out_l.as_deref())
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .map(str::to_owned),
+            operator: product
+                .opr_x
+                .and_then(|index| self.common.operators.get(index))
+                .and_then(|operator| operator.name.clone()),
+        })
+    }
+
+    /// A time of day on or after `date`: `HHMMSS`, with the number of days
+    /// to add in front if the time is on a later day.
+    fn time(&self, date: &str, time: &str) -> Result<Timestamp, Error> {
+        let unreadable = || Error::Parse {
+            message: format!("{date} {time} is not a date and a time"),
+        };
+        let zone = self.zone.clone()?;
+        let (days, time) = time
+            .len()
+            .checked_sub(6)
+            .and_then(|at| time.split_at_checked(at))
+            .ok_or_else(unreadable)?;
+        let days: i64 = if days.is_empty() {
+            0
+        } else {
+            days.parse().map_err(|_| unreadable())?
+        };
+        let local = jiff::civil::DateTime::strptime("%Y%m%d%H%M%S", format!("{date}{time}"))
+            .ok()
+            .filter(|_| date.len() == 8)
+            .ok_or_else(unreadable)?;
+        let time = jiff::Span::new()
+            .try_days(days)
+            .and_then(|days| local.checked_add(days))
+            .and_then(|local| local.to_zoned_datetime(zone))
+            .map_err(|_| unreadable())?
+            .timestamp();
+        // The check on the range of years is the one for times in a query.
+        let time = Timestamp {
+            unix_seconds: time.as_second(),
+        };
+        time.to_jiff().map_err(|_| unreadable())?;
+        Ok(time)
+    }
+
+    fn optional_time(&self, date: &str, time: Option<&String>) -> Result<Option<Timestamp>, Error> {
+        time.map(|time| self.time(date, time)).transpose()
+    }
+
+    fn leg_end(&self, date: &str, stop: &Stop, side: Side) -> Result<LegEnd, Error> {
+        let stopover = self.stopover(date, stop)?;
+        match side {
+            Side::Departure => stopover.into_leg_start(),
+            Side::Arrival => stopover.into_leg_end(),
+        }
+        .ok_or_else(|| Error::Parse {
+            message: "a stop has no scheduled time".to_owned(),
+        })
+    }
+
+    fn stopover(&self, date: &str, stop: &Stop) -> Result<Stopover, Error> {
+        let text = |platform: &Option<Platform>| platform.as_ref().and_then(|p| p.txt.clone());
+        Ok(Stopover {
+            stop: self.location(stop.loc_x)?,
+            scheduled_arrival: self.optional_time(date, stop.a_time_s.as_ref())?,
+            realtime_arrival: self.optional_time(date, stop.a_time_r.as_ref())?,
+            scheduled_departure: self.optional_time(date, stop.d_time_s.as_ref())?,
+            realtime_departure: self.optional_time(date, stop.d_time_r.as_ref())?,
+            scheduled_platform: text(&stop.d_pltf_s).or_else(|| text(&stop.a_pltf_s)),
+            realtime_platform: text(&stop.d_pltf_r).or_else(|| text(&stop.a_pltf_r)),
+            cancelled: stop.d_cncl || stop.a_cncl,
+        })
+    }
+
+    fn leg(&self, date: &str, section: &Section) -> Result<Leg, Error> {
+        let journey = section.jny.as_ref();
+        let kind = match (section.kind.as_str(), journey) {
+            ("JNY", Some(journey)) => LegKind::Transit {
+                line: self.line(journey.prod_x)?,
+                direction: journey.dir_txt.clone(),
+            },
+            // A transfer is a walk between two stops.
+            ("WALK" | "TRSF", _) => LegKind::Walk,
+            _ => LegKind::Other,
+        };
+        let calls = journey.map_or(&[][..], |journey| &journey.stop_l);
+        let between = calls.get(1..calls.len().saturating_sub(1)).unwrap_or(&[]);
+        Ok(Leg {
+            kind,
+            departure: self.leg_end(date, &section.dep, Side::Departure)?,
+            arrival: self.leg_end(date, &section.arr, Side::Arrival)?,
+            intermediate_stops: between
+                .iter()
+                .map(|stop| self.stopover(date, stop))
+                .collect::<Result<_, _>>()?,
+            cancelled: journey.is_some_and(|journey| journey.is_cncl),
+        })
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Envelope {
+    err: Option<String>,
+    err_txt: Option<String>,
+    #[serde(default)]
+    svc_res_l: Option<Vec<Service>>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Service {
+    err: Option<String>,
+    err_txt: Option<String>,
+    res: Option<Value>,
+}
+
+/// The lists that the results point into by index.
+#[derive(Deserialize, Default)]
+struct Common {
+    #[serde(default, rename = "locL")]
+    locations: Vec<WireLocation>,
+    #[serde(default, rename = "prodL")]
+    lines: Vec<Product>,
+    #[serde(default, rename = "opL")]
+    operators: Vec<Operator>,
+}
+
+#[derive(Deserialize)]
+struct LocationsResult {
+    #[serde(rename = "match")]
+    matches: Matches,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Matches {
+    #[serde(default)]
+    loc_l: Vec<WireLocation>,
+}
+
+#[derive(Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct WireLocation {
+    lid: Option<String>,
+    #[serde(rename = "type")]
+    kind: Option<String>,
+    name: Option<String>,
+    ext_id: Option<String>,
+    crd: Option<Position>,
+    #[serde(default)]
+    gid_l: Vec<String>,
+}
+
+/// A position in millionths of a degree.
+#[derive(Deserialize, Clone, Copy)]
+struct Position {
+    x: f64,
+    y: f64,
+}
+
+impl WireLocation {
+    fn into_location(self, network: &Network) -> Location {
+        Location {
+            // The short ID names a stop in a request and nothing else.
+            id: self
+                .ext_id
+                .filter(|_| self.kind.as_deref() == Some("S"))
+                .or(self.lid)
+                .unwrap_or_default(),
+            // The letter in front names the kind of ID.
+            global_ids: self
+                .gid_l
+                .iter()
+                .filter_map(|id| id.strip_prefix("A×"))
+                .filter_map(GlobalId::ifopt)
+                .collect(),
+            kind: match self.kind.as_deref() {
+                Some("S") => LocationKind::Stop,
+                Some("A") => LocationKind::Address,
+                Some("P") => LocationKind::Poi,
+                _ => LocationKind::Other,
+            },
+            name: self.name.unwrap_or_default(),
+            locality: None,
+            coordinate: self.crd.map(|position| Coordinate {
+                latitude: position.y / 1e6,
+                longitude: position.x / 1e6,
+            }),
+            timezone: network.timezone.clone(),
+            network: None,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Product {
+    name: Option<String>,
+    cls: Option<u32>,
+    opr_x: Option<usize>,
+    prod_ctx: Option<ProductContext>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProductContext {
+    cat_out_l: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct Operator {
+    name: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Board {
+    #[serde(default)]
+    common: Common,
+    #[serde(default)]
+    jny_l: Vec<Journey>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Journey {
+    #[serde(default)]
+    date: String,
+    prod_x: Option<usize>,
+    dir_txt: Option<String>,
+    #[serde(default)]
+    is_cncl: bool,
+    stb_stop: Option<Stop>,
+    #[serde(default)]
+    stop_l: Vec<Stop>,
+}
+
+/// A call at a stop, with the fields of an arrival, a departure or both.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Stop {
+    loc_x: Option<usize>,
+    a_time_s: Option<String>,
+    a_time_r: Option<String>,
+    d_time_s: Option<String>,
+    d_time_r: Option<String>,
+    a_pltf_s: Option<Platform>,
+    a_pltf_r: Option<Platform>,
+    d_pltf_s: Option<Platform>,
+    d_pltf_r: Option<Platform>,
+    #[serde(default)]
+    a_cncl: bool,
+    #[serde(default)]
+    d_cncl: bool,
+}
+
+#[derive(Deserialize)]
+struct Platform {
+    txt: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Connections {
+    #[serde(default)]
+    common: Common,
+    #[serde(default)]
+    out_con_l: Vec<Connection>,
+    out_ctx_scr_b: Option<String>,
+    out_ctx_scr_f: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Connection {
+    date: String,
+    #[serde(default)]
+    sec_l: Vec<Section>,
+}
+
+#[derive(Deserialize)]
+struct Section {
+    #[serde(rename = "type")]
+    kind: String,
+    dep: Stop,
+    arr: Stop,
+    jny: Option<Journey>,
+}

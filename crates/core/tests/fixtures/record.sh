@@ -78,3 +78,19 @@ post ojp/vrr-locations.xml $vrr_ojp "$(ojp '<ojp:OJPLocationInformationRequest><
 post ojp/vrr-departures.xml $vrr_ojp "$(ojp_departures de:05111:18235)"
 post ojp/vrr-trip.xml $vrr_ojp "$(ojp '<ojp:OJPTripRequest><ojp:Origin><ojp:PlaceRef><ojp:StopPlaceRef>de:05111:18235</ojp:StopPlaceRef><ojp:LocationName><ojp:Text>de:05111:18235</ojp:Text></ojp:LocationName></ojp:PlaceRef></ojp:Origin><ojp:Destination><ojp:PlaceRef><ojp:StopPlaceRef>de:05113:9289</ojp:StopPlaceRef><ojp:LocationName><ojp:Text>de:05113:9289</ojp:Text></ojp:LocationName></ojp:PlaceRef></ojp:Destination><ojp:Params><ojp:NumberOfResults>3</ojp:NumberOfResults><ojp:IncludeIntermediateStops>true</ojp:IncludeIntermediateStops></ojp:Params></ojp:OJPTripRequest>')"
 post ojp/vvo-departures.xml https://efa.vvo-online.de/std3/ojp "$(ojp_departures de:14612:28)"
+
+# hafas <output file> <endpoint> <envelope without svcReqL> <method> <request>
+hafas() {
+  curl --silent --show-error --fail --max-time 30 --user-agent "$user_agent" \
+    --header 'Content-Type: application/json' --output "$1" "$2" \
+    --data "{$3,\"svcReqL\":[{\"meth\":\"$4\",\"req\":$5}]}"
+}
+
+# Berlin Alexanderplatz to Zoologischer Garten on VBB's HAFAS server, with
+# the requests of the library.
+vbb=(https://fahrinfo.vbb.de/bin/mgate.exe '"lang":"de","client":{"type":"WEB","id":"VBB","name":"VBB WebApp","l":"vs_webapp_vbb"},"ext":"VBB.1","ver":"1.33","auth":{"type":"AID","aid":"hafas-vbb-webapp"}')
+mkdir -p hafas
+hafas hafas/vbb-locations.json $vbb LocMatch '{"input":{"loc":{"type":"ALL","name":"Alexanderplatz?"},"maxLoc":5,"field":"S"}}'
+hafas hafas/vbb-departures.json $vbb StationBoard '{"type":"DEP","stbLoc":{"lid":"A=1@L=900100003@"},"maxJny":10}'
+hafas hafas/vbb-departures-unknown-stop.json $vbb StationBoard '{"type":"DEP","stbLoc":{"lid":"A=1@L=999999999@"},"maxJny":10}'
+hafas hafas/vbb-trip.json $vbb TripSearch '{"depLocL":[{"lid":"A=1@L=900100003@"}],"arrLocL":[{"lid":"A=1@L=900023201@"}],"outFrwd":true,"numF":3,"getPasslist":true}'

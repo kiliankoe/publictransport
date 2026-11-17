@@ -1,4 +1,4 @@
-//! HTTP client for public transport APIs: EFA, MOTIS, TRIAS and OJP.
+//! HTTP client for public transport APIs: EFA, MOTIS, TRIAS, OJP and HAFAS.
 //!
 //! The [`publictransport`] crate builds requests and parses responses
 //! without doing I/O. This crate sends them with [`reqwest`]. It re-exports

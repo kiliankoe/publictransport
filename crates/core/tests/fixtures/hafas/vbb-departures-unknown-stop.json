@@ -1,0 +1,1 @@
+{"ver":"1.33","ext":"VBB.1","lang":"deu","id":"4dku6xxug6uf96wx","err":"OK","graph":{"id":"standard","index":0},"subGraph":{"id":"global","index":0},"view":{"id":"standard","index":0,"type":"WGS84"},"svcResL":[{"meth":"StationBoard","err":"LOCATION","errTxt":"HCI Service: location missing or invalid","errTxtOut":"Während der Suche ist ein interner Fehler aufgetreten"}]}

@@ -44,15 +44,16 @@ pub enum Error {
     /// can help.
     #[error("the server received too many requests")]
     RateLimited,
-    /// The server rejected the credentials (status 401).
+    /// The server rejected the credentials (status 401, or the code `AUTH`
+    /// in a HAFAS answer).
     #[error("the server rejected the credentials")]
     Unauthorized,
     /// The server failed (status 5xx).
     #[error("the server is unavailable")]
     Unavailable,
     /// The server reported any other failure: an HTTP status that no other
-    /// variant covers, or an error inside a successful response, as TRIAS
-    /// and OJP send them.
+    /// variant covers, or an error inside a successful response, as TRIAS,
+    /// OJP and HAFAS send them.
     #[error("the server reported an error (HTTP status {status}): {message}")]
     Server {
         /// The HTTP status code. It is 200 for an error inside a successful

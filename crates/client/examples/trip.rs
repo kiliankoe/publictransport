@@ -6,6 +6,7 @@
 //! cargo run --example trip -- transitous "Dresden Hauptbahnhof" "Dresden Albertplatz"
 //! cargo run --example trip -- vvo-trias "Dresden Hauptbahnhof" "Dresden Albertplatz"
 //! cargo run --example trip -- vrr-ojp "Düsseldorf Hbf" "Essen Hbf"
+//! cargo run --example trip -- vbb-hafas "S+U Alexanderplatz" "S+U Zoologischer Garten"
 //! ```
 
 use std::error::Error;

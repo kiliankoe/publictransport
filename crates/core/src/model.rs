@@ -13,8 +13,8 @@ pub struct LocationQuery {
     pub limit: Option<u32>,
     /// The kinds of location wanted. Empty asks for every kind. The request
     /// asks the server to filter, so `limit` counts only wanted locations.
-    /// MOTIS has no locations of the kind [`LocationKind::Other`]: it is
-    /// left out there, and a query for that kind alone is an
+    /// MOTIS and HAFAS cannot ask for the kind [`LocationKind::Other`]: it
+    /// is left out there, and a query for that kind alone is an
     /// [`Error::InvalidQuery`](crate::Error::InvalidQuery).
     #[cfg_attr(feature = "uniffi", uniffi(default = []))]
     pub kinds: Vec<LocationKind>,
@@ -351,8 +351,9 @@ pub struct TripsQuery {
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub limit: Option<u32>,
     /// Continues an earlier search: [`Trips::earlier`] or [`Trips::later`]
-    /// of its result, set on the query that led to it. On every protocol
-    /// but MOTIS the page takes the place of [`TripsQuery::time`]. A
+    /// of its result, set on the query that led to it. On EFA, TRIAS and
+    /// OJP the page takes the place of [`TripsQuery::time`]; MOTIS and
+    /// HAFAS continue the search the reference came from. A
     /// reference is only good for the network it came from, and its text
     /// has no meaning to rely on.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]

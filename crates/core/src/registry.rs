@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use serde::Deserialize;
 
-use crate::{Coordinate, Error, Network, Protocol};
+use crate::{Coordinate, Error, HafasOptions, HafasProduct, Network, Protocol};
 
 /// One of the three things a [`Network`] can be asked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -156,7 +156,9 @@ impl Network {
     ///
     /// The crate reads four fields that repository does not have: the type
     /// `ojp` with `options.ojpVersion`, `options.requestorRef`, and
-    /// `usageTerms` for [`Network::terms`]. For
+    /// `usageTerms` for [`Network::terms`]. An entry of the type
+    /// `hafasMgate` gives a network with [`Network::hafas`] that asks in the
+    /// first of the entry's `supportedLanguages`. For
     /// MOTIS the entry names the root of the server, and the endpoint gets
     /// `api` appended unless it ends in it.
     ///
@@ -171,13 +173,13 @@ impl Network {
     /// # Errors
     ///
     /// Returns [`Error::InvalidNetwork`] if the text is not such an entry,
-    /// if its protocol is not one of this crate's, or if the server wants a
-    /// key in an HTTP header.
+    /// if its protocol is not one of this crate's, if the server wants a
+    /// key in an HTTP header, or if a HAFAS server wants signed requests.
     pub fn from_json(id: &str, json: &str) -> Result<Self, Error> {
         let invalid = |message: String| Error::InvalidNetwork { message };
         let entry: Entry =
             serde_json::from_str(json).map_err(|error| invalid(format!("{id}: {error}")))?;
-        let options = entry.options;
+        let mut options = entry.options;
 
         let mut types = entry.kind.iter().filter(|(_, enabled)| **enabled);
         let protocol = match (types.next().map(|(name, _)| name.as_str()), types.next()) {
@@ -185,12 +187,16 @@ impl Network {
             (Some("motis"), None) => Protocol::Motis,
             (Some("trias"), None) => Protocol::Trias,
             (Some("ojp"), None) => Protocol::Ojp1,
+            (Some("hafasMgate"), None) => Protocol::HafasMgate,
             _ => {
                 return Err(invalid(format!(
-                    "{id}: needs exactly one of the types efa, motis, trias and ojp"
+                    "{id}: needs exactly one of the types efa, motis, trias, ojp and hafasMgate"
                 )));
             }
         };
+        let hafas = (protocol == Protocol::HafasMgate)
+            .then(|| options.hafas(id, entry.supported_languages))
+            .transpose()?;
         if protocol == Protocol::Ojp1 {
             // Written as text here, as a number for TRIAS upstream.
             let version = options.ojp_version.as_ref().map(ToString::to_string);
@@ -258,6 +264,7 @@ impl Network {
             requires_key: xml && options.requires_sign_up,
             terms: entry.usage_terms.filter(|terms| !terms.is_empty()),
             headers: Vec::new(),
+            hafas,
         })
     }
 }
@@ -273,6 +280,8 @@ struct Entry {
     attribution: Option<WireAttribution>,
     #[serde(rename = "usageTerms")]
     usage_terms: Option<String>,
+    #[serde(rename = "supportedLanguages", default)]
+    supported_languages: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -285,6 +294,68 @@ struct Options {
     #[serde(default)]
     requires_sign_up: bool,
     provided_services: Option<Vec<String>>,
+    client: Option<serde_json::Value>,
+    auth: Option<serde_json::Value>,
+    ext: Option<String>,
+    ver: Option<String>,
+    version: Option<String>,
+    checksum_salt: Option<String>,
+    mic_mac_salt: Option<String>,
+    #[serde(default)]
+    products: Vec<WireProduct>,
+}
+
+impl Options {
+    /// What a HAFAS mgate entry says about its server. Takes the values
+    /// out of the options.
+    fn hafas(&mut self, id: &str, languages: Vec<String>) -> Result<HafasOptions, Error> {
+        let invalid = |name: &str| Error::InvalidNetwork {
+            message: format!("{id}: needs options.{name}"),
+        };
+        let object = |value: Option<serde_json::Value>, name: &str| {
+            value
+                .filter(serde_json::Value::is_object)
+                .map(|value| value.to_string())
+                .ok_or_else(|| invalid(name))
+        };
+        if self.checksum_salt.is_some() || self.mic_mac_salt.is_some() {
+            return Err(Error::InvalidNetwork {
+                message: format!(
+                    "{id}: the server wants signed requests, which this crate cannot send"
+                ),
+            });
+        }
+        Ok(HafasOptions {
+            client: object(self.client.take(), "client")?,
+            auth: object(self.auth.take(), "auth")?,
+            ext: self.ext.take(),
+            version: self
+                .ver
+                .take()
+                .or_else(|| self.version.take())
+                .ok_or_else(|| invalid("ver"))?,
+            language: languages
+                .into_iter()
+                .next()
+                .unwrap_or_else(|| "en".to_owned()),
+            products: std::mem::take(&mut self.products)
+                .into_iter()
+                .map(|product| HafasProduct {
+                    id: product.id,
+                    name: product.name,
+                    bitmasks: product.bitmasks,
+                })
+                .collect(),
+        })
+    }
+}
+
+#[derive(Deserialize)]
+struct WireProduct {
+    id: String,
+    #[serde(default)]
+    name: String,
+    bitmasks: Vec<u32>,
 }
 
 #[derive(Deserialize, Default)]
@@ -378,13 +449,17 @@ pub struct CoveringNetwork {
 /// transport-apis repository, a submodule, where it has a usable entry.
 /// Those in `data/networks` are waiting to get there, or need the fields
 /// that only this crate reads.
-const BUNDLED: [(&str, &str); 7] = [
+const BUNDLED: [(&str, &str); 8] = [
     ("vvo-efa", include_str!("../data/networks/vvo-efa.json")),
     ("vvo-trias", include_str!("../data/networks/vvo-trias.json")),
     ("vvo-ojp", include_str!("../data/networks/vvo-ojp.json")),
     ("vrr-efa", include_str!("../data/networks/vrr-efa.json")),
     ("vrr-trias", include_str!("../data/networks/vrr-trias.json")),
     ("vrr-ojp", include_str!("../data/networks/vrr-ojp.json")),
+    (
+        "vbb-hafas",
+        include_str!("../data/transport-apis/data/de/vbb-hafas-mgate.json"),
+    ),
     (
         "transitous",
         include_str!("../data/transport-apis/data/un/transitous.json"),

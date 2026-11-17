@@ -1,4 +1,4 @@
-//! Client for public transport APIs: EFA, MOTIS, TRIAS and OJP.
+//! Client for public transport APIs: EFA, MOTIS, TRIAS, OJP and HAFAS.
 //!
 //! This crate does no I/O. It builds HTTP requests and parses HTTP responses,
 //! so each platform can send them with its own HTTP stack. Every operation is
@@ -32,7 +32,8 @@
 //! [`Network::departures_request`] and [`Network::parse_departures`], and
 //! with [`Network::trips_request`] and [`Network::parse_trips`]. An EFA
 //! network needs [`Network::with_timezone`] for requests that carry a time,
-//! and a TRIAS or OJP network needs [`Network::with_requestor_ref`].
+//! a TRIAS or OJP network needs [`Network::with_requestor_ref`], and a
+//! HAFAS network needs [`Network::with_hafas`] and a time zone.
 //!
 //! [`Registry::bundled`] has networks that were checked against their live
 //! servers, so that they need not be described by hand, and
@@ -53,6 +54,7 @@ mod efa;
 mod error;
 #[cfg(feature = "uniffi")]
 mod ffi;
+mod hafas;
 mod http;
 mod model;
 mod motis;
@@ -62,6 +64,7 @@ mod time;
 mod trias;
 
 pub use error::Error;
+pub use hafas::{HafasOptions, HafasProduct};
 pub use http::{Header, HttpRequest, HttpResponse, Method};
 pub use model::{
     Coordinate, Departure, DeparturesQuery, GlobalId, IdScheme, Leg, LegEnd, LegKind, Line,

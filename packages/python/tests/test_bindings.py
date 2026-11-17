@@ -1,5 +1,6 @@
 """What the hand-written parts of the Rust bindings add: times and helpers."""
 
+import json
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -8,6 +9,7 @@ from publictransport import (
     DeparturesQuery,
     Error,
     GlobalId,
+    HafasOptions,
     HttpResponse,
     IdScheme,
     LegEnd,
@@ -134,3 +136,28 @@ def test_network_is_read_from_a_transport_apis_entry() -> None:
     assert (network.id, network.protocol) == ("example", Protocol.EFA)
     with pytest.raises(Error.InvalidNetwork):
         network_from_json("broken", "{}")
+
+
+def test_hafas_network_builds_a_request_from_its_options() -> None:
+    options = HafasOptions(
+        client='{"id": "VBB"}',
+        auth='{"aid": "key"}',
+        ext=None,
+        version="1.33",
+        language="de",
+        products=[],
+    )
+    network = Network(
+        id="vbb",
+        name="VBB",
+        endpoint="https://hafas.example/bin/mgate.exe",
+        protocol=Protocol.HAFAS_MGATE,
+        hafas=options,
+    )
+
+    request = network.locations_request(LocationQuery(text="a"))
+
+    assert request.url == "https://hafas.example/bin/mgate.exe"
+    body = json.loads(request.body or b"")
+    assert (body["client"], body["ver"], body["lang"]) == ({"id": "VBB"}, "1.33", "de")
+    assert body["svcReqL"][0]["meth"] == "LocMatch"

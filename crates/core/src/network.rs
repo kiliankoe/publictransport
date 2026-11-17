@@ -1,7 +1,7 @@
 use crate::{
-    Attribution, Coverage, Departure, DeparturesQuery, Error, Header, HttpRequest, HttpResponse,
-    IdScheme, Location, LocationKind, LocationQuery, Operation, Place, Trips, TripsQuery, efa,
-    motis, trias,
+    Attribution, Coverage, Departure, DeparturesQuery, Error, HafasOptions, Header, HttpRequest,
+    HttpResponse, IdScheme, Location, LocationKind, LocationQuery, Operation, Place, Trips,
+    TripsQuery, efa, hafas, motis, trias,
 };
 
 /// One server that answers public transport queries.
@@ -20,7 +20,8 @@ pub struct Network {
     /// protocol's paths are appended to, e.g.
     /// `https://efa.vvo-online.de/std3` or `https://api.transitous.org/api`,
     /// and a trailing slash is allowed. TRIAS and OJP have one URL for all
-    /// requests, e.g. `https://efa.vvo-online.de/std3/trias`.
+    /// requests, e.g. `https://efa.vvo-online.de/std3/trias`, and so has
+    /// HAFAS mgate, e.g. `https://fahrinfo.vbb.de/bin/mgate.exe`.
     pub endpoint: String,
     /// The protocol the server speaks.
     pub protocol: Protocol,
@@ -63,6 +64,10 @@ pub struct Network {
     /// output leaves the values out.
     #[cfg_attr(feature = "uniffi", uniffi(default = []))]
     pub headers: Vec<Header>,
+    /// What a HAFAS mgate server needs. Requests to such a network fail
+    /// without it.
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub hafas: Option<HafasOptions>,
 }
 
 /// The protocol a [`Network`] speaks.
@@ -79,6 +84,11 @@ pub enum Protocol {
     Trias,
     /// OJP 1.0 (CEN/TS 17118:2017), the European successor of TRIAS.
     Ojp1,
+    /// HAFAS mgate, the JSON interface behind the apps of operators that
+    /// run the HAFAS journey planner. It needs [`Network::hafas`]. The
+    /// operators made it for their own apps and have not opened it to
+    /// others, so a server can change or lock others out without notice.
+    HafasMgate,
 }
 
 impl Network {
@@ -102,6 +112,7 @@ impl Network {
             requires_key: false,
             terms: None,
             headers: Vec::new(),
+            hafas: None,
         }
     }
 
@@ -116,6 +127,13 @@ impl Network {
     #[must_use]
     pub fn with_requestor_ref(mut self, requestor_ref: impl Into<String>) -> Self {
         self.requestor_ref = Some(requestor_ref.into());
+        self
+    }
+
+    /// Sets [`Network::hafas`].
+    #[must_use]
+    pub fn with_hafas(mut self, options: HafasOptions) -> Self {
+        self.hafas = Some(options);
         self
     }
 
@@ -154,11 +172,11 @@ impl Network {
     /// The scheme of global IDs that the protocol takes where it takes a
     /// stop ID. The German EFA, TRIAS and OJP servers take an IFOPT ID; that
     /// every server of these protocols does is an assumption. MOTIS IDs
-    /// carry the name of a feed.
+    /// carry the name of a feed, and HAFAS servers take their own IDs only.
     fn global_ids(&self) -> Option<IdScheme> {
         match self.protocol {
             Protocol::Efa | Protocol::Trias | Protocol::Ojp1 => Some(IdScheme::Ifopt),
-            Protocol::Motis => None,
+            Protocol::Motis | Protocol::HafasMgate => None,
         }
     }
 
@@ -228,7 +246,9 @@ impl Network {
     /// # Errors
     ///
     /// Returns [`Error::InvalidNetwork`] if a TRIAS or OJP network has no
-    /// requestor reference, and [`Error::InvalidQuery`] if the query asks
+    /// requestor reference or a HAFAS network lacks [`Network::hafas`] or
+    /// has options that are no JSON objects, and
+    /// [`Error::InvalidQuery`] if the query asks
     /// only for kinds of location the protocol does not have or holds text
     /// the protocol cannot carry.
     pub fn locations_request(&self, query: &LocationQuery) -> Result<HttpRequest, Error> {
@@ -237,6 +257,7 @@ impl Network {
             Protocol::Efa => Ok(efa::locations_request(self, query)),
             Protocol::Motis => motis::locations_request(self, query),
             Protocol::Trias | Protocol::Ojp1 => trias::locations_request(self, query),
+            Protocol::HafasMgate => hafas::locations_request(self, query),
         }?;
         Ok(self.sent(request))
     }
@@ -253,6 +274,7 @@ impl Network {
             Protocol::Efa => efa::parse_locations(self, response),
             Protocol::Motis => motis::parse_locations(response),
             Protocol::Trias | Protocol::Ojp1 => trias::parse_locations(self, response),
+            Protocol::HafasMgate => hafas::parse_locations(self, response),
         }?;
         for location in &mut locations {
             self.mark(location);
@@ -270,14 +292,16 @@ impl Network {
     ///
     /// Returns [`Error::InvalidNetwork`] if the query has a time and the
     /// network needs a time zone for it but has none or an unknown one, or
-    /// if a TRIAS or OJP network has no requestor reference, and
-    /// [`Error::InvalidQuery`] if the time is outside the supported range.
+    /// if a TRIAS or OJP network has no requestor reference or a HAFAS
+    /// network no usable [`Network::hafas`] or no time zone, which the
+    /// answer needs, and [`Error::InvalidQuery`] if the time is outside the supported range.
     pub fn departures_request(&self, query: &DeparturesQuery) -> Result<HttpRequest, Error> {
         self.check(Operation::Departures)?;
         let request = match self.protocol {
             Protocol::Efa => efa::departures_request(self, query),
             Protocol::Motis => motis::departures_request(self, query),
             Protocol::Trias | Protocol::Ojp1 => trias::departures_request(self, query),
+            Protocol::HafasMgate => hafas::departures_request(self, query),
         }?;
         Ok(self.sent(request))
     }
@@ -291,12 +315,14 @@ impl Network {
     /// the stop, and another error if the status code reports a failure or
     /// if the body is not what the protocol defines. TRIAS and OJP servers
     /// built on EFA answer an unknown stop with an internal error, which is
-    /// an [`Error::Server`].
+    /// an [`Error::Server`]. A HAFAS answer needs the network's time zone
+    /// and is an [`Error::InvalidNetwork`] without it.
     pub fn parse_departures(&self, response: &HttpResponse) -> Result<Vec<Departure>, Error> {
         let mut departures = match self.protocol {
             Protocol::Efa => efa::parse_departures(self, response),
             Protocol::Motis => motis::parse_departures(response),
             Protocol::Trias | Protocol::Ojp1 => trias::parse_departures(self, response),
+            Protocol::HafasMgate => hafas::parse_departures(self, response),
         }?;
         for departure in &mut departures {
             self.mark(&mut departure.stop);
@@ -313,15 +339,18 @@ impl Network {
     ///
     /// Returns [`Error::InvalidNetwork`] if the query has a time and the
     /// network needs a time zone for it but has none or an unknown one, or
-    /// if a TRIAS or OJP network has no requestor reference, and
-    /// [`Error::InvalidQuery`] if the time is outside the supported range
-    /// or the page is not a reference from this network.
+    /// if a TRIAS or OJP network has no requestor reference or a HAFAS
+    /// network no usable [`Network::hafas`] or no time zone, which the
+    /// answer needs, and [`Error::InvalidQuery`] if the time is outside the supported range
+    /// or the page is not a reference from this network. MOTIS and HAFAS
+    /// send the page on unchecked, and their servers reject a foreign one.
     pub fn trips_request(&self, query: &TripsQuery) -> Result<HttpRequest, Error> {
         self.check(Operation::Trips)?;
         let request = match self.protocol {
             Protocol::Efa => efa::trips_request(self, query),
             Protocol::Motis => motis::trips_request(self, query),
             Protocol::Trias | Protocol::Ojp1 => trias::trips_request(self, query),
+            Protocol::HafasMgate => hafas::trips_request(self, query),
         }?;
         Ok(self.sent(request))
     }
@@ -331,7 +360,8 @@ impl Network {
     /// gives an empty list.
     ///
     /// [`Trips::earlier`] and [`Trips::later`] continue the search. MOTIS
-    /// sends such references. For the other protocols the crate makes them
+    /// and HAFAS send such references. For EFA, TRIAS and OJP the crate
+    /// makes them
     /// from the times of the trips: later trips leave at least a minute
     /// after the last of these, earlier ones arrive at least a minute
     /// before the first. A trip within that minute is missed. On TRIAS and
@@ -341,7 +371,9 @@ impl Network {
     ///
     /// Returns [`Error::NotFound`] if the network does not know one of the
     /// two places, and another error if the status code reports a failure or
-    /// if the body is not what the protocol defines.
+    /// if the body is not what the protocol defines. A HAFAS answer needs
+    /// the network's time zone and is an [`Error::InvalidNetwork`] without
+    /// it.
     ///
     /// The trips are as the server planned them. Some may have left already
     /// or may no longer work out because a vehicle is late; that is for the
@@ -351,6 +383,7 @@ impl Network {
             Protocol::Efa => efa::parse_trips(self, response),
             Protocol::Motis => motis::parse_trips(response),
             Protocol::Trias | Protocol::Ojp1 => trias::parse_trips(self, response),
+            Protocol::HafasMgate => hafas::parse_trips(self, response),
         }?;
         for leg in trips.trips.iter_mut().flat_map(|trip| &mut trip.legs) {
             self.mark(&mut leg.departure.stop);
