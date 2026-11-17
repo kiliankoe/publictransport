@@ -3,7 +3,7 @@
 
 use std::time::{Duration, SystemTime};
 
-use crate::{LegEnd, Location, Timestamp, Trip};
+use crate::{Error, LegEnd, Location, Network, Timestamp, Trip};
 
 /// The name of [`Timestamp`] in the bindings. The Python generator of `UniFFI` uses
 /// the name `Timestamp` itself, and type checkers lose the type of every
@@ -71,4 +71,12 @@ impl Trip {
     fn ffi_transfers(&self) -> u32 {
         u32::try_from(self.transfers()).unwrap_or(u32::MAX)
     }
+}
+
+/// Reads a network from an entry in the JSON format of the transport-apis
+/// repository, see `Network::from_json` in the Rust documentation. A record
+/// cannot have a constructor in the bindings, so this is a function.
+#[uniffi::export]
+fn network_from_json(id: &str, json: &str) -> Result<Network, Error> {
+    Network::from_json(id, json)
 }

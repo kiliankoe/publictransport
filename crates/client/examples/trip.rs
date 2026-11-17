@@ -2,7 +2,7 @@
 //! a trip between them, against a live server.
 //!
 //! ```sh
-//! cargo run --example trip -- vvo "Dresden Hauptbahnhof" "Dresden Albertplatz"
+//! cargo run --example trip -- vvo-efa "Dresden Hauptbahnhof" "Dresden Albertplatz"
 //! cargo run --example trip -- transitous "Dresden Hauptbahnhof" "Dresden Albertplatz"
 //! cargo run --example trip -- vvo-trias "Dresden Hauptbahnhof" "Dresden Albertplatz"
 //! cargo run --example trip -- vrr-ojp "Düsseldorf Hbf" "Essen Hbf"
@@ -12,7 +12,7 @@ use std::error::Error;
 
 use publictransport_client::{
     Client, DeparturesQuery, LegEnd, LegKind, Location, LocationKind, LocationQuery, Network,
-    Place, Protocol, TripsQuery,
+    Operation, Place, Registry, TripsQuery,
 };
 
 const USER_AGENT: &str = concat!(
@@ -24,64 +24,44 @@ const USER_AGENT: &str = concat!(
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
-    let [network, from, to] = arguments.as_slice() else {
-        return Err("usage: trip <vvo|transitous|vvo-trias|vrr-ojp> <from> <to>".into());
+    let [id, from, to] = arguments.as_slice() else {
+        return Err("usage: trip <network id> <from> <to>".into());
     };
-    let network = match network.as_str() {
-        "vvo" => Network::new(
-            "vvo",
-            "Verkehrsverbund Oberelbe",
-            "https://efa.vvo-online.de/std3",
-            Protocol::Efa,
-        )
-        .with_timezone("Europe/Berlin"),
-        "transitous" => Network::new(
-            "transitous",
-            "Transitous",
-            "https://api.transitous.org/api",
-            Protocol::Motis,
-        ),
-        "vvo-trias" => Network::new(
-            "vvo-trias",
-            "Verkehrsverbund Oberelbe",
-            "https://efa.vvo-online.de/std3/trias",
-            Protocol::Trias,
-        )
-        .with_timezone("Europe/Berlin")
-        .with_requestor_ref("OpenService"),
-        "vrr-ojp" => Network::new(
-            "vrr-ojp",
-            "Verkehrsverbund Rhein-Ruhr",
-            "https://efa.vrr.de/std3/ojp",
-            Protocol::Ojp1,
-        )
-        .with_timezone("Europe/Berlin")
-        .with_requestor_ref("OpenService"),
-        other => return Err(format!("unknown network {other}").into()),
+    let registry = Registry::bundled();
+    let Some(network) = registry.get(id) else {
+        let ids: Vec<_> = registry
+            .networks()
+            .into_iter()
+            .map(|network| network.id)
+            .collect();
+        return Err(format!("unknown network {id}, known are {}", ids.join(", ")).into());
     };
     let client = Client::new(USER_AGENT)?;
 
     let from = first_stop(&client, &network, from).await?;
     let to = first_stop(&client, &network, to).await?;
 
-    println!("Departures at {}:", from.name);
-    let query = DeparturesQuery::new(&from.id).with_limit(5);
-    for departure in client.departures(&network, &query).await? {
-        let delay = departure
-            .realtime_time
-            .map(|time| time.unix_seconds - departure.scheduled_time.unix_seconds);
-        println!(
-            "  {} {:>5} {:<6} {}{}",
-            local_time(&departure.stop, departure.scheduled_time.unix_seconds),
-            delay.map_or_else(String::new, |seconds| format!("{:+}", seconds / 60)),
-            departure.line.name,
-            departure.direction.as_deref().unwrap_or("?"),
-            if departure.cancelled {
-                " (cancelled)"
-            } else {
-                ""
-            },
-        );
+    // Some servers have no departures.
+    if !network.unsupported.contains(&Operation::Departures) {
+        println!("Departures at {}:", from.name);
+        let query = DeparturesQuery::new(&from.id).with_limit(5);
+        for departure in client.departures(&network, &query).await? {
+            let delay = departure
+                .realtime_time
+                .map(|time| time.unix_seconds - departure.scheduled_time.unix_seconds);
+            println!(
+                "  {} {:>5} {:<6} {}{}",
+                local_time(&departure.stop, departure.scheduled_time.unix_seconds),
+                delay.map_or_else(String::new, |seconds| format!("{:+}", seconds / 60)),
+                departure.line.name,
+                departure.direction.as_deref().unwrap_or("?"),
+                if departure.cancelled {
+                    " (cancelled)"
+                } else {
+                    ""
+                },
+            );
+        }
     }
 
     println!("Trips from {} to {}:", from.name, to.name);

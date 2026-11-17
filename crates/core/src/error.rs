@@ -4,8 +4,8 @@
 #[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
 pub enum Error {
     /// The [`Network`](crate::Network) lacks something the request needs,
-    /// such as a time zone.
-    #[error("the network is not usable for this request: {message}")]
+    /// such as a time zone, or its description cannot be read.
+    #[error("the network is not usable: {message}")]
     InvalidNetwork {
         /// What is missing or wrong.
         message: String,
@@ -15,6 +15,13 @@ pub enum Error {
     #[error("the query is invalid: {message}")]
     InvalidQuery {
         /// What is wrong.
+        message: String,
+    },
+    /// The network's server is known not to answer this kind of request,
+    /// see [`Network::unsupported`](crate::Network::unsupported).
+    #[error("not supported: {message}")]
+    Unsupported {
+        /// What is not supported.
         message: String,
     },
     /// The network does not know the stop the query names.

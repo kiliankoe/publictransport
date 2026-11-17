@@ -1,0 +1,3 @@
+[submodule "crates/core/data/transport-apis"]
+	path = crates/core/data/transport-apis
+	url = https://github.com/public-transport/transport-apis.git

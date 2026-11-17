@@ -16,6 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The network data of transport-apis.
+          submodules: true
       - uses: DeterminateSystems/nix-installer-action@v23
       - uses: Swatinem/rust-cache@v2
       - run: nix fmt -- --check flake.nix
@@ -26,6 +29,9 @@ jobs:
       - run: nix develop -c cargo clippy -p publictransport --all-targets -- -D warnings
       - run: nix develop -c cargo test -p publictransport
       - run: nix develop -c cargo deny check
+      # Builds from the packaged files, which have to include every network
+      # entry that is compiled in.
+      - run: nix develop -c cargo package -p publictransport
       # Fetches the TRIAS and OJP schemas from GitHub.
       - run: nix develop -c scripts/validate-xml-requests.sh
 
@@ -46,6 +52,9 @@ jobs:
         working-directory: packages/python
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The network data of transport-apis.
+          submodules: true
       - uses: DeterminateSystems/nix-installer-action@v23
       - uses: Swatinem/rust-cache@v2
       # Builds the Rust library and installs the package into .venv.

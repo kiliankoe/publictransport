@@ -5,6 +5,13 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+# Of the transport-apis submodule, only the entries that are compiled in
+# and its license go into the package.
+exclude = [
+    "/data/transport-apis/**",
+    "!/data/transport-apis/license",
+    "!/data/transport-apis/data/un/transitous.json",
+]
 
 [lints]
 workspace = true

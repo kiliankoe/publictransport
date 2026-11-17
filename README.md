@@ -9,6 +9,8 @@ The project is at an early stage. It can search for locations by name, list the 
 - TRIAS 1.2, the German XML standard VDV 431-2
 - OJP 1.0, its European successor
 
+The library ships with a small registry of networks that were checked against their live servers, `Registry::bundled()`. Further networks can be described in code or read from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis). Each network says where it has coverage, so an application can pick the networks for a position.
+
 ## Design
 
 The core crate does no I/O. It builds HTTP requests and parses HTTP responses, and the caller sends them. This keeps the core usable from other languages and from WebAssembly, where each platform brings its own HTTP stack. The crate documentation of `publictransport` shows the request and parse steps and what the HTTP client has to do.
@@ -16,10 +18,12 @@ The core crate does no I/O. It builds HTTP requests and parses HTTP responses, a
 Rust applications that do not want to bring their own HTTP client use `publictransport-client`, which sends the requests with `reqwest`. Its example plans a trip against a live server:
 
 ```sh
-cargo run -p publictransport-client --example trip -- vvo "Dresden Hauptbahnhof" "Dresden Albertplatz"
+cargo run -p publictransport-client --example trip -- vvo-efa "Dresden Hauptbahnhof" "Dresden Albertplatz"
 ```
 
 ## Development
+
+Clone with `--recurse-submodules`, or run `git submodule update --init` afterwards: the network data of [transport-apis](https://github.com/public-transport/transport-apis) is a submodule under `crates/core/data`. Networks that repository does not have yet are in `crates/core/data/networks`, in the same format.
 
 The development environment is a nix flake; `direnv allow` or `nix develop` provides the toolchain. CI runs these checks:
 

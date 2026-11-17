@@ -1,15 +1,15 @@
 use crate::{
-    Departure, DeparturesQuery, Error, HttpRequest, HttpResponse, Location, LocationQuery, Trip,
-    TripsQuery, efa, motis, trias,
+    Attribution, Coverage, Departure, DeparturesQuery, Error, HttpRequest, HttpResponse, Location,
+    LocationQuery, Operation, Trip, TripsQuery, efa, motis, trias,
 };
 
 /// One server that answers public transport queries.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub struct Network {
-    /// A short identifier, e.g. `vvo`.
+    /// A short identifier, e.g. `vvo-efa`.
     pub id: String,
     /// The name to show to users.
     pub name: String,
@@ -32,6 +32,21 @@ pub struct Network {
     /// `OpenService`; others hand out a key.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub requestor_ref: Option<String>,
+    /// Where the network has data.
+    #[cfg_attr(feature = "uniffi", uniffi(default))]
+    pub coverage: Coverage,
+    /// Whom to name as the source of the data.
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    pub attribution: Option<Attribution>,
+    /// The operations the server is known not to answer. Building a request
+    /// for one of them fails with [`Error::Unsupported`].
+    #[cfg_attr(feature = "uniffi", uniffi(default = []))]
+    pub unsupported: Vec<Operation>,
+    /// Whether the server only answers with a key that its operator hands
+    /// out on request. The application sets it as
+    /// [`Network::requestor_ref`].
+    #[cfg_attr(feature = "uniffi", uniffi(default = false))]
+    pub requires_key: bool,
 }
 
 /// The protocol a [`Network`] speaks.
@@ -65,6 +80,10 @@ impl Network {
             protocol,
             timezone: None,
             requestor_ref: None,
+            coverage: Coverage::default(),
+            attribution: None,
+            unsupported: Vec::new(),
+            requires_key: false,
         }
     }
 
@@ -81,6 +100,20 @@ impl Network {
         self.requestor_ref = Some(requestor_ref.into());
         self
     }
+
+    fn check(&self, operation: Operation) -> Result<(), Error> {
+        if self.unsupported.contains(&operation) {
+            let requests = match operation {
+                Operation::Locations => "location searches",
+                Operation::Departures => "departure requests",
+                Operation::Trips => "trip requests",
+            };
+            return Err(Error::Unsupported {
+                message: format!("{} does not answer {requests}", self.id),
+            });
+        }
+        Ok(())
+    }
 }
 
 #[cfg_attr(feature = "uniffi", uniffi::export)]
@@ -94,6 +127,7 @@ impl Network {
     /// only for kinds of location the protocol does not have or holds text
     /// the protocol cannot carry.
     pub fn locations_request(&self, query: &LocationQuery) -> Result<HttpRequest, Error> {
+        self.check(Operation::Locations)?;
         match self.protocol {
             Protocol::Efa => Ok(efa::locations_request(self, query)),
             Protocol::Motis => motis::locations_request(self, query),
@@ -129,6 +163,7 @@ impl Network {
     /// if a TRIAS or OJP network has no requestor reference, and
     /// [`Error::InvalidQuery`] if the time is outside the supported range.
     pub fn departures_request(&self, query: &DeparturesQuery) -> Result<HttpRequest, Error> {
+        self.check(Operation::Departures)?;
         match self.protocol {
             Protocol::Efa => efa::departures_request(self, query),
             Protocol::Motis => motis::departures_request(self, query),
@@ -166,6 +201,7 @@ impl Network {
     /// if a TRIAS or OJP network has no requestor reference, and
     /// [`Error::InvalidQuery`] if the time is outside the supported range.
     pub fn trips_request(&self, query: &TripsQuery) -> Result<HttpRequest, Error> {
+        self.check(Operation::Trips)?;
         match self.protocol {
             Protocol::Efa => efa::trips_request(self, query),
             Protocol::Motis => motis::trips_request(self, query),
