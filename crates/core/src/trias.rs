@@ -14,7 +14,8 @@ use serde::Deserialize;
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, GlobalId, Header, HttpRequest, HttpResponse,
     Leg, LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, Network,
-    Place, Protocol, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery, time::WireTime,
+    Place, Protocol, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery, model::Target,
+    time::WireTime,
 };
 
 /// How the two protocols write a request.
@@ -51,9 +52,9 @@ impl Dialect {
     }
 
     /// A reference to a place, with the time bound to it if there is one.
-    fn place(self, name: &str, place: &Place, time: Option<&str>) -> String {
+    fn place(self, name: &str, place: &Target, time: Option<&str>) -> String {
         let (reference, label) = match place {
-            Place::Id(id) => {
+            Target::Id(id) => {
                 let stop = if self.ojp {
                     "StopPlaceRef"
                 } else {
@@ -61,7 +62,7 @@ impl Dialect {
                 };
                 (self.text(stop, id), id.clone())
             }
-            Place::Coordinate(coordinate) => {
+            Target::Coordinate(coordinate) => {
                 // The coordinates are SIRI elements in OJP, where SIRI is
                 // the default namespace.
                 let (longitude, latitude) = (coordinate.longitude, coordinate.latitude);
@@ -150,11 +151,12 @@ fn query_text(text: &str) -> Result<&str, Error> {
     }
 }
 
-fn place_text(place: &Place) -> Result<&Place, Error> {
-    if let Place::Id(id) = place {
+fn place_text(network: &Network, place: &Place) -> Result<Target, Error> {
+    let target = place.target(network)?;
+    if let Target::Id(id) = &target {
         query_text(id)?;
     }
-    place.checked()
+    Ok(target)
 }
 
 fn utc(time: Timestamp) -> Result<String, Error> {
@@ -204,7 +206,7 @@ pub(crate) fn departures_request(
     let time = query.time.map(utc).transpose()?;
     let location = dialect.place(
         "Location",
-        &Place::Id(query_text(&query.stop_id)?.to_owned()),
+        &Target::Id(query_text(&query.stop.stop_id(network)?)?.to_owned()),
         time.as_deref(),
     );
     let parameters = dialect.element(
@@ -224,10 +226,14 @@ pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<Htt
         Some(TripTime::ArriveBy(time)) => (None, Some(utc(time)?)),
         None => (None, None),
     };
-    let origin = dialect.place("Origin", place_text(&query.origin)?, departure.as_deref());
+    let origin = dialect.place(
+        "Origin",
+        &place_text(network, &query.origin)?,
+        departure.as_deref(),
+    );
     let destination = dialect.place(
         "Destination",
-        place_text(&query.destination)?,
+        &place_text(network, &query.destination)?,
         arrival.as_deref(),
     );
     // A plain `NumberOfResults` makes the server add a trip from the other

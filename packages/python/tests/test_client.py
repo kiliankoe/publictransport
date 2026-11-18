@@ -105,7 +105,9 @@ class TooLarge(httpx.SyncByteStream, httpx.AsyncByteStream):
         (
             MOTIS,
             "departures",
-            DeparturesQuery(stop_id="de-DELFI_de:14612:28"),
+            DeparturesQuery(
+                stop=Place.ID("de-DELFI_de:14612:28"),  # pyright: ignore[reportArgumentType]
+            ),
             "motis/transitous-stoptimes.json",
         ),
         (
@@ -174,7 +176,8 @@ def test_rejected_query_sends_no_request(call: Call) -> None:
         id="vvo", name="VVO", endpoint="https://efa.example/std3", protocol=Protocol.EFA
     )
     query = DeparturesQuery(
-        stop_id="de:14612:28", time=datetime(2026, 1, 1, tzinfo=timezone.utc)
+        stop=Place.ID("de:14612:28"),  # pyright: ignore[reportArgumentType]
+        time=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
     sent: list[httpx.Request] = []
 

@@ -14,7 +14,7 @@ use std::error::Error;
 
 use publictransport_client::{
     Client, DeparturesQuery, LegEnd, LegKind, Location, LocationKind, LocationQuery, Network,
-    Operation, Place, Registry, TripsQuery,
+    Operation, Registry, TripsQuery,
 };
 
 const USER_AGENT: &str = concat!(
@@ -52,7 +52,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Some servers have no departures.
     if !network.unsupported.contains(&Operation::Departures) {
         println!("Departures at {}:", from.name);
-        let query = DeparturesQuery::new(&from.id).with_limit(5);
+        let query = DeparturesQuery::new(&from).with_limit(5);
         for departure in client.departures(&network, &query).await? {
             let delay = departure
                 .realtime_time
@@ -73,7 +73,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     println!("Trips from {} to {}:", from.name, to.name);
-    let query = TripsQuery::new(Place::Id(from.id), Place::Id(to.id)).with_limit(3);
+    let query = TripsQuery::new(&from, &to).with_limit(3);
     for trip in client.trips(&network, &query).await?.trips {
         let (Some(departure), Some(arrival)) = (trip.departure(), trip.arrival()) else {
             continue;

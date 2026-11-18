@@ -4,8 +4,8 @@ use serde::Deserialize;
 
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, Leg,
-    LegKind, Line, Location, LocationKind, LocationQuery, Mode, Network, Place, Stopover, Trip,
-    TripTime, Trips, TripsQuery, time::WireTime,
+    LegKind, Line, Location, LocationKind, LocationQuery, Mode, Network, Stopover, Trip, TripTime,
+    Trips, TripsQuery, model::Target, time::WireTime,
 };
 
 pub(crate) fn locations_request(
@@ -125,7 +125,8 @@ pub(crate) fn departures_request(
         .time
         .map(|time| time.to_jiff().map(|time| time.to_string()))
         .transpose()?;
-    let mut parameters = vec![("stopId", query.stop_id.as_str()), ("n", limit.as_str())];
+    let stop = query.stop.stop_id(network)?;
+    let mut parameters = vec![("stopId", stop.as_str()), ("n", limit.as_str())];
     if let Some(time) = &time {
         parameters.push(("time", time));
     }
@@ -148,8 +149,8 @@ pub(crate) fn parse_departures(response: &HttpResponse) -> Result<Vec<Departure>
 }
 
 pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<HttpRequest, Error> {
-    let from = place(query.origin.checked()?);
-    let to = place(query.destination.checked()?);
+    let from = place(query.origin.target(network)?);
+    let to = place(query.destination.target(network)?);
     let limit = query.limit.map(|limit| limit.to_string());
     let (time, arrive_by) = match query.time {
         Some(TripTime::DepartAt(time)) => (Some(time), false),
@@ -182,10 +183,10 @@ pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<Htt
     Ok(HttpRequest::get(&network.endpoint, "v6/plan", parameters))
 }
 
-fn place(place: &Place) -> String {
+fn place(place: Target) -> String {
     match place {
-        Place::Id(id) => id.clone(),
-        Place::Coordinate(coordinate) => coordinate_id(*coordinate),
+        Target::Id(id) => id,
+        Target::Coordinate(coordinate) => coordinate_id(coordinate),
     }
 }
 

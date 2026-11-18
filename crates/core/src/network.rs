@@ -223,8 +223,8 @@ impl Network {
 
 #[cfg_attr(feature = "uniffi", uniffi::export)]
 impl Network {
-    /// The location as the stop of a departures query on this network, for
-    /// [`DeparturesQuery::stop_id`].
+    /// The ID that names the location as a stop on this network. A
+    /// [`DeparturesQuery`] with a location as its stop is sent with it.
     ///
     /// For a stop this network returned, that is its ID. For a stop from
     /// another network, or one without a network, it is the global ID of
@@ -250,10 +250,10 @@ impl Network {
             .map(|id| id.value)
     }
 
-    /// The location as an end of a trip on this network, for
-    /// [`TripsQuery`]: the stop as for [`Network::stop_id`], otherwise the
-    /// coordinate. A trip planned from a coordinate starts with a walk to
-    /// a stop nearby.
+    /// The location as an end of a trip on this network: the stop as for
+    /// [`Network::stop_id`], otherwise the coordinate. A [`TripsQuery`]
+    /// with a location as an end is sent with it. A trip planned from a
+    /// coordinate starts with a walk to a stop nearby.
     ///
     /// `None` if the location has neither and is not from this network.
     #[must_use]
@@ -323,7 +323,9 @@ impl Network {
     /// network needs a time zone for it but has none or an unknown one, or
     /// if a TRIAS or OJP network has no requestor reference or a HAFAS
     /// network no usable [`Network::hafas`] or no time zone, which the
-    /// answer needs, and [`Error::InvalidQuery`] if the time is outside the supported range.
+    /// answer needs, and [`Error::InvalidQuery`] if the time is outside the
+    /// supported range, if the stop is a position, or if it is a location
+    /// that the network cannot name as a stop, see [`Network::stop_id`].
     pub fn departures_request(&self, query: &DeparturesQuery) -> Result<HttpRequest, Error> {
         self.check(Operation::Departures)?;
         let request = match self.protocol {
@@ -372,8 +374,10 @@ impl Network {
     /// network needs a time zone for it but has none or an unknown one, or
     /// if a TRIAS or OJP network has no requestor reference or a HAFAS
     /// network no usable [`Network::hafas`] or no time zone, which the
-    /// answer needs, and [`Error::InvalidQuery`] if the time is outside the supported range
-    /// or the page is not a reference from this network. MOTIS, HAFAS and
+    /// answer needs, and [`Error::InvalidQuery`] if the time is outside the
+    /// supported range, if an end is a coordinate off the globe or a
+    /// location that the network cannot name, see [`Network::place`], or
+    /// if the page is not a reference from this network. MOTIS, HAFAS and
     /// `OpenTripPlanner` send the page on unchecked, and their servers
     /// reject a foreign one.
     pub fn trips_request(&self, query: &TripsQuery) -> Result<HttpRequest, Error> {

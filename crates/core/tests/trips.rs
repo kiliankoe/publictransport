@@ -146,6 +146,7 @@ proptest! {
                     prop_assert!(is_degrees(parts[1], coordinate.latitude), "{}", name);
                     prop_assert_eq!(parts[2], "WGS84[dd.ddddd]");
                 }
+                Place::Location(_) => prop_assert!(false, "the strategy makes no locations"),
             }
         }
 
@@ -167,6 +168,7 @@ proptest! {
                     prop_assert!(is_degrees(parts[0], coordinate.latitude), "{}", value);
                     prop_assert!(is_degrees(parts[1], coordinate.longitude), "{}", value);
                 }
+                Place::Location(_) => prop_assert!(false, "the strategy makes no locations"),
             }
         }
     }

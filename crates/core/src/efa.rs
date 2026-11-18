@@ -4,8 +4,8 @@ use serde::Deserialize;
 
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, Leg,
-    LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Mode, Network, Place, Stopover,
-    Timestamp, Trip, TripTime, Trips, TripsQuery, time::WireTime,
+    LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Mode, Network, Stopover,
+    Timestamp, Trip, TripTime, Trips, TripsQuery, model::Target, time::WireTime,
 };
 
 /// Parameters of every request.
@@ -64,6 +64,7 @@ pub(crate) fn departures_request(
     network: &Network,
     query: &DeparturesQuery,
 ) -> Result<HttpRequest, Error> {
+    let stop = query.stop.stop_id(network)?;
     let limit = query.limit.map(|limit| limit.to_string());
     let local_time = query
         .time
@@ -73,7 +74,7 @@ pub(crate) fn departures_request(
     let mut parameters = common();
     parameters.extend([
         ("type_dm", "any"),
-        ("name_dm", query.stop_id.as_str()),
+        ("name_dm", stop.as_str()),
         // Skips the page that asks the user to confirm the stop.
         ("mode", "direct"),
         ("useRealtime", "1"),
@@ -97,8 +98,8 @@ pub(crate) fn departures_request(
 
 pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<HttpRequest, Error> {
     let limit = query.limit.map(|limit| limit.to_string());
-    let (from_type, from) = place(query.origin.checked()?);
-    let (to_type, to) = place(query.destination.checked()?);
+    let (from_type, from) = place(query.origin.target(network)?);
+    let (to_type, to) = place(query.destination.target(network)?);
     let time = query
         .paged_time()?
         .map(|time| match time {
@@ -168,10 +169,10 @@ fn walk_between(previous: &Leg, next: &Leg, seconds: i64) -> Option<Leg> {
 }
 
 /// The type and name parameters for one end of a trip.
-fn place(place: &Place) -> (&'static str, String) {
+fn place(place: Target) -> (&'static str, String) {
     match place {
-        Place::Id(id) => ("any", id.clone()),
-        Place::Coordinate(Coordinate {
+        Target::Id(id) => ("any", id),
+        Target::Coordinate(Coordinate {
             latitude,
             longitude,
         }) => ("coord", format!("{longitude}:{latitude}:WGS84[dd.ddddd]")),

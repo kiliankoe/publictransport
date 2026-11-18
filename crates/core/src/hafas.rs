@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, GlobalId, Header, HttpRequest, HttpResponse,
     Leg, LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, Network,
-    Place, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
+    Place, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery, model::Target,
 };
 
 /// What a HAFAS mgate server needs to answer, as the operator's own app
@@ -232,10 +232,10 @@ fn place_by_id(id: &str) -> Value {
     }
 }
 
-fn place(place: &Place) -> Result<Value, Error> {
-    Ok(match place.checked()? {
-        Place::Id(id) => place_by_id(id),
-        Place::Coordinate(coordinate) => {
+fn place(network: &Network, place: &Place) -> Result<Value, Error> {
+    Ok(match place.target(network)? {
+        Target::Id(id) => place_by_id(&id),
+        Target::Coordinate(coordinate) => {
             // On the globe, so the millionths fit.
             #[expect(clippy::cast_possible_truncation)]
             let millionths = |degrees: f64| (degrees * 1e6).round() as i64;
@@ -301,7 +301,7 @@ pub(crate) fn departures_request(
     let (date, time) = time.unzip();
     let arguments = object([
         ("type", Some(json!("DEP"))),
-        ("stbLoc", Some(place_by_id(&query.stop_id))),
+        ("stbLoc", Some(place_by_id(&query.stop.stop_id(network)?))),
         ("maxJny", query.limit.map(|limit| json!(limit))),
         ("date", date.map(Value::String)),
         ("time", time.map(Value::String)),
@@ -321,8 +321,11 @@ pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<Htt
     };
     let (date, time) = time.unzip();
     let arguments = object([
-        ("depLocL", Some(json!([place(&query.origin)?]))),
-        ("arrLocL", Some(json!([place(&query.destination)?]))),
+        ("depLocL", Some(json!([place(network, &query.origin)?]))),
+        (
+            "arrLocL",
+            Some(json!([place(network, &query.destination)?])),
+        ),
         (
             "outFrwd",
             Some(json!(!matches!(query.time, Some(TripTime::ArriveBy(_))))),

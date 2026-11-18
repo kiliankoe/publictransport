@@ -23,6 +23,36 @@ pub struct LocationQuery {
     pub kinds: Vec<LocationKind>,
 }
 
+impl<T: Into<String>> From<T> for LocationQuery {
+    fn from(text: T) -> Self {
+        Self::new(text)
+    }
+}
+
+impl From<&Self> for LocationQuery {
+    fn from(query: &Self) -> Self {
+        query.clone()
+    }
+}
+
+impl<T: Into<Place>> From<T> for DeparturesQuery {
+    fn from(stop: T) -> Self {
+        Self::new(stop)
+    }
+}
+
+impl From<&Self> for DeparturesQuery {
+    fn from(query: &Self) -> Self {
+        query.clone()
+    }
+}
+
+impl From<&Self> for TripsQuery {
+    fn from(query: &Self) -> Self {
+        query.clone()
+    }
+}
+
 impl LocationQuery {
     /// A search for `text` without a limit, for every kind of location.
     pub fn new(text: impl Into<String>) -> Self {
@@ -199,15 +229,14 @@ pub struct Timestamp {
 }
 
 /// A request for the next departures at a stop.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub struct DeparturesQuery {
-    /// The [`Location::id`] of a stop, from the same network.
-    /// [`Network::stop_id`](crate::Network::stop_id) gives it for any
-    /// location.
-    pub stop_id: String,
+    /// The stop: its [`Location::id`] on the network that is asked, or a
+    /// location of any network. A position is not a stop.
+    pub stop: Place,
     /// The time from which on departures are wanted. `None` means now.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub time: Option<Timestamp>,
@@ -218,10 +247,11 @@ pub struct DeparturesQuery {
 }
 
 impl DeparturesQuery {
-    /// The next departures at `stop_id` from now on.
-    pub fn new(stop_id: impl Into<String>) -> Self {
+    /// The next departures at `stop` from now on. The stop is an ID, a
+    /// [`Location`] or a [`Place`].
+    pub fn new(stop: impl Into<Place>) -> Self {
         Self {
-            stop_id: stop_id.into(),
+            stop: stop.into(),
             time: None,
             limit: None,
         }
@@ -369,12 +399,13 @@ const LATER: &str = "departure:";
 const EARLIER: &str = "arrival:";
 
 impl TripsQuery {
-    /// Trips from `origin` to `destination` that leave now.
+    /// Trips from `origin` to `destination` that leave now. Each end is
+    /// an ID, a [`Coordinate`], a [`Location`] or a [`Place`].
     #[must_use]
-    pub fn new(origin: Place, destination: Place) -> Self {
+    pub fn new(origin: impl Into<Place>, destination: impl Into<Place>) -> Self {
         Self {
-            origin,
-            destination,
+            origin: origin.into(),
+            destination: destination.into(),
             time: None,
             limit: None,
             page: None,
@@ -433,34 +464,125 @@ impl TripsQuery {
     }
 }
 
+/// A place as a request names it: what is left of a [`Place`] once the
+/// network has translated a location.
+pub(crate) enum Target {
+    Id(String),
+    Coordinate(Coordinate),
+}
+
 impl Place {
-    /// The place as a coordinate, checked to be on the globe.
-    pub(crate) fn checked(&self) -> Result<&Self, crate::Error> {
+    /// The place as `network` can name it in a trip request, with a
+    /// coordinate checked to be on the globe.
+    pub(crate) fn target(&self, network: &crate::Network) -> Result<Target, crate::Error> {
+        let invalid = |message: &str| crate::Error::InvalidQuery {
+            message: message.to_owned(),
+        };
         match self {
+            Self::Id(id) => Ok(Target::Id(id.clone())),
             Self::Coordinate(coordinate)
-                if !(-90.0..=90.0).contains(&coordinate.latitude)
-                    || !(-180.0..=180.0).contains(&coordinate.longitude) =>
+                if (-90.0..=90.0).contains(&coordinate.latitude)
+                    && (-180.0..=180.0).contains(&coordinate.longitude) =>
             {
-                Err(crate::Error::InvalidQuery {
-                    message: "the coordinate is not on the globe".to_owned(),
-                })
+                Ok(Target::Coordinate(*coordinate))
             }
-            place => Ok(place),
+            Self::Coordinate(_) => Err(invalid("the coordinate is not on the globe")),
+            Self::Location(location) => network
+                .place(location)
+                .ok_or_else(|| {
+                    invalid(&format!(
+                        "{} cannot name the location {}: it has neither a stop ID that the \
+                         network takes nor a coordinate",
+                        network.id, location.name
+                    ))
+                })?
+                .target(network),
+        }
+    }
+
+    /// The place as the ID of a stop that `network` can ask departures
+    /// for.
+    pub(crate) fn stop_id(&self, network: &crate::Network) -> Result<String, crate::Error> {
+        let invalid = |message: &str| crate::Error::InvalidQuery {
+            message: message.to_owned(),
+        };
+        match self {
+            Self::Id(id) => Ok(id.clone()),
+            Self::Coordinate(_) => Err(invalid("departures need a stop, not a position")),
+            Self::Location(location) => network.stop_id(location).ok_or_else(|| {
+                invalid(&format!(
+                    "{} cannot name the location {} as a stop: it is no stop, or it comes from \
+                     another network and has no global ID that this one takes",
+                    network.id, location.name
+                ))
+            }),
         }
     }
 }
 
-/// One end of a trip in a [`TripsQuery`].
+impl From<&str> for Place {
+    fn from(id: &str) -> Self {
+        Self::Id(id.to_owned())
+    }
+}
+
+impl From<&String> for Place {
+    fn from(id: &String) -> Self {
+        Self::Id(id.clone())
+    }
+}
+
+impl From<&Self> for Place {
+    fn from(place: &Self) -> Self {
+        place.clone()
+    }
+}
+
+impl From<String> for Place {
+    fn from(id: String) -> Self {
+        Self::Id(id)
+    }
+}
+
+impl From<Coordinate> for Place {
+    fn from(coordinate: Coordinate) -> Self {
+        Self::Coordinate(coordinate)
+    }
+}
+
+impl From<Location> for Place {
+    fn from(location: Location) -> Self {
+        Self::Location(location)
+    }
+}
+
+impl From<&Location> for Place {
+    fn from(location: &Location) -> Self {
+        Self::Location(location.clone())
+    }
+}
+
+/// A place in a query: the stop of a [`DeparturesQuery`] or one end of a
+/// trip in a [`TripsQuery`]. An ID, a position and a location convert into
+/// it.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
 pub enum Place {
     /// A [`Location::id`] from the same network, or another ID the network
-    /// understands. [`Network::place`](crate::Network::place) picks the
-    /// variant for any location.
+    /// understands.
     Id(String),
-    /// A position, such as where the user is.
+    /// A position, such as where the user is. Departures need a stop, so a
+    /// position is an [`Error::InvalidQuery`](crate::Error::InvalidQuery)
+    /// there.
     Coordinate(Coordinate),
+    /// A location from a search, a departure or a trip, of this network or
+    /// another. The network that is asked translates it with
+    /// [`Network::stop_id`](crate::Network::stop_id) for departures and
+    /// [`Network::place`](crate::Network::place) for trips. A location it
+    /// cannot name is an
+    /// [`Error::InvalidQuery`](crate::Error::InvalidQuery).
+    Location(Location),
 }
 
 /// The time a [`TripsQuery`] is bound to.

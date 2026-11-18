@@ -15,7 +15,7 @@ use std::error::Error;
 use std::path::Path;
 
 use publictransport_client::{
-    Client, DeparturesQuery, LegKind, LocationKind, LocationQuery, Mode, Network, Operation, Place,
+    Client, DeparturesQuery, LegKind, LocationKind, LocationQuery, Mode, Network, Operation,
     Registry, Trips, TripsQuery,
 };
 
@@ -104,7 +104,7 @@ async fn check(client: &Client, network: &Network) -> Result<String, Box<dyn Err
             continue;
         };
         let departures = if supports(Operation::Departures) {
-            let query = DeparturesQuery::new(&from.id).with_limit(10);
+            let query = DeparturesQuery::new(from).with_limit(10);
             client
                 .departures(network, &query)
                 .await
@@ -141,8 +141,7 @@ async fn check(client: &Client, network: &Network) -> Result<String, Box<dyn Err
         // to one of them, or count it as the same station as the first.
         let mut outcome = Err("no destination".to_owned());
         for to in &destinations {
-            let query =
-                TripsQuery::new(Place::Id(from.id.clone()), Place::Id(to.id.clone())).with_limit(2);
+            let query = TripsQuery::new(&from, to).with_limit(2);
             let mut answer = client.trips(network, &query).await;
             // OpenTripPlanner searches a window of time and answers with
             // no trips and a reference if the window has none, as at night.

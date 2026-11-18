@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, Header, HttpRequest, HttpResponse, Leg, LegEnd,
     LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, Network, Place, Stopover,
-    Timestamp, Trip, TripTime, Trips, TripsQuery, time::WireTime,
+    Timestamp, Trip, TripTime, Trips, TripsQuery, model::Target, time::WireTime,
 };
 
 // The queries name only fields that OTP has had for long: a server answers
@@ -104,7 +104,8 @@ pub(crate) fn departures_request(
     query: &DeparturesQuery,
 ) -> Result<HttpRequest, Error> {
     // The IDs of the Nordic stop registries name the kind of place.
-    let place = if query.stop_id.contains(":Quay:") {
+    let stop = query.stop.stop_id(network)?;
+    let place = if stop.contains(":Quay:") {
         "quay"
     } else {
         "stopPlace"
@@ -115,7 +116,7 @@ pub(crate) fn departures_request(
         network,
         &text,
         [
-            ("id", Some(json!(query.stop_id))),
+            ("id", Some(json!(stop))),
             ("limit", query.limit.map(|limit| json!(limit))),
             ("start", query.time.map(time).transpose()?),
         ],
@@ -124,9 +125,9 @@ pub(crate) fn departures_request(
 
 pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<HttpRequest, Error> {
     let place = |place: &Place| {
-        Ok::<_, Error>(match place.checked()? {
-            Place::Id(id) => json!({"place": id}),
-            Place::Coordinate(coordinate) => json!({"coordinates": {
+        Ok::<_, Error>(match place.target(network)? {
+            Target::Id(id) => json!({"place": id}),
+            Target::Coordinate(coordinate) => json!({"coordinates": {
                 "latitude": coordinate.latitude,
                 "longitude": coordinate.longitude,
             }}),

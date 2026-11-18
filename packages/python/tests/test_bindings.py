@@ -77,7 +77,12 @@ def test_time_crosses_the_boundary_as_an_aware_utc_datetime(
 def test_query_time_reaches_the_request() -> None:
     time = datetime(2026, 11, 16, 14, 24, tzinfo=timezone(timedelta(hours=1)))
 
-    request = MOTIS.departures_request(DeparturesQuery(stop_id="a", time=time))
+    # The generated `Place.ID` is not typed as a `Place`.
+    query = DeparturesQuery(
+        stop=Place.ID("a"),  # pyright: ignore[reportArgumentType]
+        time=time,
+    )
+    request = MOTIS.departures_request(query)
 
     assert "time=2026-11-16T13%3A24%3A00Z" in request.url
 
