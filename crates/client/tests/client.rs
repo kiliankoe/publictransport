@@ -275,3 +275,50 @@ async fn request_body_and_headers_arrive_as_the_core_built_them() {
         assert_eq!(value.to_str().unwrap(), header.value);
     }
 }
+
+#[tokio::test]
+async fn plain_values_and_locations_send_the_request_of_the_query_they_stand_for() {
+    let server = MockServer::start().await;
+    for (route, body) in [
+        ("/std3/XML_STOPFINDER_REQUEST", EFA_LOCATIONS),
+        ("/std3/XML_DM_REQUEST", EFA_DEPARTURES),
+        ("/std3/XML_TRIP_REQUEST2", EFA_TRIPS),
+    ] {
+        Mock::given(path(route))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(body))
+            .mount(&server)
+            .await;
+    }
+    let network = efa(server.uri() + "/std3").with_timezone("Europe/Berlin");
+    let client = Client::new(USER_AGENT).unwrap();
+
+    // Each plain form is followed by its query object.
+    let found = client.locations(&network, "Hauptbahnhof").await.unwrap();
+    let query = LocationQuery::new("Hauptbahnhof");
+    client.locations(&network, &query).await.unwrap();
+
+    let from = &found[0];
+    let mut to = from.clone();
+    to.id = "de:14612:13".to_owned();
+    let to = &to;
+    let [from_id, to_id] = [from, to].map(|stop| network.stop_id(stop).unwrap());
+
+    client.departures(&network, from).await.unwrap();
+    let query = DeparturesQuery::new(from_id.as_str());
+    client.departures(&network, &query).await.unwrap();
+
+    client.departures(&network, "de:14612:28").await.unwrap();
+    let query = DeparturesQuery::new("de:14612:28");
+    client.departures(&network, &query).await.unwrap();
+
+    let query = TripsQuery::new(from, to).with_departure(TIME);
+    client.trips(&network, query).await.unwrap();
+    let query = TripsQuery::new(from_id, to_id).with_departure(TIME);
+    client.trips(&network, &query).await.unwrap();
+
+    let received = server.received_requests().await.unwrap();
+    assert_eq!(received.len(), 8);
+    for pair in received.chunks(2) {
+        assert_eq!(pair[0].url, pair[1].url);
+    }
+}

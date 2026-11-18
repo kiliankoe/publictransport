@@ -8,7 +8,7 @@
 //!
 //! ```no_run
 //! use publictransport_client::{
-//!     Client, DeparturesQuery, LocationKind, LocationQuery, Network, Protocol,
+//!     Client, DeparturesQuery, LocationKind, LocationQuery, Network, Protocol, TripsQuery,
 //! };
 //!
 //! # async fn example() -> Result<(), publictransport_client::Error> {
@@ -16,12 +16,19 @@
 //! let vvo = Network::new("vvo", "VVO", "https://efa.vvo-online.de/std3", Protocol::Efa)
 //!     .with_timezone("Europe/Berlin");
 //!
+//! // The text alone searches for every kind of location.
+//! let everything = client.locations(&vvo, "Hauptbahnhof").await?;
+//! // A query type carries the options of a request.
 //! let query = LocationQuery::new("Hauptbahnhof").with_kinds([LocationKind::Stop]);
-//! let stops = client.locations(&vvo, &query).await?;
-//! if let Some(stop) = stops.first() {
-//!     for departure in client.departures(&vvo, &DeparturesQuery::new(&stop.id)).await? {
+//! let stops = client.locations(&vvo, query).await?;
+//! println!("{} locations, {} of them stops", everything.len(), stops.len());
+//! if let [from, to, ..] = stops.as_slice() {
+//!     for departure in client.departures(&vvo, from).await? {
 //!         println!("{} to {:?}", departure.line.name, departure.direction);
 //!     }
+//!     let board = client.departures(&vvo, DeparturesQuery::new(from).with_limit(5)).await?;
+//!     let found = client.trips(&vvo, TripsQuery::new(from, to)).await?;
+//!     println!("{} departures, {} trips", board.len(), found.trips.len());
 //! }
 //! # Ok(())
 //! # }
@@ -117,7 +124,8 @@ impl Client {
         Self { http }
     }
 
-    /// Searches for locations by name. See
+    /// Searches for locations by name. The query is the text to search
+    /// for, or a [`LocationQuery`] for a search with options. See
     /// [`Network::parse_locations`] for the result.
     ///
     /// # Errors
@@ -127,13 +135,18 @@ impl Client {
     pub async fn locations(
         &self,
         network: &Network,
-        query: &LocationQuery,
+        query: impl Into<LocationQuery>,
     ) -> Result<Vec<Location>, Error> {
-        let response = self.send(network.locations_request(query)?).await?;
+        let request = network.locations_request(&query.into())?;
+        let response = self.send(request).await?;
         Ok(network.parse_locations(&response)?)
     }
 
-    /// Lists the next departures at a stop. See
+    /// Lists the next departures at a stop. The query is the stop, as a
+    /// [`Location`] or as an ID of this network, or a [`DeparturesQuery`]
+    /// for a request with options. A stop that another network returned
+    /// works where this network can name it, see [`Network::stop_id`].
+    /// See
     /// [`Network::parse_departures`] for the result.
     ///
     /// # Errors
@@ -143,14 +156,16 @@ impl Client {
     pub async fn departures(
         &self,
         network: &Network,
-        query: &DeparturesQuery,
+        query: impl Into<DeparturesQuery>,
     ) -> Result<Vec<Departure>, Error> {
-        let response = self.send(network.departures_request(query)?).await?;
+        let request = network.departures_request(&query.into())?;
+        let response = self.send(request).await?;
         Ok(network.parse_departures(&response)?)
     }
 
-    /// Plans trips between two places. See [`Network::parse_trips`] for the
-    /// result. Its references continue the search:
+    /// Plans trips between two places. The query is a [`TripsQuery`],
+    /// whose ends are locations, coordinates or IDs. See
+    /// [`Network::parse_trips`] for the result. Its references continue the search:
     ///
     /// ```no_run
     /// # use publictransport_client::{Client, Error, Network, TripsQuery};
@@ -169,8 +184,13 @@ impl Client {
     ///
     /// Returns [`Error::Transport`] if the request got no answer and
     /// [`Error::Api`] for everything the server or the query got wrong.
-    pub async fn trips(&self, network: &Network, query: &TripsQuery) -> Result<Trips, Error> {
-        let response = self.send(network.trips_request(query)?).await?;
+    pub async fn trips(
+        &self,
+        network: &Network,
+        query: impl Into<TripsQuery>,
+    ) -> Result<Trips, Error> {
+        let request = network.trips_request(&query.into())?;
+        let response = self.send(request).await?;
         Ok(network.parse_trips(&response)?)
     }
 
