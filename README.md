@@ -11,7 +11,7 @@ The project is at an early stage. It can search for locations by name, list the 
 - HAFAS mgate, the JSON interface behind the apps of many operators
 - OpenTripPlanner 2 with its Transmodel API
 
-The library ships with a registry of networks that were checked against their live servers, `Registry::bundled()`: VVO, VRR, Transitous, Entur and the HAFAS servers of about 35 operators in Europe and the USA. Further networks can be described in code or read from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis). Each network says where it has coverage, so an application can pick the networks for a position.
+The library ships with networks that were checked against their live servers, named by `BundledNetwork` and listed by `Registry::bundled()`: VVO, VRR, Transitous, Entur and the HAFAS servers of about 35 operators in Europe and the USA. Further networks can be described in code or read from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis). Each network says where it has coverage, so an application can pick the networks for a position.
 
 ## Design
 

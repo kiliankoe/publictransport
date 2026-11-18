@@ -39,9 +39,10 @@
 //! (`company-application`) and limits clients without it, so add it with
 //! [`Network::with_header`].
 //!
-//! [`Registry::bundled`] has networks that were checked against their live
-//! servers, so that they need not be described by hand, and
-//! [`Registry::covering`] finds the ones for a position.
+//! [`BundledNetwork`] names networks that were checked against their live
+//! servers, so that they need not be described by hand:
+//! `Network::bundled(BundledNetwork::VvoEfa)`. [`Registry::bundled`] holds
+//! them all, and [`Registry::covering`] finds the ones for a position.
 //!
 //! The HTTP client has two duties:
 //!
@@ -78,5 +79,6 @@ pub use model::{
 };
 pub use network::{Network, Protocol};
 pub use registry::{
-    Area, Attribution, Coverage, CoverageTier, CoveringNetwork, Operation, Polygon, Registry,
+    Area, Attribution, BundledNetwork, Coverage, CoverageTier, CoveringNetwork, Operation, Polygon,
+    Registry,
 };

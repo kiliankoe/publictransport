@@ -458,169 +458,128 @@ pub struct CoveringNetwork {
     pub tier: CoverageTier,
 }
 
-/// The entries that ship with the crate, by ID. They come from the
-/// transport-apis repository, a submodule, where it has a usable entry.
-/// Those in `data/networks` are waiting to get there, or need the fields
-/// that only this crate reads. They come from the
-/// transport-apis repository, a submodule, where it has a usable entry.
-/// Those in `data/networks` are waiting to get there, or need the fields
-/// that only this crate reads.
-const BUNDLED: [(&str, &str); 43] = [
-    ("vvo-efa", include_str!("../data/networks/vvo-efa.json")),
-    ("vvo-trias", include_str!("../data/networks/vvo-trias.json")),
-    ("vvo-ojp", include_str!("../data/networks/vvo-ojp.json")),
-    ("vrr-efa", include_str!("../data/networks/vrr-efa.json")),
-    ("vrr-trias", include_str!("../data/networks/vrr-trias.json")),
-    ("vrr-ojp", include_str!("../data/networks/vrr-ojp.json")),
-    (
-        "oebb-hafas",
-        include_str!("../data/transport-apis/data/at/oebb-hafas-mgate.json"),
-    ),
-    (
-        "ooevv-hafas",
-        include_str!("../data/transport-apis/data/at/ooevv-hafas-mgate.json"),
-    ),
-    (
-        "salzburg-hafas",
-        include_str!("../data/transport-apis/data/at/salzburg-hafas-mgate.json"),
-    ),
-    (
-        "stv-hafas",
-        include_str!("../data/transport-apis/data/at/stv-hafas-mgate.json"),
-    ),
-    (
-        "svv-hafas",
-        include_str!("../data/transport-apis/data/at/svv-hafas-mgate.json"),
-    ),
-    (
-        "vkg-hafas",
-        include_str!("../data/transport-apis/data/at/vkg-hafas-mgate.json"),
-    ),
-    (
-        "vor-hafas",
-        include_str!("../data/transport-apis/data/at/vor-hafas-mgate.json"),
-    ),
-    (
-        "vvt-hafas",
-        include_str!("../data/transport-apis/data/at/vvt-hafas-mgate.json"),
-    ),
-    (
-        "vvv-hafas",
-        include_str!("../data/transport-apis/data/at/vvv-hafas-mgate.json"),
-    ),
-    (
-        "tpg-hafas",
-        include_str!("../data/transport-apis/data/ch/tpg-hafas-mgate.json"),
-    ),
-    (
-        "avv-hafas",
-        include_str!("../data/transport-apis/data/de/avv-hafas-mgate.json"),
-    ),
-    (
-        "bvg-hafas",
-        include_str!("../data/transport-apis/data/de/bvg-hafas-mgate.json"),
-    ),
-    (
-        "dart-hafas",
-        include_str!("../data/transport-apis/data/us/dart-hafas-mgate.json"),
-    ),
-    (
-        "db-busradar-nrw-hafas",
-        include_str!("../data/transport-apis/data/de/db-busradar-nrw-hafas-mgate.json"),
-    ),
-    (
-        "db-sbahn-muenchen-hafas",
-        include_str!("../data/transport-apis/data/de/db-sbahn-muenchen-hafas-mgate.json"),
-    ),
-    (
-        "db-smartrbl-hafas",
-        include_str!("../data/transport-apis/data/de/db-smartrbl-hafas-mgate.json"),
-    ),
-    (
-        "gvh-hafas",
-        include_str!("../data/transport-apis/data/de/gvh-hafas-mgate.json"),
-    ),
-    (
-        "invg-hafas",
-        include_str!("../data/transport-apis/data/de/invg-hafas-mgate.json"),
-    ),
-    (
-        "kvb-hafas",
-        include_str!("../data/transport-apis/data/de/kvb-hafas-mgate.json"),
-    ),
-    (
-        "nahsh-hafas",
-        include_str!("../data/transport-apis/data/de/nahsh-hafas-mgate.json"),
-    ),
-    (
-        "nasa-hafas",
-        include_str!("../data/transport-apis/data/de/nasa-hafas-mgate.json"),
-    ),
-    (
-        "nvv-hafas",
-        include_str!("../data/transport-apis/data/de/nvv-hafas-mgate.json"),
-    ),
-    (
-        "rmv-hafas",
-        include_str!("../data/transport-apis/data/de/rmv-hafas-mgate.json"),
-    ),
-    (
-        "rsag-hafas",
-        include_str!("../data/transport-apis/data/de/rsag-hafas-mgate.json"),
-    ),
-    (
-        "saarvv-hafas",
-        include_str!("../data/transport-apis/data/de/saarvv-hafas-mgate.json"),
-    ),
-    (
-        "vbb-hafas",
-        include_str!("../data/transport-apis/data/de/vbb-hafas-mgate.json"),
-    ),
-    (
-        "vbn-hafas",
-        include_str!("../data/transport-apis/data/de/vbn-hafas-mgate.json"),
-    ),
-    (
-        "vmt-hafas",
-        include_str!("../data/transport-apis/data/de/vmt-hafas-mgate.json"),
-    ),
-    (
-        "vos-hafas",
-        include_str!("../data/transport-apis/data/de/vos-hafas-mgate.json"),
-    ),
-    (
-        "vsn-hafas",
-        include_str!("../data/transport-apis/data/de/vsn-hafas-mgate.json"),
-    ),
-    (
-        "rejseplanen-hafas",
-        include_str!("../data/transport-apis/data/dk/rejseplanen-hafas-mgate.json"),
-    ),
-    (
-        "iarnrod-eireann-hafas",
-        include_str!("../data/transport-apis/data/ie/iarnrod-eireann-hafas-mgate.json"),
-    ),
-    (
-        "mobiliteit-lu-hafas",
-        include_str!("../data/transport-apis/data/lu/mobiliteit-lu-hafas-mgate.json"),
-    ),
-    (
-        "resrobot-hafas",
-        include_str!("../data/transport-apis/data/se/resrobot-hafas-mgate.json"),
-    ),
-    (
-        "bart-hafas",
-        include_str!("../data/transport-apis/data/us/bart-hafas-mgate.json"),
-    ),
-    (
-        "entur",
-        include_str!("../data/transport-apis/data/no/entur-otp.json"),
-    ),
-    (
-        "transitous",
-        include_str!("../data/transport-apis/data/un/transitous.json"),
-    ),
-];
+/// Declares the networks that ship with the crate: the enum that names
+/// them and the table of their entries, from one list.
+macro_rules! bundled {
+    ($($variant:ident => $id:literal, $entry:literal;)*) => {
+        /// A network that ships with the library. Its name is its ID,
+        /// `vvo-efa`, in the spelling the language has for such names.
+        /// Each network was checked against its live server when it was
+        /// added, and leaves the list when its server is gone for good.
+        // No export of `Debug`: the other languages then print the name as
+        // they spell it.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[non_exhaustive]
+        #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+        pub enum BundledNetwork {
+            $(
+                // The documentation of a network is its ID. UniFFI cannot
+                // read a `concat!` there that would make a sentence of it.
+                #[doc = $id]
+                $variant,
+            )*
+        }
+
+        impl BundledNetwork {
+            /// Every bundled network, in the order of the registry.
+            pub const ALL: &'static [Self] = &[$(Self::$variant,)*];
+
+            /// The ID of the network, such as `vvo-efa`.
+            #[must_use]
+            pub fn id(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $id,)*
+                }
+            }
+
+            /// The entry of the network in the format of transport-apis.
+            fn entry(self) -> &'static str {
+                match self {
+                    $(Self::$variant => include_str!($entry),)*
+                }
+            }
+
+            /// Where the entry is, to check it against the ID.
+            #[cfg(test)]
+            fn entry_path(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $entry,)*
+                }
+            }
+        }
+    };
+}
+
+// The entries come from the transport-apis repository, a submodule, where
+// it has a usable entry. Those in `data/networks` are waiting to get there,
+// or need the fields that only this crate reads.
+bundled! {
+    VvoEfa => "vvo-efa", "../data/networks/vvo-efa.json";
+    VvoTrias => "vvo-trias", "../data/networks/vvo-trias.json";
+    VvoOjp => "vvo-ojp", "../data/networks/vvo-ojp.json";
+    VrrEfa => "vrr-efa", "../data/networks/vrr-efa.json";
+    VrrTrias => "vrr-trias", "../data/networks/vrr-trias.json";
+    VrrOjp => "vrr-ojp", "../data/networks/vrr-ojp.json";
+    OebbHafas => "oebb-hafas", "../data/transport-apis/data/at/oebb-hafas-mgate.json";
+    OoevvHafas => "ooevv-hafas", "../data/transport-apis/data/at/ooevv-hafas-mgate.json";
+    SalzburgHafas => "salzburg-hafas", "../data/transport-apis/data/at/salzburg-hafas-mgate.json";
+    StvHafas => "stv-hafas", "../data/transport-apis/data/at/stv-hafas-mgate.json";
+    SvvHafas => "svv-hafas", "../data/transport-apis/data/at/svv-hafas-mgate.json";
+    VkgHafas => "vkg-hafas", "../data/transport-apis/data/at/vkg-hafas-mgate.json";
+    VorHafas => "vor-hafas", "../data/transport-apis/data/at/vor-hafas-mgate.json";
+    VvtHafas => "vvt-hafas", "../data/transport-apis/data/at/vvt-hafas-mgate.json";
+    VvvHafas => "vvv-hafas", "../data/transport-apis/data/at/vvv-hafas-mgate.json";
+    TpgHafas => "tpg-hafas", "../data/transport-apis/data/ch/tpg-hafas-mgate.json";
+    AvvHafas => "avv-hafas", "../data/transport-apis/data/de/avv-hafas-mgate.json";
+    BvgHafas => "bvg-hafas", "../data/transport-apis/data/de/bvg-hafas-mgate.json";
+    DartHafas => "dart-hafas", "../data/transport-apis/data/us/dart-hafas-mgate.json";
+    DbBusradarNrwHafas => "db-busradar-nrw-hafas", "../data/transport-apis/data/de/db-busradar-nrw-hafas-mgate.json";
+    DbSbahnMuenchenHafas => "db-sbahn-muenchen-hafas", "../data/transport-apis/data/de/db-sbahn-muenchen-hafas-mgate.json";
+    DbSmartrblHafas => "db-smartrbl-hafas", "../data/transport-apis/data/de/db-smartrbl-hafas-mgate.json";
+    GvhHafas => "gvh-hafas", "../data/transport-apis/data/de/gvh-hafas-mgate.json";
+    InvgHafas => "invg-hafas", "../data/transport-apis/data/de/invg-hafas-mgate.json";
+    KvbHafas => "kvb-hafas", "../data/transport-apis/data/de/kvb-hafas-mgate.json";
+    NahshHafas => "nahsh-hafas", "../data/transport-apis/data/de/nahsh-hafas-mgate.json";
+    NasaHafas => "nasa-hafas", "../data/transport-apis/data/de/nasa-hafas-mgate.json";
+    NvvHafas => "nvv-hafas", "../data/transport-apis/data/de/nvv-hafas-mgate.json";
+    RmvHafas => "rmv-hafas", "../data/transport-apis/data/de/rmv-hafas-mgate.json";
+    RsagHafas => "rsag-hafas", "../data/transport-apis/data/de/rsag-hafas-mgate.json";
+    SaarvvHafas => "saarvv-hafas", "../data/transport-apis/data/de/saarvv-hafas-mgate.json";
+    VbbHafas => "vbb-hafas", "../data/transport-apis/data/de/vbb-hafas-mgate.json";
+    VbnHafas => "vbn-hafas", "../data/transport-apis/data/de/vbn-hafas-mgate.json";
+    VmtHafas => "vmt-hafas", "../data/transport-apis/data/de/vmt-hafas-mgate.json";
+    VosHafas => "vos-hafas", "../data/transport-apis/data/de/vos-hafas-mgate.json";
+    VsnHafas => "vsn-hafas", "../data/transport-apis/data/de/vsn-hafas-mgate.json";
+    RejseplanenHafas => "rejseplanen-hafas", "../data/transport-apis/data/dk/rejseplanen-hafas-mgate.json";
+    IarnrodEireannHafas => "iarnrod-eireann-hafas", "../data/transport-apis/data/ie/iarnrod-eireann-hafas-mgate.json";
+    MobiliteitLuHafas => "mobiliteit-lu-hafas", "../data/transport-apis/data/lu/mobiliteit-lu-hafas-mgate.json";
+    ResrobotHafas => "resrobot-hafas", "../data/transport-apis/data/se/resrobot-hafas-mgate.json";
+    BartHafas => "bart-hafas", "../data/transport-apis/data/us/bart-hafas-mgate.json";
+    Entur => "entur", "../data/transport-apis/data/no/entur-otp.json";
+    Transitous => "transitous", "../data/transport-apis/data/un/transitous.json";
+}
+
+impl BundledNetwork {
+    /// The network, as [`Registry::bundled`] has it.
+    pub(crate) fn network(self) -> Network {
+        #[expect(clippy::expect_used, reason = "the entries are part of the crate")]
+        let network =
+            Network::from_json(self.id(), self.entry()).expect("a bundled entry can be read");
+        corrected(network)
+    }
+}
+
+impl Network {
+    /// The network that ships with the crate under this name.
+    ///
+    /// # Panics
+    ///
+    /// If an entry of the crate cannot be read, which its tests rule out.
+    #[must_use]
+    pub fn bundled(network: BundledNetwork) -> Self {
+        network.network()
+    }
+}
 
 /// A set of networks to choose from.
 #[derive(Debug, Clone)]
@@ -669,11 +628,9 @@ impl Registry {
     #[cfg_attr(feature = "uniffi", uniffi::constructor)]
     #[must_use]
     pub fn bundled() -> Self {
-        // The tests read every entry, so none is skipped here.
-        let networks = BUNDLED
+        let networks = BundledNetwork::ALL
             .iter()
-            .filter_map(|(id, json)| Network::from_json(id, json).ok())
-            .map(corrected)
+            .map(|network| network.network())
             .collect();
         Self { networks }
     }
@@ -720,5 +677,20 @@ impl Registry {
             .collect();
         covering.sort_by_key(|covering| covering.tier);
         covering
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BundledNetwork;
+
+    /// The macro pairs each ID with a file by hand.
+    #[test]
+    fn entry_of_a_bundled_network_is_the_file_of_its_id() {
+        for network in BundledNetwork::ALL {
+            let path = network.entry_path();
+            let file = path.rsplit('/').next().unwrap_or(path);
+            assert!(file.starts_with(network.id()), "{network:?}: {path}");
+        }
     }
 }

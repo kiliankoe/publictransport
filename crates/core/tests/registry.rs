@@ -2,8 +2,8 @@
 
 use proptest::prelude::*;
 use publictransport::{
-    Area, Coordinate, Coverage, CoverageTier, DeparturesQuery, Error, HafasProduct, LocationQuery,
-    Network, Operation, Place, Polygon, Protocol, Registry, TripsQuery,
+    Area, BundledNetwork, Coordinate, Coverage, CoverageTier, DeparturesQuery, Error, HafasProduct,
+    LocationQuery, Network, Operation, Place, Polygon, Protocol, Registry, TripsQuery,
 };
 
 /// The TRIAS and OJP service behind each operation.
@@ -486,8 +486,6 @@ fn registry_keeps_the_given_networks() {
 fn bundled_networks_are_usable() {
     let registry = Registry::bundled();
     let networks = registry.networks();
-    // An entry that cannot be read would be left out silently.
-    assert_eq!(networks.len(), 43);
     for id in ["vvo-efa", "vrr-ojp", "vbb-hafas", "transitous", "entur"] {
         assert!(registry.get(id).is_some(), "{id}");
     }
@@ -539,6 +537,31 @@ fn bundled_networks_are_usable() {
     for id in ["vrr-efa", "vrr-trias", "vrr-ojp"] {
         assert!(duesseldorf.iter().any(|d| d == id), "{id} in Düsseldorf");
     }
+}
+
+/// The list of bundled networks pairs names, IDs and entries by hand.
+#[test]
+fn bundled_network_is_named_after_its_id_and_gives_the_network_with_it() {
+    let mut ids = Vec::new();
+    for &bundled in BundledNetwork::ALL {
+        let name: String = bundled
+            .id()
+            .split('-')
+            .map(|part| {
+                let (first, rest) = part.split_at(1);
+                first.to_uppercase() + rest
+            })
+            .collect();
+        assert_eq!(format!("{bundled:?}"), name);
+        assert_eq!(Network::bundled(bundled).id, bundled.id());
+        assert!(!ids.contains(&bundled.id()), "{bundled:?} is there twice");
+        ids.push(bundled.id());
+    }
+    // The registry holds the same networks, with its corrections.
+    let registry = Registry::bundled();
+    assert_eq!(registry.networks().len(), ids.len());
+    let moved = BundledNetwork::OoevvHafas;
+    assert_eq!(Some(Network::bundled(moved)), registry.get(moved.id()));
 }
 
 #[test]

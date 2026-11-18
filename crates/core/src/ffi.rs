@@ -3,7 +3,7 @@
 
 use std::time::{Duration, SystemTime};
 
-use crate::{Error, GlobalId, LegEnd, Location, Network, Timestamp, Trip};
+use crate::{BundledNetwork, Error, GlobalId, LegEnd, Location, Network, Timestamp, Trip};
 
 /// The name of [`Timestamp`] in the bindings. The Python generator of `UniFFI` uses
 /// the name `Timestamp` itself, and type checkers lose the type of every
@@ -40,6 +40,29 @@ uniffi::custom_type!(UtcTime, SystemTime, {
 
 // These methods return references or `usize` in Rust, which cannot cross the
 // boundary. The bindings get them under the same names with owned values.
+
+#[uniffi::export]
+impl BundledNetwork {
+    /// The ID of the network, such as `vvo-efa`.
+    #[uniffi::method(name = "id")]
+    #[expect(
+        clippy::trivially_copy_pass_by_ref,
+        reason = "UniFFI hands a method its receiver by reference"
+    )]
+    fn ffi_id(&self) -> String {
+        self.id().to_owned()
+    }
+
+    /// The network, as the bundled registry has it.
+    #[uniffi::method(name = "network")]
+    #[expect(
+        clippy::trivially_copy_pass_by_ref,
+        reason = "UniFFI hands a method its receiver by reference"
+    )]
+    fn ffi_network(&self) -> Network {
+        self.network()
+    }
+}
 
 #[uniffi::export]
 impl Location {
