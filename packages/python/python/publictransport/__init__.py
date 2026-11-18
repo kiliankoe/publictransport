@@ -10,6 +10,7 @@ from publictransport._client import AsyncClient, Client, ResponseTooLarge
 from publictransport._uniffi import (
     Area,
     Attribution,
+    BundledNetwork,
     Coordinate,
     Coverage,
     CoverageTier,
@@ -52,6 +53,7 @@ __all__ = [
     "Area",
     "AsyncClient",
     "Attribution",
+    "BundledNetwork",
     "Client",
     "Coordinate",
     "Coverage",

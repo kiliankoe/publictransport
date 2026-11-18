@@ -5,15 +5,9 @@ A Python client for public transport APIs. One shared model for stops, departure
 The package wraps the Rust library of the same name. The Rust code builds the requests and parses the answers, and [httpx](https://www.python-httpx.org) sends them.
 
 ```python
-from publictransport import Client, LocationKind, Network, Protocol
+from publictransport import BundledNetwork, Client, LocationKind
 
-vvo = Network(
-    id="vvo",
-    name="Verkehrsverbund Oberelbe",
-    endpoint="https://efa.vvo-online.de/std3",
-    protocol=Protocol.EFA,
-    timezone="Europe/Berlin",
-)
+vvo = BundledNetwork.VVO_EFA.network()
 
 with Client(user_agent="my-app/1.0 (+https://example.org)") as client:
     stops = client.locations(vvo, "Hauptbahnhof", kinds=[LocationKind.STOP])
@@ -26,7 +20,7 @@ with Client(user_agent="my-app/1.0 (+https://example.org)") as client:
 
 `AsyncClient` has the same methods as coroutines. A stop or a place is a `Location` from a search, a departure or a trip, or an ID as text; a place in `trips` can be a `Coordinate` too. A location that another network returned works as well: for a trip always if it has a coordinate, for departures where the asked network can name the stop, which EFA, TRIAS and OJP can for stops with a global ID. Each method also takes a query object (`LocationQuery`, `DeparturesQuery`, `TripsQuery`) in place of the plain values, which is what the Rust library works with.
 
-`Registry.bundled()` holds the networks that ship with the package, so a `Network` does not have to be written by hand: `Registry.bundled().get("vvo-efa")` is the server above, and `covering(Coordinate(...))` lists the networks for a position, each with the tier of its coverage there. `network_from_json(id, json)` reads further ones from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis).
+`BundledNetwork` names the networks that ship with the package. `Registry.bundled()` holds them all, for a list to choose from: `get("vvo-efa")` finds one by its ID as text, and `covering(Coordinate(...))` lists the networks for a position, each with the tier of its coverage there. A `Network` can also be written by hand, as `Network(id=..., name=..., endpoint=..., protocol=Protocol.EFA, timezone="Europe/Berlin")`, and `network_from_json(id, json)` reads further ones from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis).
 
 Times are timezone-aware `datetime` objects in UTC, and `Location.timezone` names the zone to show them in. A time in a query has to be timezone-aware too, in any zone. An EFA network needs its `timezone` to send a query time. A TRIAS or OJP network needs a `requestor_ref`, which public servers document, e.g. `OpenService`. A HAFAS network needs `hafas=HafasOptions(...)` and its `timezone`; the bundled ones have both. Entur asks every client for its name in the header `ET-Client-Name` (`company-application`) and limits clients without it, so add it to the bundled network: `entur.headers.append(Header(name="ET-Client-Name", value="mycompany-myapp"))`. A network of that protocol searches for locations on the geocoder named in `geocoder=`, and its answer to `trips` can be empty at night and still have a `later` reference to follow. A server that wants a key in an HTTP header gets it through `Network(headers=[Header(...)])`.
 

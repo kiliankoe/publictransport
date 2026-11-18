@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 from publictransport import (
+    BundledNetwork,
     Coordinate,
     DeparturesQuery,
     Error,
@@ -127,6 +128,14 @@ def test_registry_finds_the_bundled_networks_that_cover_a_position() -> None:
 
     assert "vvo-efa" in covering
     assert "vrr-efa" not in covering
+
+
+def test_bundled_network_gives_the_network_of_the_registry() -> None:
+    # The last one: a member is sent to Rust as its position in the list.
+    bundled = BundledNetwork.TRANSITOUS
+
+    assert bundled.id() == "transitous"
+    assert bundled.network() == Registry.bundled().get("transitous")
 
 
 def test_network_is_read_from_a_transport_apis_entry() -> None:
