@@ -34,6 +34,8 @@ jobs:
       - run: nix develop -c cargo package -p publictransport
       # Fetches the TRIAS and OJP schemas from GitHub.
       - run: nix develop -c scripts/validate-xml-requests.sh
+      # The generated code of the Swift package is committed.
+      - run: nix develop -c scripts/build-swift.sh check
 
   commits:
     runs-on: ubuntu-latest
@@ -64,3 +66,37 @@ jobs:
       - run: nix develop -c pyright
       - run: nix develop -c uv run --no-sync pytest
       - run: nix develop -c uv build --wheel
+
+  swift:
+    runs-on: ubuntu-latest
+    # The same sources build for Apple platforms, where the tests would
+    # need a macOS runner.
+    container: swift:6.2
+    steps:
+      - run: apt-get update && apt-get install --yes curl build-essential
+      - uses: actions/checkout@v7
+        with:
+          # The network data of transport-apis.
+          submodules: true
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # The static library alone: the Swift package links it.
+      - run: cargo rustc -p publictransport-uniffi --lib --release --crate-type staticlib
+      # The hand-written code; the generated file has its own style.
+      - run: swift format lint --strict --recursive packages/swift/Sources/PublicTransport/Client.swift packages/swift/Tests
+      - run: swift test -Xlinker -Ltarget/release
+
+  swift-macos:
+    # Foundation differs between Linux and Apple platforms, and the
+    # XCFramework is only built here.
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The network data of transport-apis.
+          submodules: true
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: scripts/build-swift.sh xcframework macos
+      - run: swift test
+
