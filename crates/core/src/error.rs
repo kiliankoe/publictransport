@@ -2,6 +2,7 @@
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Display))]
 pub enum Error {
     /// The [`Network`](crate::Network) lacks something the request needs,
     /// such as a time zone, or its description cannot be read.
