@@ -23,6 +23,8 @@ Rust applications that do not want to bring their own HTTP client use `publictra
 cargo run -p publictransport-client --example trip -- vvo-efa "Dresden Hauptbahnhof" "Dresden Albertplatz"
 ```
 
+Packages for Python and Swift wrap the same core, each with a client on its platform's HTTP stack, httpx and `URLSession`. Neither is released yet. The Swift package has its `Package.swift` at the root of this repository.
+
 ## Development
 
 Clone with `--recurse-submodules`, or run `git submodule update --init` afterwards: the network data of [transport-apis](https://github.com/public-transport/transport-apis) is a submodule under `crates/core/data`. Networks that repository does not have yet are in `crates/core/data/networks`, in the same format.
@@ -36,7 +38,7 @@ cargo test --workspace --all-features
 cargo deny check
 ```
 
-A Python package in `packages/python` wraps the library through [UniFFI](https://mozilla.github.io/uniffi-rs/); see its README. The crate in `bindings/uniffi` builds the shared library for it.
+The Python package in `packages/python` and the Swift package in `packages/swift` wrap the library through [UniFFI](https://mozilla.github.io/uniffi-rs/); see their READMEs. The crate in `bindings/uniffi` builds the library for them, and `scripts/build-swift.sh` generates the Swift code and builds the XCFramework.
 
 The tests replay responses recorded from real servers. `crates/core/tests/fixtures/record.sh` records them again. `cargo run --example check` asks every bundled network's live server for stops, departures and trips, to see which still work. `scripts/validate-xml-requests.sh` checks the TRIAS and OJP requests that the library builds against the official schemas, which it fetches from the VDV repositories.
 

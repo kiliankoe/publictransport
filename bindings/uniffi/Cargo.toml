@@ -1,6 +1,6 @@
 [package]
 name = "publictransport-uniffi"
-description = "The publictransport library as a shared library for Python, Swift and Kotlin"
+description = "The publictransport library as a shared or static library for Python, Swift and Kotlin"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

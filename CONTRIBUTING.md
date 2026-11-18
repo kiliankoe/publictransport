@@ -37,6 +37,7 @@ The scope names the part that changed:
 | `client` | `crates/client`, the client on reqwest |
 | `uniffi` | `bindings/uniffi` and the `uniffi` feature of the core |
 | `python` | `packages/python` |
+| `swift` | `packages/swift` and `Package.swift` |
 | `ci` | a fix that only CI needed |
 | `deps` | dependency updates |
 

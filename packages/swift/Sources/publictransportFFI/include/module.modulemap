@@ -1,0 +1,4 @@
+module publictransportFFI {
+    header "publictransportFFI.h"
+    export *
+}

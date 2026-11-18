@@ -47,6 +47,21 @@
                 "rust-src"
                 "rust-analyzer"
               ];
+              # For the XCFramework of the Swift package, see
+              # scripts/build-swift.sh
+              targets = pkgs.lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
+                "aarch64-apple-darwin"
+                "x86_64-apple-darwin"
+                "aarch64-apple-ios"
+                "aarch64-apple-ios-sim"
+                "x86_64-apple-ios"
+                "aarch64-apple-tvos"
+                "aarch64-apple-tvos-sim"
+                "aarch64-apple-watchos"
+                "aarch64-apple-watchos-sim"
+                "aarch64-apple-visionos"
+                "aarch64-apple-visionos-sim"
+              ];
             })
             pkgs.cargo-deny
             # The commit convention, see CONTRIBUTING.md

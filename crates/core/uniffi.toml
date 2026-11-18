@@ -1,0 +1,10 @@
+# Settings for the bindings that UniFFI generates from this crate.
+
+[bindings.swift.rename]
+# `Error` is the name of Swift's own protocol for errors.
+Error = "PublicTransportError"
+# These three are also names in Foundation and the Objective-C runtime, so
+# a file that imports Foundation could not name them.
+Protocol = "NetworkProtocol"
+Operation = "NetworkOperation"
+Method = "HttpMethod"
