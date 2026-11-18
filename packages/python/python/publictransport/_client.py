@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import httpx
 
 from publictransport._uniffi import (
+    Coordinate,
     Departure,
     DeparturesQuery,
     Header,
@@ -15,14 +16,20 @@ from publictransport._uniffi import (
     Location,
     LocationQuery,
     Network,
+    Place,
     Trips,
     TripsQuery,
+    TripTime,
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from datetime import datetime
     from types import TracebackType
 
     from typing_extensions import Self
+
+    from publictransport._uniffi import LocationKind
 
 TIMEOUT_SECONDS = 30.0
 # Real answers stay below 1 MB. The limit keeps a broken or hostile server
@@ -47,6 +54,79 @@ def _exactly_one(user_agent: str | None, http_client: object | None) -> None:
     if user_agent is not None and not user_agent.strip():
         message = "user_agent is empty"
         raise ValueError(message)
+
+
+def _no_options(name: str, *options: object) -> None:
+    # By identity: the generated classes cannot be compared with other types.
+    if any(option is not None for option in options):
+        message = f"the {name} holds everything, so pass nothing next to it"
+        raise TypeError(message)
+
+
+def _place(place: Place | Location | Coordinate | str) -> Place:
+    # The generated variants are not typed as a `Place`.
+    if isinstance(place, Place):
+        return place
+    if isinstance(place, Location):
+        return Place.LOCATION(place)  # pyright: ignore[reportReturnType]
+    if isinstance(place, Coordinate):
+        return Place.COORDINATE(place)  # pyright: ignore[reportReturnType]
+    if isinstance(place, str):  # pyright: ignore[reportUnnecessaryIsInstance]
+        return Place.ID(place)  # pyright: ignore[reportReturnType]
+    message = f"a Location, a Coordinate, a Place or an ID is needed, not {place!r}"
+    raise TypeError(message)
+
+
+def _location_query(
+    query: LocationQuery | str, kinds: Sequence[LocationKind], limit: int | None
+) -> LocationQuery:
+    if isinstance(query, LocationQuery):
+        _no_options("LocationQuery", tuple(kinds) or None, limit)
+        return query
+    return LocationQuery(text=query, kinds=list(kinds), limit=limit)
+
+
+def _departures_query(
+    stop: DeparturesQuery | Place | Location | str,
+    time: datetime | None,
+    limit: int | None,
+) -> DeparturesQuery:
+    if isinstance(stop, DeparturesQuery):
+        _no_options("DeparturesQuery", time, limit)
+        return stop
+    return DeparturesQuery(stop=_place(stop), time=time, limit=limit)
+
+
+def _trips_query(  # noqa: PLR0913
+    origin: TripsQuery | Place | Location | Coordinate | str,
+    destination: Place | Location | Coordinate | str | None,
+    *,
+    depart_at: datetime | None,
+    arrive_by: datetime | None,
+    limit: int | None,
+    page: str | None,
+) -> TripsQuery:
+    if isinstance(origin, TripsQuery):
+        _no_options("TripsQuery", destination, depart_at, arrive_by, limit, page)
+        return origin
+    if destination is None:
+        message = "trips need a destination"
+        raise TypeError(message)
+    if depart_at is not None and arrive_by is not None:
+        message = "pass depart_at or arrive_by, not both"
+        raise ValueError(message)
+    time = None
+    if depart_at is not None:
+        time = TripTime.DEPART_AT(depart_at)
+    if arrive_by is not None:
+        time = TripTime.ARRIVE_BY(arrive_by)
+    return TripsQuery(
+        origin=_place(origin),
+        destination=_place(destination),
+        time=time,  # pyright: ignore[reportArgumentType]
+        limit=limit,
+        page=page,
+    )
 
 
 def _headers(request: HttpRequest) -> list[tuple[str, str]]:
@@ -113,20 +193,74 @@ class Client:
             follow_redirects=False,
         )
 
-    def locations(self, network: Network, query: LocationQuery) -> list[Location]:
-        """Search for locations by name. The best match comes first."""
-        response = self._send(network.locations_request(query))
-        return network.parse_locations(response)
+    def locations(
+        self,
+        network: Network,
+        query: LocationQuery | str,
+        *,
+        kinds: Sequence[LocationKind] = (),
+        limit: int | None = None,
+    ) -> list[Location]:
+        """Search for locations by name. The best match comes first.
 
-    def departures(self, network: Network, query: DeparturesQuery) -> list[Departure]:
-        """List the next departures at a stop, ordered by expected time."""
-        response = self._send(network.departures_request(query))
-        return network.parse_departures(response)
+        `query` is the text to search for. `kinds` narrows the search to
+        kinds of location and `limit` is the largest number wanted, which
+        is not sent to EFA servers: they return every match. A
+        `LocationQuery` carries the same and takes the place of all three.
+        """
+        request = network.locations_request(_location_query(query, kinds, limit))
+        return network.parse_locations(self._send(request))
 
-    def trips(self, network: Network, query: TripsQuery) -> Trips:
-        """Plan trips between two places, in the order the server ranks them."""
-        response = self._send(network.trips_request(query))
-        return network.parse_trips(response)
+    def departures(
+        self,
+        network: Network,
+        stop: DeparturesQuery | Place | Location | str,
+        *,
+        time: datetime | None = None,
+        limit: int | None = None,
+    ) -> list[Departure]:
+        """List the next departures at a stop, ordered by expected time.
+
+        `stop` is a location or the ID of a stop on this network. A stop
+        that another network returned works where this network can name it,
+        which EFA, TRIAS and OJP can for stops with a global ID; otherwise
+        the call raises `Error.InvalidQuery`. `time` is when the list starts,
+        now if left out, and `limit` how many departures are wanted. A
+        `DeparturesQuery` carries the same and takes the place of all three.
+        """
+        request = network.departures_request(_departures_query(stop, time, limit))
+        return network.parse_departures(self._send(request))
+
+    def trips(  # noqa: PLR0913
+        self,
+        network: Network,
+        origin: TripsQuery | Place | Location | Coordinate | str,
+        destination: Place | Location | Coordinate | str | None = None,
+        *,
+        depart_at: datetime | None = None,
+        arrive_by: datetime | None = None,
+        limit: int | None = None,
+        page: str | None = None,
+    ) -> Trips:
+        """Plan trips between two places, in the order the server ranks them.
+
+        Each end is a location, also one that another network returned, a
+        coordinate, or an ID on this network. A location this network
+        cannot name by ID is sent as its coordinate. Pass `depart_at` or
+        `arrive_by` for another time than now, `limit` for how many trips
+        are wanted, and `page` with `earlier` or `later` of an answer to
+        continue that search with the same other arguments. A `TripsQuery`
+        carries the same and takes the place of all of them.
+        """
+        query = _trips_query(
+            origin,
+            destination,
+            depart_at=depart_at,
+            arrive_by=arrive_by,
+            limit=limit,
+            page=page,
+        )
+        return network.parse_trips(self._send(network.trips_request(query)))
 
     def close(self) -> None:
         """Close the connections, unless the caller passed `http_client`."""
@@ -181,22 +315,74 @@ class AsyncClient:
             follow_redirects=False,
         )
 
-    async def locations(self, network: Network, query: LocationQuery) -> list[Location]:
-        """Search for locations by name. The best match comes first."""
-        response = await self._send(network.locations_request(query))
-        return network.parse_locations(response)
+    async def locations(
+        self,
+        network: Network,
+        query: LocationQuery | str,
+        *,
+        kinds: Sequence[LocationKind] = (),
+        limit: int | None = None,
+    ) -> list[Location]:
+        """Search for locations by name. The best match comes first.
+
+        `query` is the text to search for. `kinds` narrows the search to
+        kinds of location and `limit` is the largest number wanted, which
+        is not sent to EFA servers: they return every match. A
+        `LocationQuery` carries the same and takes the place of all three.
+        """
+        request = network.locations_request(_location_query(query, kinds, limit))
+        return network.parse_locations(await self._send(request))
 
     async def departures(
-        self, network: Network, query: DeparturesQuery
+        self,
+        network: Network,
+        stop: DeparturesQuery | Place | Location | str,
+        *,
+        time: datetime | None = None,
+        limit: int | None = None,
     ) -> list[Departure]:
-        """List the next departures at a stop, ordered by expected time."""
-        response = await self._send(network.departures_request(query))
-        return network.parse_departures(response)
+        """List the next departures at a stop, ordered by expected time.
 
-    async def trips(self, network: Network, query: TripsQuery) -> Trips:
-        """Plan trips between two places, in the order the server ranks them."""
-        response = await self._send(network.trips_request(query))
-        return network.parse_trips(response)
+        `stop` is a location or the ID of a stop on this network. A stop
+        that another network returned works where this network can name it,
+        which EFA, TRIAS and OJP can for stops with a global ID; otherwise
+        the call raises `Error.InvalidQuery`. `time` is when the list starts,
+        now if left out, and `limit` how many departures are wanted. A
+        `DeparturesQuery` carries the same and takes the place of all three.
+        """
+        request = network.departures_request(_departures_query(stop, time, limit))
+        return network.parse_departures(await self._send(request))
+
+    async def trips(  # noqa: PLR0913
+        self,
+        network: Network,
+        origin: TripsQuery | Place | Location | Coordinate | str,
+        destination: Place | Location | Coordinate | str | None = None,
+        *,
+        depart_at: datetime | None = None,
+        arrive_by: datetime | None = None,
+        limit: int | None = None,
+        page: str | None = None,
+    ) -> Trips:
+        """Plan trips between two places, in the order the server ranks them.
+
+        Each end is a location, also one that another network returned, a
+        coordinate, or an ID on this network. A location this network
+        cannot name by ID is sent as its coordinate. Pass `depart_at` or
+        `arrive_by` for another time than now, `limit` for how many trips
+        are wanted, and `page` with `earlier` or `later` of an answer to
+        continue that search with the same other arguments. A `TripsQuery`
+        carries the same and takes the place of all of them.
+        """
+        query = _trips_query(
+            origin,
+            destination,
+            depart_at=depart_at,
+            arrive_by=arrive_by,
+            limit=limit,
+            page=page,
+        )
+        return network.parse_trips(await self._send(network.trips_request(query)))
 
     async def aclose(self) -> None:
         """Close the connections, unless the caller passed `http_client`."""

@@ -5,14 +5,7 @@ A Python client for public transport APIs. One shared model for stops, departure
 The package wraps the Rust library of the same name. The Rust code builds the requests and parses the answers, and [httpx](https://www.python-httpx.org) sends them.
 
 ```python
-from publictransport import (
-    Client,
-    DeparturesQuery,
-    LocationKind,
-    LocationQuery,
-    Network,
-    Protocol,
-)
+from publictransport import Client, LocationKind, Network, Protocol
 
 vvo = Network(
     id="vvo",
@@ -23,20 +16,21 @@ vvo = Network(
 )
 
 with Client(user_agent="my-app/1.0 (+https://example.org)") as client:
-    stops = client.locations(
-        vvo, LocationQuery(text="Hauptbahnhof", kinds=[LocationKind.STOP])
-    )
-    for departure in client.departures(vvo, DeparturesQuery(stop_id=stops[0].id)):
+    stops = client.locations(vvo, "Hauptbahnhof", kinds=[LocationKind.STOP])
+    for departure in client.departures(vvo, stops[0], limit=10):
         print(departure.scheduled_time, departure.line.name, departure.direction)
+
+    found = client.trips(vvo, stops[0], stops[1])
+    more = client.trips(vvo, stops[0], stops[1], page=found.later)
 ```
 
-`AsyncClient` has the same methods as coroutines.
+`AsyncClient` has the same methods as coroutines. A stop or a place is a `Location` from a search, a departure or a trip, or an ID as text; a place in `trips` can be a `Coordinate` too. A location that another network returned works as well: for a trip always if it has a coordinate, for departures where the asked network can name the stop, which EFA, TRIAS and OJP can for stops with a global ID. Each method also takes a query object (`LocationQuery`, `DeparturesQuery`, `TripsQuery`) in place of the plain values, which is what the Rust library works with.
 
 `Registry.bundled()` holds the networks that ship with the package, so a `Network` does not have to be written by hand: `Registry.bundled().get("vvo-efa")` is the server above, and `covering(Coordinate(...))` lists the networks for a position, each with the tier of its coverage there. `network_from_json(id, json)` reads further ones from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis).
 
 Times are timezone-aware `datetime` objects in UTC, and `Location.timezone` names the zone to show them in. A time in a query has to be timezone-aware too, in any zone. An EFA network needs its `timezone` to send a query time. A TRIAS or OJP network needs a `requestor_ref`, which public servers document, e.g. `OpenService`. A HAFAS network needs `hafas=HafasOptions(...)` and its `timezone`; the bundled ones have both. Entur asks every client for its name in the header `ET-Client-Name` (`company-application`) and limits clients without it, so add it to the bundled network: `entur.headers.append(Header(name="ET-Client-Name", value="mycompany-myapp"))`. A network of that protocol searches for locations on the geocoder named in `geocoder=`, and its answer to `trips` can be empty at night and still have a `later` reference to follow. A server that wants a key in an HTTP header gets it through `Network(headers=[Header(...)])`.
 
-`trips` returns a `Trips` record: the list is in `trips`, and `earlier` and `later` are references for more. Pass one as `page` in the same query to continue the search.
+`trips` returns a `Trips` record: the list is in `trips`, and `earlier` and `later` are references for more. Pass one as `page` with the same other arguments to continue the search.
 
 Failures that the server or the query cause are raised as subclasses of `publictransport.Error`, such as `Error.NotFound` or `Error.RateLimited`. Failures of the HTTP exchange are raised as httpx raises them. An answer above 16 MB raises `ResponseTooLarge`.
 

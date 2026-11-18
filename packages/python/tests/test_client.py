@@ -19,16 +19,22 @@ import pytest
 from publictransport import (
     AsyncClient,
     Client,
+    Coordinate,
     DeparturesQuery,
     Error,
+    GlobalId,
     Header,
     HttpResponse,
+    IdScheme,
+    Location,
+    LocationKind,
     LocationQuery,
     Network,
     Place,
     Protocol,
     ResponseTooLarge,
     TripsQuery,
+    TripTime,
 )
 
 FIXTURES = Path(__file__).parents[3] / "crates/core/tests/fixtures"
@@ -323,3 +329,214 @@ def test_request_body_and_headers_arrive_as_the_library_built_them(call: Call) -
         "application/xml",
         "secret",
     ]
+
+
+TIME = datetime(2026, 11, 16, 13, 24, tzinfo=timezone.utc)
+DRESDEN = Coordinate(latitude=51.04, longitude=13.73)
+
+
+def foreign(kind: LocationKind) -> Location:
+    """Return a location that another network returned."""
+    return Location(
+        id="8010085",
+        global_ids=[GlobalId(scheme=IdScheme.IFOPT, value="de:14612:28:3:2")],
+        kind=kind,
+        name="Dresden Hbf",
+        locality=None,
+        coordinate=None,
+        timezone=None,
+        network="other",
+    )
+
+
+FOREIGN_STOP = foreign(LocationKind.STOP)
+EFA_FIXTURES = {
+    "locations": "efa/vvo-stopfinder.json",
+    "departures": "efa/vvo-departures.json",
+    "trips": "efa/vvo-trip.json",
+}
+# The reference to the trips after those of the fixture.
+LATER = EFA.parse_trips(
+    HttpResponse(
+        status=200, headers=[], body=(FIXTURES / EFA_FIXTURES["trips"]).read_bytes()
+    )
+).later
+
+
+def sent_by(operation: str, *args: object, **options: object) -> list[httpx.Request]:
+    """Return the requests one plain call of the blocking client sends to EFA."""
+    sent: list[httpx.Request] = []
+    body = (FIXTURES / EFA_FIXTURES[operation]).read_bytes()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        return httpx.Response(200, content=body)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        getattr(Client(http_client=http), operation)(EFA, *args, **options)
+    return sent
+
+
+# The generated variants of `Place` and `TripTime` are not typed as such.
+@pytest.mark.parametrize(
+    ("operation", "args", "options", "query"),
+    [
+        (
+            "locations",
+            ["Hauptbahnhof"],
+            {"kinds": [LocationKind.STOP], "limit": 3},
+            LocationQuery(text="Hauptbahnhof", kinds=[LocationKind.STOP], limit=3),
+        ),
+        (
+            "departures",
+            ["de:14612:28"],
+            {"time": TIME, "limit": 7},
+            DeparturesQuery(
+                stop=Place.ID("de:14612:28"),  # pyright: ignore[reportArgumentType]
+                time=TIME,
+                limit=7,
+            ),
+        ),
+        (
+            "departures",
+            [FOREIGN_STOP],
+            {},
+            DeparturesQuery(
+                stop=Place.ID("de:14612:28"),  # pyright: ignore[reportArgumentType]
+            ),
+        ),
+        (
+            "trips",
+            [FOREIGN_STOP, "de:14612:13"],
+            {"depart_at": TIME, "limit": 3},
+            TripsQuery(
+                origin=Place.ID("de:14612:28"),  # pyright: ignore[reportArgumentType]
+                destination=Place.ID("de:14612:13"),  # pyright: ignore[reportArgumentType]
+                time=TripTime.DEPART_AT(TIME),  # pyright: ignore[reportArgumentType]
+                limit=3,
+            ),
+        ),
+        (
+            "trips",
+            ["de:14612:28", DRESDEN],
+            {"arrive_by": TIME},
+            TripsQuery(
+                origin=Place.ID("de:14612:28"),  # pyright: ignore[reportArgumentType]
+                destination=Place.COORDINATE(DRESDEN),  # pyright: ignore[reportArgumentType]
+                time=TripTime.ARRIVE_BY(TIME),  # pyright: ignore[reportArgumentType]
+            ),
+        ),
+        (
+            "trips",
+            ["de:14612:28", "de:14612:13"],
+            {"page": LATER},
+            TripsQuery(
+                origin=Place.ID("de:14612:28"),  # pyright: ignore[reportArgumentType]
+                destination=Place.ID("de:14612:13"),  # pyright: ignore[reportArgumentType]
+                page=LATER,
+            ),
+        ),
+    ],
+)
+def test_plain_call_sends_the_request_of_the_query_with_the_same_values(
+    operation: str, args: list[object], options: dict[str, object], query: object
+) -> None:
+    request = getattr(EFA, f"{operation}_request")(query)
+
+    sent = sent_by(operation, *args, **options)
+
+    assert [(r.method, r.url) for r in sent] == [
+        (request.method.name, httpx.URL(request.url))
+    ]
+
+
+@pytest.mark.parametrize(
+    ("operation", "args", "options", "error"),
+    [
+        ("locations", [LOCATIONS], {"limit": 3}, TypeError),
+        ("locations", [LOCATIONS], {"kinds": [LocationKind.STOP]}, TypeError),
+        (
+            "departures",
+            [DeparturesQuery(stop=Place.ID("x"))],  # pyright: ignore[reportArgumentType]
+            {"time": TIME},
+            TypeError,
+        ),
+        (
+            "trips",
+            [
+                TripsQuery(
+                    origin=Place.ID("x"),  # pyright: ignore[reportArgumentType]
+                    destination=Place.ID("y"),  # pyright: ignore[reportArgumentType]
+                )
+            ],
+            {"depart_at": TIME},
+            TypeError,
+        ),
+        ("trips", ["x"], {}, TypeError),
+        ("trips", ["x", "y"], {"depart_at": TIME, "arrive_by": TIME}, ValueError),
+        # A destination next to a query that has one, also an empty value.
+        (
+            "trips",
+            [
+                TripsQuery(
+                    origin=Place.ID("x"),  # pyright: ignore[reportArgumentType]
+                    destination=Place.ID("y"),  # pyright: ignore[reportArgumentType]
+                ),
+                (),
+            ],
+            {},
+            TypeError,
+        ),
+        # Not a stop, with a message that names what is one.
+        ("departures", [None], {}, TypeError),
+    ],
+)
+def test_call_that_mixes_or_misses_arguments_is_refused_before_a_request(
+    operation: str,
+    args: list[object],
+    options: dict[str, object],
+    error: type[Exception],
+) -> None:
+    sent: list[httpx.Request] = []
+    with pytest.raises(error):
+        sent = sent_by(operation, *args, **options)
+    assert sent == []
+
+
+def test_location_the_network_cannot_name_is_an_invalid_query() -> None:
+    with pytest.raises(Error.InvalidQuery):
+        sent_by("departures", foreign(LocationKind.POI))
+
+
+def test_async_client_takes_the_plain_form_too() -> None:
+    request = EFA.trips_request(
+        TripsQuery(
+            origin=Place.ID("de:14612:28"),  # pyright: ignore[reportArgumentType]
+            destination=Place.COORDINATE(DRESDEN),  # pyright: ignore[reportArgumentType]
+            time=TripTime.DEPART_AT(TIME),  # pyright: ignore[reportArgumentType]
+        )
+    )
+    sent: list[httpx.URL] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request.url)
+        return httpx.Response(
+            200, content=(FIXTURES / "efa/vvo-trip.json").read_bytes()
+        )
+
+    async def run() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+            client = AsyncClient(http_client=http)
+            await client.trips(EFA, FOREIGN_STOP, DRESDEN, depart_at=TIME)
+
+    asyncio.run(run())
+
+    assert sent == [httpx.URL(request.url)]
+
+
+def test_place_is_taken_where_a_stop_or_an_end_of_a_trip_is() -> None:
+    # `Network.place` returns one, so it has to go back in.
+    stop = Place.ID("de:14612:28")
+    [by_place] = sent_by("departures", stop)
+    [by_id] = sent_by("departures", "de:14612:28")
+    assert by_place.url == by_id.url
