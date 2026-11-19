@@ -7,5 +7,5 @@ __pycache__/
 /packages/python/python/publictransport/_uniffi/
 # Built by scripts/build-swift.sh.
 /packages/swift/PublicTransportBinary.xcframework/
-/.build/
-/.swiftpm/
+.build/
+.swiftpm/

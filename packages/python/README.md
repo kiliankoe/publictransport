@@ -22,6 +22,8 @@ with Client(user_agent="my-app/1.0 (+https://example.org)") as client:
     more = client.trips(vvo, stops[0], stops[1], page=found.later)
 ```
 
+The [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/python) have a short program for each kind of request.
+
 `AsyncClient` has the same methods as coroutines. A stop or a place is a `Location` from a search, a departure or a trip, or an ID as text; a place in `trips` can be a `Coordinate` too. A location that another network returned works as well: for a trip always if it has a coordinate, for departures where the asked network can name the stop, which EFA, TRIAS and OJP can for stops with a global ID. Each method also takes a query object (`LocationQuery`, `DeparturesQuery`, `TripsQuery`) in place of the plain values, which is what the Rust library works with.
 
 `BundledNetwork` names the networks that ship with the package. `Registry.bundled()` holds them all, for a list to choose from: `get("vvo-efa")` finds one by its ID as text, and `covering(Coordinate(...))` lists the networks for a position, each with the tier of its coverage there. A `Network` can also be written by hand, as `Network(id=..., name=..., endpoint=..., protocol=Protocol.EFA, timezone="Europe/Berlin")`, and `network_from_json(id, json)` reads further ones from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis).

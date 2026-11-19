@@ -17,13 +17,9 @@ The library ships with networks that were checked against their live servers, na
 
 The core crate does no I/O. It builds HTTP requests and parses HTTP responses, and the caller sends them. This keeps the core usable from other languages and from WebAssembly, where each platform brings its own HTTP stack. The crate documentation of `publictransport` shows the request and parse steps and what the HTTP client has to do.
 
-Rust applications that do not want to bring their own HTTP client use `publictransport-client`, which sends the requests with `reqwest`. Its example plans a trip against a live server:
+Rust applications that do not want to bring their own HTTP client use `publictransport-client`, which sends the requests with `reqwest`. Packages for Python and Swift wrap the same core, each with a client on its platform's HTTP stack, httpx and `URLSession`.
 
-```sh
-cargo run -p publictransport-client --example trip -- vvo-efa "Dresden Hauptbahnhof" "Dresden Albertplatz"
-```
-
-Packages for Python and Swift wrap the same core, each with a client on its platform's HTTP stack, httpx and `URLSession`.
+[examples](examples) has a short program for each kind of request in every language.
 
 ## Install
 
@@ -56,7 +52,7 @@ cargo deny check
 
 The Python package in `packages/python` and the Swift package in `packages/swift` have their own READMEs. The Swift package has its `Package.swift` at the root of this repository, where SwiftPM looks for it. The crate in `bindings/uniffi` builds the library for both, and `scripts/build-swift.sh` generates the Swift code and builds the XCFramework.
 
-The tests replay responses recorded from real servers. `crates/core/tests/fixtures/record.sh` records them again. `cargo run --example check` asks every bundled network's live server for stops, departures and trips, to see which still work. `scripts/validate-xml-requests.sh` checks the TRIAS and OJP requests that the library builds against the official schemas, which it fetches from the VDV repositories.
+The tests replay responses recorded from real servers. `crates/core/tests/fixtures/record.sh` records them again. `just check-networks` asks every bundled network's live server for stops, departures and trips, to see which still work. `scripts/validate-xml-requests.sh` checks the TRIAS and OJP requests that the library builds against the official schemas, which it fetches from the VDV repositories.
 
 Please also see `CONTRIBUTING.md` for further details.
 

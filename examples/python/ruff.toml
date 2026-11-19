@@ -1,0 +1,8 @@
+extend = "../../packages/python/pyproject.toml"
+
+[lint]
+extend-ignore = [
+  # Scripts that print, not a package.
+  "T201",
+  "INP001",
+]

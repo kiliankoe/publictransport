@@ -1,0 +1,33 @@
+[package]
+name = "publictransport-examples"
+description = "Examples for publictransport-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "locations"
+path = "locations.rs"
+
+[[bin]]
+name = "departures"
+path = "departures.rs"
+
+[[bin]]
+name = "trips"
+path = "trips.rs"
+
+[[bin]]
+name = "networks"
+path = "networks.rs"
+
+[dependencies]
+# The crate of this checkout. An application depends on the published one,
+# with `cargo add publictransport-client`.
+publictransport-client = { path = "../../crates/client" }
+tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread"] }

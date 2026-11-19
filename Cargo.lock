@@ -1270,12 +1270,19 @@ dependencies = [
 name = "publictransport-client"
 version = "0.1.0"
 dependencies = [
- "jiff",
  "publictransport",
  "reqwest",
  "thiserror",
  "tokio",
  "wiremock",
+]
+
+[[package]]
+name = "publictransport-examples"
+version = "0.1.0"
+dependencies = [
+ "publictransport-client",
+ "tokio",
 ]
 
 [[package]]

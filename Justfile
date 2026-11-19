@@ -1,6 +1,9 @@
 # The commands of the project. Run them in the development shell
 # (`nix develop` or direnv); `just` alone lists them.
 
+# Stop at the first failing command, also inside a loop.
+set shell := ["bash", "-euc"]
+
 _default:
     @just --list
 
@@ -34,6 +37,28 @@ swift-test:
     env -i PATH=/usr/bin:/bin:/usr/sbin HOME="$HOME" PUBLICTRANSPORT_LOCAL_BINARY=1 swift test
     env -i PATH=/usr/bin:/bin:/usr/sbin HOME="$HOME" swift format lint --strict --recursive \
         packages/swift/Sources/PublicTransport/Client.swift packages/swift/Sources/PublicTransport/Codable.swift packages/swift/Tests
+
+# Run the examples of every language against their live servers
+examples: examples-rust examples-python examples-swift
+
+# Run the Rust examples
+examples-rust:
+    for name in locations departures trips networks; do cargo run --quiet -p publictransport-examples --bin $name; done
+
+# Lint and run the Python examples
+examples-python:
+    cd packages/python && uv sync --quiet --reinstall-package publictransport
+    cd packages/python && ruff check ../../examples/python && ruff format --check ../../examples/python && pyright ../../examples/python
+    for name in locations departures trips networks; do uv run --project packages/python --no-sync python examples/python/$name.py; done
+
+# Lint and run the Swift examples against the library that `swift-library` built
+examples-swift:
+    env -i PATH=/usr/bin:/bin:/usr/sbin HOME="$HOME" swift format lint --strict --recursive \
+        --configuration packages/swift/.swift-format examples/swift
+    for name in locations departures trips networks; do \
+        env -i PATH=/usr/bin:/bin:/usr/sbin HOME="$HOME" PUBLICTRANSPORT_LOCAL_BINARY=1 \
+            swift run --quiet --package-path examples/swift $name; \
+    done
 
 # Ask the live server of every bundled network for stops, departures and trips
 check-networks:
