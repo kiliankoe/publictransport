@@ -31,7 +31,7 @@ let found = try await client.trips(in: network, from: from, to: to, limit: 5)
 let more = try await client.trips(in: network, from: from, to: to, limit: 5, page: found.later)
 ```
 
-The [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/swift) have a short program for each kind of request.
+The [documentation](https://kiliankoe.github.io/publictransport/swift.html) has this guide with a short program for each kind of request, which are also in [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/swift).
 
 `Network.bundled(_:)` gives a network that ships with the package by name. `Registry.bundled()` holds them all, for a list to choose from: `network(id:)` finds one by its ID as text, and `covering(at:)` lists the networks for a position. A `Network` can also be described in code or read from an entry in the format of [transport-apis](https://github.com/public-transport/transport-apis) with `Network(id:json:)`.
 

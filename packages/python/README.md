@@ -23,7 +23,7 @@ with Client(user_agent="my-app/1.0 (+https://example.org)") as client:
     more = client.trips(vvo, stops[0], stops[1], page=found.later)
 ```
 
-The [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/python) have a short program for each kind of request.
+The [documentation](https://kiliankoe.github.io/publictransport/python.html) has this guide with a short program for each kind of request, which are also in [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/python).
 
 `AsyncClient` has the same methods as coroutines. A stop or a place is a `Location` from a search, a departure or a trip, or an ID as text; a place in `trips` can be a `Coordinate` too. A location that another network returned works as well: for a trip always if it has a coordinate, for departures where the asked network can name the stop, which EFA, TRIAS and OJP can for stops with a global ID. Each method also takes a query object (`LocationQuery`, `DeparturesQuery`, `TripsQuery`) in place of the plain values, which is what the Rust library works with.
 

@@ -21,7 +21,7 @@ The core crate does no I/O. It builds HTTP requests and parses HTTP responses, a
 
 Rust applications that do not want to bring their own HTTP client use `publictransport-client`, which sends the requests with `reqwest`. Packages for Python and Swift wrap the same core, each with a client on its platform's HTTP stack, httpx and `URLSession`.
 
-[examples](https://github.com/kiliankoe/publictransport/tree/main/examples) has a short program for each kind of request in every language.
+The [documentation](https://kiliankoe.github.io/publictransport/) has a guide for each language, and [examples](https://github.com/kiliankoe/publictransport/tree/main/examples) has a short program for each kind of request.
 
 ## Install
 

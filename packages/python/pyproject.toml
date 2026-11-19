@@ -13,6 +13,7 @@ requires-python = ">=3.10"
 dependencies = ["httpx>=0.28"]
 
 [project.urls]
+Documentation = "https://kiliankoe.github.io/publictransport/"
 Repository = "https://github.com/kiliankoe/publictransport"
 
 [dependency-groups]
