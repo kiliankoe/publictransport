@@ -26,6 +26,16 @@ updates:
       python:
         patterns: ["*"]
 
+  - package-ecosystem: gradle
+    directory: /packages/kotlin
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build(deps)
+    groups:
+      kotlin:
+        patterns: ["*"]
+
   - package-ecosystem: github-actions
     directory: /
     schedule:

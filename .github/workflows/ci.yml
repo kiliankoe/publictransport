@@ -24,6 +24,7 @@ jobs:
       rust: ${{ steps.filter.outputs.rust }}
       python: ${{ steps.filter.outputs.python }}
       swift: ${{ steps.filter.outputs.swift }}
+      kotlin: ${{ steps.filter.outputs.kotlin }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -62,6 +63,11 @@ jobs:
               - examples/swift/**
               - scripts/build-swift.sh
               - scripts/swift-idioms.py
+            kotlin:
+              - *shared
+              - packages/kotlin/**
+              - examples/kotlin/**
+              - scripts/kotlin-idioms.py
 
   check:
     needs: changes
@@ -163,6 +169,29 @@ jobs:
       - run: swift format lint --strict --recursive packages/swift/Sources/PublicTransport/Client.swift packages/swift/Sources/PublicTransport/Codable.swift packages/swift/Tests
       - run: swift format lint --strict --recursive --configuration packages/swift/.swift-format examples/swift
       - run: swift test -Xlinker -Ltarget/release
+
+  kotlin:
+    needs: changes
+    if: needs.changes.outputs.kotlin == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The network data of transport-apis.
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@v23
+      - uses: Swatinem/rust-cache@v2
+      # The hand-written code; the generated file is under build.
+      - run: nix develop -c ktlint 'packages/kotlin/**/*.kt' 'packages/kotlin/**/*.kts' 'examples/kotlin/**/*.kt' 'examples/kotlin/**/*.kts' '!**/build/**'
+      # Builds the Rust library, generates the model from it, runs the
+      # tests and compiles the examples.
+      - run: nix develop -c gradle --project-dir packages/kotlin build
+      # Last, because they ask live servers, which can fail without a fault
+      # in the code.
+      - run: |
+          for name in locations departures trips networks; do
+            nix develop -c gradle --project-dir packages/kotlin --quiet :examples:$name
+          done
 
   swift-macos:
     needs: changes
