@@ -12,7 +12,11 @@ vvo = BundledNetwork.VVO_EFA.network()
 with Client(user_agent="my-app/1.0 (+https://example.org)") as client:
     stops = client.locations(vvo, "Hauptbahnhof", kinds=[LocationKind.STOP])
     for departure in client.departures(vvo, stops[0], limit=10):
-        print(departure.scheduled_time, departure.line.name, departure.direction)
+        # The time on the clocks at the stop, where its time zone is known.
+        time = departure.stop.local_time(departure.scheduled_time)
+        print(
+            f"{time:%H:%M}" if time else "?", departure.line.name, departure.direction
+        )
 
     found = client.trips(vvo, stops[0], stops[1])
     more = client.trips(vvo, stops[0], stops[1], page=found.later)
@@ -22,7 +26,7 @@ with Client(user_agent="my-app/1.0 (+https://example.org)") as client:
 
 `BundledNetwork` names the networks that ship with the package. `Registry.bundled()` holds them all, for a list to choose from: `get("vvo-efa")` finds one by its ID as text, and `covering(Coordinate(...))` lists the networks for a position, each with the tier of its coverage there. A `Network` can also be written by hand, as `Network(id=..., name=..., endpoint=..., protocol=Protocol.EFA, timezone="Europe/Berlin")`, and `network_from_json(id, json)` reads further ones from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis).
 
-Times are timezone-aware `datetime` objects in UTC, and `Location.timezone` names the zone to show them in. A time in a query has to be timezone-aware too, in any zone. An EFA network needs its `timezone` to send a query time. A TRIAS or OJP network needs a `requestor_ref`, which public servers document, e.g. `OpenService`. A HAFAS network needs `hafas=HafasOptions(...)` and its `timezone`; the bundled ones have both. Entur asks every client for its name in the header `ET-Client-Name` (`company-application`) and limits clients without it, so add it to the bundled network: `entur.headers.append(Header(name="ET-Client-Name", value="mycompany-myapp"))`. A network of that protocol searches for locations on the geocoder named in `geocoder=`, and its answer to `trips` can be empty at night and still have a `later` reference to follow. A server that wants a key in an HTTP header gets it through `Network(headers=[Header(...)])`.
+Times are timezone-aware `datetime` objects in UTC. `Location.local_time(time)` gives one as the clocks at that location show it, with the UTC offset that holds there at that time, or `None` where no time zone is known for it. It is for showing a time; calculate with the UTC values. A time in a query has to be timezone-aware too, in any zone. An EFA network needs its `timezone` to send a query time. A TRIAS or OJP network needs a `requestor_ref`, which public servers document, e.g. `OpenService`. A HAFAS network needs `hafas=HafasOptions(...)` and its `timezone`; the bundled ones have both. Entur asks every client for its name in the header `ET-Client-Name` (`company-application`) and limits clients without it, so add it to the bundled network: `entur.headers.append(Header(name="ET-Client-Name", value="mycompany-myapp"))`. A network of that protocol searches for locations on the geocoder named in `geocoder=`, and its answer to `trips` can be empty at night and still have a `later` reference to follow. A server that wants a key in an HTTP header gets it through `Network(headers=[Header(...)])`.
 
 `trips` returns a `Trips` record: the list is in `trips`, and `earlier` and `later` are references for more. Pass one as `page` with the same other arguments to continue the search.
 

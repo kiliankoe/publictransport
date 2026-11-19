@@ -41,6 +41,12 @@ fn location() -> Location {
     locations.remove(0)
 }
 
+fn location_in(timezone: Option<&str>) -> Location {
+    let mut location = location();
+    location.timezone = timezone.map(str::to_owned);
+    location
+}
+
 prop_compose! {
     /// Stops and other places of the asked network, of another one and of
     /// none, with and without a global ID and a coordinate.
@@ -114,6 +120,87 @@ proptest! {
             None => prop_assert!(matches!(asked, Err(Error::InvalidQuery { .. })), "{asked:?}"),
         }
     }
+}
+
+#[test]
+fn local_time_is_what_the_clocks_of_the_zone_show() {
+    // (zone, instant, date and time there, seconds ahead of UTC)
+    let cases = [
+        // The last second of winter time and the first of summer time.
+        (
+            "Europe/Berlin",
+            1_774_745_999,
+            (2026, 3, 29, 1, 59, 59),
+            3600,
+        ),
+        ("Europe/Berlin", 1_774_746_000, (2026, 3, 29, 3, 0, 0), 7200),
+        // West of UTC, on the day and in the year before.
+        (
+            "America/New_York",
+            1_767_236_400,
+            (2025, 12, 31, 22, 0, 0),
+            -18_000,
+        ),
+        // Not a whole hour ahead.
+        (
+            "Asia/Kolkata",
+            TIME.unix_seconds,
+            (2026, 11, 16, 18, 54, 0),
+            19_800,
+        ),
+    ];
+    for (zone, unix_seconds, clock, offset) in cases {
+        let local = location_in(Some(zone)).local_time(Timestamp { unix_seconds });
+        let shown = local.map(|local| {
+            (
+                (
+                    local.year,
+                    local.month,
+                    local.day,
+                    local.hour,
+                    local.minute,
+                    local.second,
+                ),
+                local.utc_offset_seconds,
+            )
+        });
+        assert_eq!(shown, Some((clock, offset)), "{zone} at {unix_seconds}");
+    }
+}
+
+#[test]
+fn local_time_prints_as_the_time_of_day() {
+    // 2026-03-29T03:00:00+02:00.
+    let local = location_in(Some("Europe/Berlin")).local_time(Timestamp {
+        unix_seconds: 1_774_746_000,
+    });
+    assert_eq!(
+        local.map(|local| local.to_string()).as_deref(),
+        Some("03:00")
+    );
+}
+
+#[test]
+fn local_time_is_none_without_a_known_time_zone() {
+    // `Etc/Unknown` is a name of the time zone database for "not known".
+    for timezone in [
+        None,
+        Some(""),
+        Some("Europe/Dresden"),
+        Some("+01:00"),
+        Some("Etc/Unknown"),
+    ] {
+        assert_eq!(location_in(timezone).local_time(TIME), None, "{timezone:?}");
+    }
+}
+
+#[test]
+fn local_time_before_the_year_1_is_none() {
+    // 0001-01-01T00:00:00Z, which is still the year before in New York.
+    let time = Timestamp {
+        unix_seconds: -62_135_596_800,
+    };
+    assert_eq!(location_in(Some("America/New_York")).local_time(time), None);
 }
 
 #[test]

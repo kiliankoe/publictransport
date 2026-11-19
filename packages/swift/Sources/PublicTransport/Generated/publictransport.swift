@@ -2346,7 +2346,8 @@ public struct Location: Equatable, Hashable, Codable {
     public var coordinate: Coordinate?
     /**
      * The IANA name of the time zone the location is in, e.g.
-     * `Europe/Berlin`, for showing times there. MOTIS sends it, and
+     * `Europe/Berlin`, for showing times there, as
+     * ``Location/timeZone`` does. MOTIS sends it, and
      * `OpenTripPlanner` for stops in departures and trips; otherwise it is
      * ``Network/timeZoneIdentifier``.
      */
@@ -2386,7 +2387,8 @@ public struct Location: Equatable, Hashable, Codable {
          */coordinate: Coordinate?, 
         /**
          * The IANA name of the time zone the location is in, e.g.
-         * `Europe/Berlin`, for showing times there. MOTIS sends it, and
+         * `Europe/Berlin`, for showing times there, as
+         * ``Location/timeZone`` does. MOTIS sends it, and
          * `OpenTripPlanner` for stops in departures and trips; otherwise it is
          * ``Network/timeZoneIdentifier``.
          */timeZoneIdentifier: String?, 
@@ -2408,6 +2410,23 @@ public struct Location: Equatable, Hashable, Codable {
         self.network = network
     }
 
+    
+    /**
+     * The time on the clocks at this location, with the offset from UTC
+     * that holds there at that time. `nil` if the location has no time
+     * zone or one that is not a known IANA name, so that no time is shown
+     * in a zone the stop is not in. A network written by hand gives its
+     * locations a time zone through its `timezone`.
+     */
+func localTime(time: UtcTime) -> LocalTime?  {
+    return try!  FfiConverterOptionTypeLocalTime.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_location_local_time(
+            FfiConverterTypeLocation_lower(self),
+        FfiConverterTypeUtcTime_lower(time),uniffiCallStatus
+    )
+})
+}
     
     /**
      * Whether the two locations are the same station or parts of it, by
@@ -5576,6 +5595,30 @@ fileprivate struct FfiConverterOptionTypeTripTime: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeLocalTime: FfiConverterRustBuffer {
+    typealias SwiftType = LocalTime?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeLocalTime.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeLocalTime.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeUtcTime: FfiConverterRustBuffer {
     typealias SwiftType = UtcTime?
 
@@ -6021,6 +6064,46 @@ fileprivate struct FfiConverterSequenceSequenceTypeCoordinate: FfiConverterRustB
         return seq
     }
 }
+
+
+typealias LocalTime = String
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+struct FfiConverterTypeLocalTime: FfiConverter {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LocalTime {
+        return try FfiConverterString.read(from: &buf)
+    }
+
+    public static func write(_ value: LocalTime, into buf: inout [UInt8]) {
+        return FfiConverterString.write(value, into: &buf)
+    }
+
+    public static func lift(_ value: RustBuffer) throws -> LocalTime {
+        return try FfiConverterString.lift(value)
+    }
+
+    public static func lower(_ value: LocalTime) -> RustBuffer {
+        return FfiConverterString.lower(value)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+func FfiConverterTypeLocalTime_lift(_ value: RustBuffer) throws -> LocalTime {
+    return try FfiConverterTypeLocalTime.lift(value)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+func FfiConverterTypeLocalTime_lower(_ value: LocalTime) -> RustBuffer {
+    return FfiConverterTypeLocalTime.lower(value)
+}
+
 
 
 public typealias UtcTime = Date

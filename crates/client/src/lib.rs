@@ -24,7 +24,10 @@
 //! println!("{} locations, {} of them stops", everything.len(), stops.len());
 //! if let [from, to, ..] = stops.as_slice() {
 //!     for departure in client.departures(&vvo, from).await? {
-//!         println!("{} to {:?}", departure.line.name, departure.direction);
+//!         // The time on the clocks at the stop, where its time zone is known.
+//!         if let Some(time) = departure.stop.local_time(departure.scheduled_time) {
+//!             println!("{time} {} to {:?}", departure.line.name, departure.direction);
+//!         }
 //!     }
 //!     let board = client.departures(&vvo, DeparturesQuery::new(from).with_limit(5)).await?;
 //!     let found = client.trips(&vvo, TripsQuery::new(from, to)).await?;

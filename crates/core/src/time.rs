@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Deserializer};
 
-use crate::{Error, Network, Timestamp};
+use crate::{Error, LocalTime, Location, Network, Timestamp};
 
 /// The times every protocol can write down and every language can hold, in
 /// Unix seconds.
@@ -34,6 +34,37 @@ impl Timestamp {
             .ok_or_else(|| Error::InvalidQuery {
                 message: "the time is outside the years 1 to 9999".to_owned(),
             })
+    }
+}
+
+impl Location {
+    /// `time` on the clocks at this location. `None` if the location has
+    /// no [`Location::timezone`] or one that is not a known IANA name, so
+    /// that no time is shown in a zone the stop is not in, and for a time
+    /// outside the years 1 to 9999.
+    ///
+    /// Locations of the bundled networks have a time zone. A network
+    /// written by hand gives its locations one through
+    /// [`Network::timezone`], unless its server names one per stop.
+    #[must_use]
+    pub fn local_time(&self, time: Timestamp) -> Option<LocalTime> {
+        let zone = jiff::tz::TimeZone::get(self.timezone.as_deref()?).ok()?;
+        // The database has names for "not known", which act as UTC.
+        if zone.is_unknown() {
+            return None;
+        }
+        let local = time.to_jiff().ok()?.to_zoned_datetime(zone);
+        // Other languages cannot hold the year before the year 1.
+        let year = u16::try_from(local.year()).ok().filter(|year| *year >= 1)?;
+        Some(LocalTime {
+            year,
+            month: u8::try_from(local.month()).ok()?,
+            day: u8::try_from(local.day()).ok()?,
+            hour: u8::try_from(local.hour()).ok()?,
+            minute: u8::try_from(local.minute()).ok()?,
+            second: u8::try_from(local.second()).ok()?,
+            utc_offset_seconds: local.offset().seconds(),
+        })
     }
 }
 

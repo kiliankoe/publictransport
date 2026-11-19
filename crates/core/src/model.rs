@@ -99,7 +99,8 @@ pub struct Location {
     /// The position.
     pub coordinate: Option<Coordinate>,
     /// The IANA name of the time zone the location is in, e.g.
-    /// `Europe/Berlin`, for showing times there. MOTIS sends it, and
+    /// `Europe/Berlin`, for showing times there, as
+    /// [`Location::local_time`] does. MOTIS sends it, and
     /// `OpenTripPlanner` for stops in departures and trips; otherwise it is
     /// [`Network::timezone`](crate::Network::timezone).
     pub timezone: Option<String>,
@@ -221,11 +222,40 @@ pub struct Coordinate {
     pub longitude: f64,
 }
 
-/// An instant in UTC. Showing it as a local time is up to the application.
+/// An instant in UTC. [`Location::local_time`] gives it as the clocks at a
+/// stop show it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Timestamp {
     /// Seconds since 1970-01-01T00:00:00Z.
     pub unix_seconds: i64,
+}
+
+/// A time on the clocks at a place, from [`Location::local_time`]. It
+/// prints as the time of day, such as `14:08`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct LocalTime {
+    /// The year.
+    pub year: u16,
+    /// The month, 1 to 12.
+    pub month: u8,
+    /// The day of the month, 1 to 31.
+    pub day: u8,
+    /// The hour, 0 to 23.
+    pub hour: u8,
+    /// The minute.
+    pub minute: u8,
+    /// The second.
+    pub second: u8,
+    /// What the clocks there are ahead of UTC, in seconds. Negative to the
+    /// west.
+    pub utc_offset_seconds: i32,
+}
+
+impl std::fmt::Display for LocalTime {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{:02}:{:02}", self.hour, self.minute)
+    }
 }
 
 /// A request for the next departures at a stop.

@@ -31,18 +31,21 @@ MOTIS = Network(
 )
 
 
-def leg_end(time: datetime) -> LegEnd:
-    stop = Location(
+def stop(timezone: str | None = None) -> Location:
+    return Location(
         id="a",
         global_ids=[GlobalId(scheme=IdScheme.IFOPT, value="de:14612:28:3:2")],
         kind=LocationKind.STOP,
         name="A",
         locality=None,
         coordinate=None,
-        timezone=None,
+        timezone=timezone,
     )
+
+
+def leg_end(time: datetime) -> LegEnd:
     return LegEnd(
-        stop=stop,
+        stop=stop(),
         scheduled_time=time,
         realtime_time=None,
         scheduled_platform=None,
@@ -73,6 +76,37 @@ def test_time_crosses_the_boundary_as_an_aware_utc_datetime(
 
     assert result == (expected or time)
     assert result.utcoffset() == timedelta(0)
+
+
+@pytest.mark.parametrize(
+    ("zone", "time", "on_the_clock"),
+    [
+        # Asked with a time of another zone, shown on the day after.
+        (
+            "Europe/Berlin",
+            datetime(2026, 7, 1, 18, 30, tzinfo=timezone(timedelta(hours=-4))),
+            "2026-07-02T00:30:00+02:00",
+        ),
+        # Behind UTC by less than an hour, with seconds.
+        (
+            "Africa/Monrovia",
+            datetime(1960, 1, 1, tzinfo=timezone.utc),
+            "1959-12-31T23:15:30-00:44:30",
+        ),
+    ],
+)
+def test_local_time_is_the_same_instant_on_the_clocks_of_the_location(
+    zone: str, time: datetime, on_the_clock: str
+) -> None:
+    result = stop(zone).local_time(time)
+
+    assert result is not None
+    assert result == time
+    assert result.isoformat() == on_the_clock
+
+
+def test_local_time_is_none_without_a_time_zone() -> None:
+    assert stop().local_time(datetime.now(timezone.utc)) is None
 
 
 def test_query_time_reaches_the_request() -> None:

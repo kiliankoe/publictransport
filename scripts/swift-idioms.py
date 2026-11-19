@@ -43,6 +43,8 @@ MEMBERS = {
     "Coverage/tierAt": "Coverage/tier(at:)",
     "Location/sameStation": "Location/isSameStation(with:)",
     "Location/timezone": "Location/timeZoneIdentifier",
+    # Internal in Swift, see `hide_helpers`.
+    "Location/localTime": "Location/timeZone",
     "Network/timezone": "Network/timeZoneIdentifier",
     "Network/fromJson": "Network/init(id:json:)",
 }
@@ -219,6 +221,10 @@ def hide_helpers(code: Code) -> None:
     code.replace("handle clone", r"^    public func uniffiCloneHandle\(", "    func uniffiCloneHandle(", 1)
     # Nothing takes the protocol of the registry, and nobody can adopt it.
     code.replace("registry protocol", r"^public protocol RegistryProtocol\b", "protocol RegistryProtocol", 1)
+    # Swift shows a `Date` in the `TimeZone` of a location, see
+    # `Location.timeZone`, and has no use for the local time as text.
+    code.replace("local time", r"^public func localTime\(", "func localTime(", 1)
+    code.replace("local time type", r"^public typealias LocalTime\b", "typealias LocalTime", 1)
     declared = r"^(?:public|open) (?:final )?(?:struct|enum|class|protocol|func|typealias) (\w+)"
     for name in re.findall(declared, code.text, flags=re.MULTILINE):
         if re.search(r"Ffi|[Uu]niffi|Protocol$", name) and name not in RENAMED.values():

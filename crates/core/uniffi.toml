@@ -1,5 +1,12 @@
 # Settings for the bindings that UniFFI generates from this crate.
 
+# A local time is a `datetime` with the offset of its place.
+[bindings.python.custom_types.LocalTime]
+type_name = "datetime.datetime"
+imports = ["datetime"]
+lift = "datetime.datetime.fromisoformat({})"
+lower = "{}.isoformat()"
+
 [bindings.swift.rename]
 # `Error` is the name of Swift's own protocol for errors.
 Error = "PublicTransportError"

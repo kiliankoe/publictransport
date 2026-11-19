@@ -49,6 +49,10 @@ from publictransport._uniffi import (
     network_from_json,
 )
 
+# Names of `datetime` in the signatures, which the generated package does
+# not export.
+from publictransport._uniffi.publictransport import LocalTime, UtcTime
+
 __all__ = [
     "Area",
     "AsyncClient",
@@ -74,6 +78,7 @@ __all__ = [
     "LegEnd",
     "LegKind",
     "Line",
+    "LocalTime",
     "Location",
     "LocationKind",
     "LocationQuery",
@@ -91,5 +96,6 @@ __all__ = [
     "TripTime",
     "Trips",
     "TripsQuery",
+    "UtcTime",
     "network_from_json",
 ]

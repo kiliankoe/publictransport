@@ -74,8 +74,8 @@ pub use hafas::{HafasOptions, HafasProduct};
 pub use http::{Header, HttpRequest, HttpResponse, Method};
 pub use model::{
     Coordinate, Departure, DeparturesQuery, GlobalId, IdScheme, Leg, LegEnd, LegKind, Line,
-    Location, LocationKind, LocationQuery, Mode, Place, Stopover, Timestamp, Trip, TripTime, Trips,
-    TripsQuery,
+    LocalTime, Location, LocationKind, LocationQuery, Mode, Place, Stopover, Timestamp, Trip,
+    TripTime, Trips, TripsQuery,
 };
 pub use network::{Network, Protocol};
 pub use registry::{

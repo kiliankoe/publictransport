@@ -3,7 +3,9 @@
 
 use std::time::{Duration, SystemTime};
 
-use crate::{BundledNetwork, Error, GlobalId, LegEnd, Location, Network, Timestamp, Trip};
+use crate::{
+    BundledNetwork, Error, GlobalId, LegEnd, LocalTime, Location, Network, Timestamp, Trip,
+};
 
 /// The name of [`Timestamp`] in the bindings. The Python generator of `UniFFI` uses
 /// the name `Timestamp` itself, and type checkers lose the type of every
@@ -35,6 +37,35 @@ uniffi::custom_type!(UtcTime, SystemTime, {
             }
         };
         Ok(Timestamp { unix_seconds: seconds })
+    },
+});
+
+// A local time crosses the boundary as text in ISO 8601 format, such as
+// `2026-11-19T14:08:00+01:00`, which uniffi.toml turns into the type a
+// language has for a time with an offset.
+uniffi::custom_type!(LocalTime, String, {
+    lower: |time| {
+        let offset = time.utc_offset_seconds.unsigned_abs();
+        // Zones had offsets with seconds before they agreed on whole minutes.
+        let seconds = match offset % 60 {
+            0 => String::new(),
+            seconds => format!(":{seconds:02}"),
+        };
+        format!(
+            "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}{}{:02}:{:02}{seconds}",
+            time.year,
+            time.month,
+            time.day,
+            time.hour,
+            time.minute,
+            time.second,
+            if time.utc_offset_seconds < 0 { '-' } else { '+' },
+            offset / 3600,
+            offset / 60 % 60,
+        )
+    },
+    try_lift: |_text| {
+        uniffi::deps::anyhow::bail!("nothing takes a local time")
     },
 });
 
@@ -79,6 +110,16 @@ impl Location {
     #[uniffi::method(name = "same_station")]
     fn ffi_same_station(&self, other: &Self) -> bool {
         self.same_station(other)
+    }
+
+    /// The time on the clocks at this location, with the offset from UTC
+    /// that holds there at that time. `None` if the location has no time
+    /// zone or one that is not a known IANA name, so that no time is shown
+    /// in a zone the stop is not in. A network written by hand gives its
+    /// locations a time zone through its `timezone`.
+    #[uniffi::method(name = "local_time")]
+    fn ffi_local_time(&self, time: UtcTime) -> Option<LocalTime> {
+        self.local_time(time)
     }
 }
 
