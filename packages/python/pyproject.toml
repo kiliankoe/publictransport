@@ -8,6 +8,7 @@ version = "0.0.0"
 description = "Client for public transport APIs: EFA, MOTIS, TRIAS, OJP, HAFAS and OpenTripPlanner"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
+license-files = ["LICENSE-*", "NOTICE"]
 requires-python = ">=3.10"
 dependencies = ["httpx>=0.28"]
 
