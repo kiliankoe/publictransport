@@ -52,21 +52,21 @@ BREAKING CHANGE: the fields from and to of TripsQuery are now origin
 and destination.
 ```
 
+## Pull requests
+
+A squash turns the title and the description of a pull request into the commit message, so the title follows the format above. CI checks it, and it checks that a pull request that breaks the Rust API has a `!` in its title and in one of its commits.
+
 ## Changelog
 
-`CHANGELOG.md` is generated from the commit messages with [git-cliff](https://git-cliff.org), configured in `cliff.toml`, and then edited by hand before a release. It lists breaking changes, features, fixes and performance changes; the other types are left out. `git cliff --unreleased` shows what the next release would contain.
-
-The file does not exist before the first release.
+`CHANGELOG.md` is generated from the commit messages with [git-cliff](https://git-cliff.org) and edited by hand before a release. `git cliff --unreleased` shows what the next release would contain.
 
 ## Releases
 
 The crates, the Python package and the Swift package share one version.
 
-1. `just release 0.2.0` writes the version into the manifests and READMEs and the new section into `CHANGELOG.md`. Edit the section, commit the result as `chore: release 0.2.0` and push to `main`.
-2. Start the workflow "Release" on `main` with "Publish". It builds the XCFramework, the wheels and the crates and tests them. Then it commits the address and checksum of the XCFramework to `Package.swift`, tags that commit `v0.2.0`, creates the GitHub release with the XCFramework, and publishes to crates.io and PyPI.
+1. `just release` sets the next version, which follows from the commits, and writes the new section into `CHANGELOG.md`. `just release 0.2.0` sets another version. Edit the section, commit the result as `chore: release 0.2.0` and push to `main`.
+2. Start the workflow "Release" on `main` with "Publish". It builds and tests everything, tags the release, and publishes to crates.io, PyPI, GitHub releases and the documentation site.
 
-Without "Publish" the workflow stops after the builds and tests, on any branch. Use that to try a change to the workflow.
+Without "Publish" the workflow only builds and tests, on any branch.
 
-The workflow makes the tag, not the person who releases: the Swift package names the checksum of its binary in `Package.swift`, so the tagged commit can only exist once the binary is built.
-
-crates.io and PyPI trust the workflow `release.yml` in its environment `release`, so no token is stored. If a job fails after the tag exists, run the failed jobs of that run again: each skips what is already published. A new run cannot finish the release, because it would build a binary with another checksum.
+If a job fails after the tag exists, run the failed jobs of that run again: each skips what is already published. A new run cannot finish the release.
