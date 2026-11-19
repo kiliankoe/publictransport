@@ -393,6 +393,16 @@ fn failure_status_wins_over_a_valid_body() {
         assert!(matches!(status(404), Error::Server { status: 404, .. }));
         assert_eq!(status(302), Error::Moved { location: None });
     }
+    // An application may show the message as it is.
+    let moved = |location: Option<&str>| {
+        let location = location.map(str::to_owned);
+        Error::Moved { location }.to_string()
+    };
+    assert_eq!(moved(None), "the endpoint has moved");
+    assert_eq!(
+        moved(Some("https://new.example")),
+        "the endpoint has moved to https://new.example"
+    );
 }
 
 #[test]

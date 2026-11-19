@@ -36,7 +36,10 @@ pub enum Error {
         message: String,
     },
     /// The server redirected the request, so the endpoint has moved.
-    #[error("the endpoint has moved (new location: {location:?})")]
+    #[error(
+        "the endpoint has moved{}",
+        .location.as_ref().map_or_default(|location| format!(" to {location}"))
+    )]
     Moved {
         /// The value of the `Location` header.
         location: Option<String>,
