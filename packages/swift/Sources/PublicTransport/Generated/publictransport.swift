@@ -648,7 +648,7 @@ fileprivate struct FfiConverterTimestamp: FfiConverterRustBuffer {
 /**
  * A set of networks to choose from.
  */
-public protocol RegistryProtocol: AnyObject, Sendable {
+protocol RegistryProtocol: AnyObject, Sendable {
     
     /**
      * The networks with a coverage polygon that contains the position,
@@ -672,15 +672,15 @@ public protocol RegistryProtocol: AnyObject, Sendable {
 /**
  * A set of networks to choose from.
  */
-open class Registry: RegistryProtocol, @unchecked Sendable {
+public final class Registry: RegistryProtocol, @unchecked Sendable {
     fileprivate let handle: UInt64
 
     /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
 #if swift(>=5.8)
     @_documentation(visibility: private)
 #endif
-    public struct NoHandle {
-        public init() {}
+    struct NoHandle {
+        init() {}
     }
 
     // TODO: We'd like this to be `private` but for Swifty reasons,
@@ -689,7 +689,7 @@ open class Registry: RegistryProtocol, @unchecked Sendable {
 #if swift(>=5.8)
     @_documentation(visibility: private)
 #endif
-    required public init(unsafeFromHandle handle: UInt64) {
+    required init(unsafeFromHandle handle: UInt64) {
         self.handle = handle
     }
 
@@ -701,14 +701,14 @@ open class Registry: RegistryProtocol, @unchecked Sendable {
 #if swift(>=5.8)
     @_documentation(visibility: private)
 #endif
-    public init(noHandle: NoHandle) {
+    init(noHandle: NoHandle) {
         self.handle = 0
     }
 
 #if swift(>=5.8)
     @_documentation(visibility: private)
 #endif
-    public func uniffiCloneHandle() -> UInt64 {
+    func uniffiCloneHandle() -> UInt64 {
         return try! rustCall { uniffi_publictransport_fn_clone_registry(self.handle, $0) }
     }
     /**
@@ -757,7 +757,7 @@ public static func bundled() -> Registry  {
      * the order of the registry within a tier. Coverage that an entry
      * gives only as region codes is not found.
      */
-open func covering(at: Coordinate) -> [CoveringNetwork]  {
+public func covering(at: Coordinate) -> [CoveringNetwork]  {
     return try!  FfiConverterSequenceTypeCoveringNetwork.lift(try! rustCall() {
         uniffiCallStatus in
     uniffi_publictransport_fn_method_registry_covering(
@@ -770,7 +770,7 @@ open func covering(at: Coordinate) -> [CoveringNetwork]  {
     /**
      * The network with the given ID.
      */
-open func network(id: String) -> Network?  {
+public func network(id: String) -> Network?  {
     return try!  FfiConverterOptionTypeNetwork.lift(try! rustCall() {
         uniffiCallStatus in
     uniffi_publictransport_fn_method_registry_get(
@@ -783,7 +783,7 @@ open func network(id: String) -> Network?  {
     /**
      * All networks, in the order they were given.
      */
-open func networks() -> [Network]  {
+public func networks() -> [Network]  {
     return try!  FfiConverterSequenceTypeNetwork.lift(try! rustCall() {
         uniffiCallStatus in
     uniffi_publictransport_fn_method_registry_networks(
@@ -800,7 +800,7 @@ open func networks() -> [Network]  {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeRegistry: FfiConverter {
+struct FfiConverterTypeRegistry: FfiConverter {
     typealias FfiType = UInt64
     typealias SwiftType = Registry
 
@@ -826,14 +826,14 @@ public struct FfiConverterTypeRegistry: FfiConverter {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeRegistry_lift(_ handle: UInt64) throws -> Registry {
+func FfiConverterTypeRegistry_lift(_ handle: UInt64) throws -> Registry {
     return try FfiConverterTypeRegistry.lift(handle)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeRegistry_lower(_ value: Registry) -> UInt64 {
+func FfiConverterTypeRegistry_lower(_ value: Registry) -> UInt64 {
     return FfiConverterTypeRegistry.lower(value)
 }
 
@@ -877,7 +877,7 @@ extension Area: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeArea: FfiConverterRustBuffer {
+struct FfiConverterTypeArea: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Area {
         return
             try Area(
@@ -896,14 +896,14 @@ public struct FfiConverterTypeArea: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeArea_lift(_ buf: RustBuffer) throws -> Area {
+func FfiConverterTypeArea_lift(_ buf: RustBuffer) throws -> Area {
     return try FfiConverterTypeArea.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeArea_lower(_ value: Area) -> RustBuffer {
+func FfiConverterTypeArea_lower(_ value: Area) -> RustBuffer {
     return FfiConverterTypeArea.lower(value)
 }
 
@@ -953,7 +953,7 @@ extension Attribution: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeAttribution: FfiConverterRustBuffer {
+struct FfiConverterTypeAttribution: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Attribution {
         return
             try Attribution(
@@ -974,14 +974,14 @@ public struct FfiConverterTypeAttribution: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeAttribution_lift(_ buf: RustBuffer) throws -> Attribution {
+func FfiConverterTypeAttribution_lift(_ buf: RustBuffer) throws -> Attribution {
     return try FfiConverterTypeAttribution.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeAttribution_lower(_ value: Attribution) -> RustBuffer {
+func FfiConverterTypeAttribution_lower(_ value: Attribution) -> RustBuffer {
     return FfiConverterTypeAttribution.lower(value)
 }
 
@@ -989,7 +989,7 @@ public func FfiConverterTypeAttribution_lower(_ value: Attribution) -> RustBuffe
 /**
  * A WGS 84 position in degrees.
  */
-public struct Coordinate: Equatable, Hashable {
+public struct Coordinate: Equatable, Hashable, Codable {
     /**
      * Latitude, positive to the north.
      */
@@ -1023,7 +1023,7 @@ extension Coordinate: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeCoordinate: FfiConverterRustBuffer {
+struct FfiConverterTypeCoordinate: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Coordinate {
         return
             try Coordinate(
@@ -1042,14 +1042,14 @@ public struct FfiConverterTypeCoordinate: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeCoordinate_lift(_ buf: RustBuffer) throws -> Coordinate {
+func FfiConverterTypeCoordinate_lift(_ buf: RustBuffer) throws -> Coordinate {
     return try FfiConverterTypeCoordinate.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeCoordinate_lower(_ value: Coordinate) -> RustBuffer {
+func FfiConverterTypeCoordinate_lower(_ value: Coordinate) -> RustBuffer {
     return FfiConverterTypeCoordinate.lower(value)
 }
 
@@ -1113,7 +1113,7 @@ extension Coverage: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeCoverage: FfiConverterRustBuffer {
+struct FfiConverterTypeCoverage: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Coverage {
         return
             try Coverage(
@@ -1134,14 +1134,14 @@ public struct FfiConverterTypeCoverage: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeCoverage_lift(_ buf: RustBuffer) throws -> Coverage {
+func FfiConverterTypeCoverage_lift(_ buf: RustBuffer) throws -> Coverage {
     return try FfiConverterTypeCoverage.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeCoverage_lower(_ value: Coverage) -> RustBuffer {
+func FfiConverterTypeCoverage_lower(_ value: Coverage) -> RustBuffer {
     return FfiConverterTypeCoverage.lower(value)
 }
 
@@ -1183,7 +1183,7 @@ extension CoveringNetwork: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeCoveringNetwork: FfiConverterRustBuffer {
+struct FfiConverterTypeCoveringNetwork: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CoveringNetwork {
         return
             try CoveringNetwork(
@@ -1202,14 +1202,14 @@ public struct FfiConverterTypeCoveringNetwork: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeCoveringNetwork_lift(_ buf: RustBuffer) throws -> CoveringNetwork {
+func FfiConverterTypeCoveringNetwork_lift(_ buf: RustBuffer) throws -> CoveringNetwork {
     return try FfiConverterTypeCoveringNetwork.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeCoveringNetwork_lower(_ value: CoveringNetwork) -> RustBuffer {
+func FfiConverterTypeCoveringNetwork_lower(_ value: CoveringNetwork) -> RustBuffer {
     return FfiConverterTypeCoveringNetwork.lower(value)
 }
 
@@ -1217,7 +1217,7 @@ public func FfiConverterTypeCoveringNetwork_lower(_ value: CoveringNetwork) -> R
 /**
  * One vehicle leaving a stop.
  */
-public struct Departure: Equatable, Hashable {
+public struct Departure: Equatable, Hashable, Codable {
     /**
      * Where the vehicle leaves from. Servers name the platform here where
      * they have one in their data and the station otherwise, so compare
@@ -1322,7 +1322,7 @@ extension Departure: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeDeparture: FfiConverterRustBuffer {
+struct FfiConverterTypeDeparture: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Departure {
         return
             try Departure(
@@ -1353,14 +1353,14 @@ public struct FfiConverterTypeDeparture: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeDeparture_lift(_ buf: RustBuffer) throws -> Departure {
+func FfiConverterTypeDeparture_lift(_ buf: RustBuffer) throws -> Departure {
     return try FfiConverterTypeDeparture.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeDeparture_lower(_ value: Departure) -> RustBuffer {
+func FfiConverterTypeDeparture_lower(_ value: Departure) -> RustBuffer {
     return FfiConverterTypeDeparture.lower(value)
 }
 
@@ -1368,7 +1368,7 @@ public func FfiConverterTypeDeparture_lower(_ value: Departure) -> RustBuffer {
 /**
  * A request for the next departures at a stop.
  */
-public struct DeparturesQuery: Equatable, Hashable {
+public struct DeparturesQuery: Equatable, Hashable, Codable {
     /**
      * The stop: its ``Location/id`` on the network that is asked, or a
      * location of any network. A position is not a stop.
@@ -1414,7 +1414,7 @@ extension DeparturesQuery: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeDeparturesQuery: FfiConverterRustBuffer {
+struct FfiConverterTypeDeparturesQuery: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DeparturesQuery {
         return
             try DeparturesQuery(
@@ -1435,14 +1435,14 @@ public struct FfiConverterTypeDeparturesQuery: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeDeparturesQuery_lift(_ buf: RustBuffer) throws -> DeparturesQuery {
+func FfiConverterTypeDeparturesQuery_lift(_ buf: RustBuffer) throws -> DeparturesQuery {
     return try FfiConverterTypeDeparturesQuery.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeDeparturesQuery_lower(_ value: DeparturesQuery) -> RustBuffer {
+func FfiConverterTypeDeparturesQuery_lower(_ value: DeparturesQuery) -> RustBuffer {
     return FfiConverterTypeDeparturesQuery.lower(value)
 }
 
@@ -1450,7 +1450,7 @@ public func FfiConverterTypeDeparturesQuery_lower(_ value: DeparturesQuery) -> R
 /**
  * An identifier of a stop that is shared across networks.
  */
-public struct GlobalId: Equatable, Hashable {
+public struct GlobalId: Equatable, Hashable, Codable {
     /**
      * The scheme that gives the value its meaning.
      */
@@ -1484,7 +1484,7 @@ extension GlobalId: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeGlobalId: FfiConverterRustBuffer {
+struct FfiConverterTypeGlobalId: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> GlobalId {
         return
             try GlobalId(
@@ -1503,14 +1503,14 @@ public struct FfiConverterTypeGlobalId: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeGlobalId_lift(_ buf: RustBuffer) throws -> GlobalId {
+func FfiConverterTypeGlobalId_lift(_ buf: RustBuffer) throws -> GlobalId {
     return try FfiConverterTypeGlobalId.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeGlobalId_lower(_ value: GlobalId) -> RustBuffer {
+func FfiConverterTypeGlobalId_lower(_ value: GlobalId) -> RustBuffer {
     return FfiConverterTypeGlobalId.lower(value)
 }
 
@@ -1613,7 +1613,7 @@ extension HafasOptions: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeHafasOptions: FfiConverterRustBuffer {
+struct FfiConverterTypeHafasOptions: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> HafasOptions {
         return
             try HafasOptions(
@@ -1640,14 +1640,14 @@ public struct FfiConverterTypeHafasOptions: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeHafasOptions_lift(_ buf: RustBuffer) throws -> HafasOptions {
+func FfiConverterTypeHafasOptions_lift(_ buf: RustBuffer) throws -> HafasOptions {
     return try FfiConverterTypeHafasOptions.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeHafasOptions_lower(_ value: HafasOptions) -> RustBuffer {
+func FfiConverterTypeHafasOptions_lower(_ value: HafasOptions) -> RustBuffer {
     return FfiConverterTypeHafasOptions.lower(value)
 }
 
@@ -1701,7 +1701,7 @@ extension HafasProduct: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeHafasProduct: FfiConverterRustBuffer {
+struct FfiConverterTypeHafasProduct: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> HafasProduct {
         return
             try HafasProduct(
@@ -1722,14 +1722,14 @@ public struct FfiConverterTypeHafasProduct: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeHafasProduct_lift(_ buf: RustBuffer) throws -> HafasProduct {
+func FfiConverterTypeHafasProduct_lift(_ buf: RustBuffer) throws -> HafasProduct {
     return try FfiConverterTypeHafasProduct.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeHafasProduct_lower(_ value: HafasProduct) -> RustBuffer {
+func FfiConverterTypeHafasProduct_lower(_ value: HafasProduct) -> RustBuffer {
     return FfiConverterTypeHafasProduct.lower(value)
 }
 
@@ -1795,7 +1795,7 @@ extension Header: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeHeader: FfiConverterRustBuffer {
+struct FfiConverterTypeHeader: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Header {
         return
             try Header(
@@ -1814,14 +1814,14 @@ public struct FfiConverterTypeHeader: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeHeader_lift(_ buf: RustBuffer) throws -> Header {
+func FfiConverterTypeHeader_lift(_ buf: RustBuffer) throws -> Header {
     return try FfiConverterTypeHeader.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeHeader_lower(_ value: Header) -> RustBuffer {
+func FfiConverterTypeHeader_lower(_ value: Header) -> RustBuffer {
     return FfiConverterTypeHeader.lower(value)
 }
 
@@ -1879,7 +1879,7 @@ extension HttpRequest: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeHttpRequest: FfiConverterRustBuffer {
+struct FfiConverterTypeHttpRequest: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> HttpRequest {
         return
             try HttpRequest(
@@ -1902,14 +1902,14 @@ public struct FfiConverterTypeHttpRequest: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeHttpRequest_lift(_ buf: RustBuffer) throws -> HttpRequest {
+func FfiConverterTypeHttpRequest_lift(_ buf: RustBuffer) throws -> HttpRequest {
     return try FfiConverterTypeHttpRequest.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeHttpRequest_lower(_ value: HttpRequest) -> RustBuffer {
+func FfiConverterTypeHttpRequest_lower(_ value: HttpRequest) -> RustBuffer {
     return FfiConverterTypeHttpRequest.lower(value)
 }
 
@@ -1960,7 +1960,7 @@ extension HttpResponse: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeHttpResponse: FfiConverterRustBuffer {
+struct FfiConverterTypeHttpResponse: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> HttpResponse {
         return
             try HttpResponse(
@@ -1981,14 +1981,14 @@ public struct FfiConverterTypeHttpResponse: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeHttpResponse_lift(_ buf: RustBuffer) throws -> HttpResponse {
+func FfiConverterTypeHttpResponse_lift(_ buf: RustBuffer) throws -> HttpResponse {
     return try FfiConverterTypeHttpResponse.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeHttpResponse_lower(_ value: HttpResponse) -> RustBuffer {
+func FfiConverterTypeHttpResponse_lower(_ value: HttpResponse) -> RustBuffer {
     return FfiConverterTypeHttpResponse.lower(value)
 }
 
@@ -1996,7 +1996,7 @@ public func FfiConverterTypeHttpResponse_lower(_ value: HttpResponse) -> RustBuf
 /**
  * One part of a ``Trip``: a ride in one vehicle, or a walk.
  */
-public struct Leg: Equatable, Hashable {
+public struct Leg: Equatable, Hashable, Codable {
     /**
      * How this part is traveled.
      */
@@ -2056,7 +2056,7 @@ extension Leg: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeLeg: FfiConverterRustBuffer {
+struct FfiConverterTypeLeg: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Leg {
         return
             try Leg(
@@ -2081,14 +2081,14 @@ public struct FfiConverterTypeLeg: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeLeg_lift(_ buf: RustBuffer) throws -> Leg {
+func FfiConverterTypeLeg_lift(_ buf: RustBuffer) throws -> Leg {
     return try FfiConverterTypeLeg.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeLeg_lower(_ value: Leg) -> RustBuffer {
+func FfiConverterTypeLeg_lower(_ value: Leg) -> RustBuffer {
     return FfiConverterTypeLeg.lower(value)
 }
 
@@ -2097,7 +2097,7 @@ public func FfiConverterTypeLeg_lower(_ value: Leg) -> RustBuffer {
  * The start or the end of a ``Leg``. The fields follow the same rules as
  * those of a ``Departure``.
  */
-public struct LegEnd: Equatable, Hashable {
+public struct LegEnd: Equatable, Hashable, Codable {
     /**
      * The stop, platform or other place.
      */
@@ -2181,7 +2181,7 @@ extension LegEnd: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeLegEnd: FfiConverterRustBuffer {
+struct FfiConverterTypeLegEnd: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LegEnd {
         return
             try LegEnd(
@@ -2208,14 +2208,14 @@ public struct FfiConverterTypeLegEnd: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeLegEnd_lift(_ buf: RustBuffer) throws -> LegEnd {
+func FfiConverterTypeLegEnd_lift(_ buf: RustBuffer) throws -> LegEnd {
     return try FfiConverterTypeLegEnd.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeLegEnd_lower(_ value: LegEnd) -> RustBuffer {
+func FfiConverterTypeLegEnd_lower(_ value: LegEnd) -> RustBuffer {
     return FfiConverterTypeLegEnd.lower(value)
 }
 
@@ -2223,7 +2223,7 @@ public func FfiConverterTypeLegEnd_lower(_ value: LegEnd) -> RustBuffer {
 /**
  * A line of a public transport network.
  */
-public struct Line: Equatable, Hashable {
+public struct Line: Equatable, Hashable, Codable {
     /**
      * The short name shown on vehicles, e.g. `7`, `S1` or `RE13`. Trains
      * without a line have their category and number here, e.g. `ICE 1652`.
@@ -2277,7 +2277,7 @@ extension Line: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeLine: FfiConverterRustBuffer {
+struct FfiConverterTypeLine: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Line {
         return
             try Line(
@@ -2300,14 +2300,14 @@ public struct FfiConverterTypeLine: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeLine_lift(_ buf: RustBuffer) throws -> Line {
+func FfiConverterTypeLine_lift(_ buf: RustBuffer) throws -> Line {
     return try FfiConverterTypeLine.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeLine_lower(_ value: Line) -> RustBuffer {
+func FfiConverterTypeLine_lower(_ value: Line) -> RustBuffer {
     return FfiConverterTypeLine.lower(value)
 }
 
@@ -2315,7 +2315,7 @@ public func FfiConverterTypeLine_lower(_ value: Line) -> RustBuffer {
 /**
  * A place a trip can start or end at.
  */
-public struct Location: Equatable, Hashable {
+public struct Location: Equatable, Hashable, Codable {
     /**
      * Identifies the location on the network that returned it. Other
      * networks do not understand it.
@@ -2445,7 +2445,7 @@ extension Location: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeLocation: FfiConverterRustBuffer {
+struct FfiConverterTypeLocation: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Location {
         return
             try Location(
@@ -2476,14 +2476,14 @@ public struct FfiConverterTypeLocation: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeLocation_lift(_ buf: RustBuffer) throws -> Location {
+func FfiConverterTypeLocation_lift(_ buf: RustBuffer) throws -> Location {
     return try FfiConverterTypeLocation.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeLocation_lower(_ value: Location) -> RustBuffer {
+func FfiConverterTypeLocation_lower(_ value: Location) -> RustBuffer {
     return FfiConverterTypeLocation.lower(value)
 }
 
@@ -2491,7 +2491,7 @@ public func FfiConverterTypeLocation_lower(_ value: Location) -> RustBuffer {
 /**
  * A search for locations by name.
  */
-public struct LocationQuery: Equatable, Hashable {
+public struct LocationQuery: Equatable, Hashable, Codable {
     /**
      * The text to search for, as a user typed it.
      */
@@ -2551,7 +2551,7 @@ extension LocationQuery: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeLocationQuery: FfiConverterRustBuffer {
+struct FfiConverterTypeLocationQuery: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LocationQuery {
         return
             try LocationQuery(
@@ -2572,14 +2572,14 @@ public struct FfiConverterTypeLocationQuery: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeLocationQuery_lift(_ buf: RustBuffer) throws -> LocationQuery {
+func FfiConverterTypeLocationQuery_lift(_ buf: RustBuffer) throws -> LocationQuery {
     return try FfiConverterTypeLocationQuery.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeLocationQuery_lower(_ value: LocationQuery) -> RustBuffer {
+func FfiConverterTypeLocationQuery_lower(_ value: LocationQuery) -> RustBuffer {
     return FfiConverterTypeLocationQuery.lower(value)
 }
 
@@ -2982,7 +2982,7 @@ extension Network: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeNetwork: FfiConverterRustBuffer {
+struct FfiConverterTypeNetwork: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Network {
         return
             try Network(
@@ -3025,14 +3025,14 @@ public struct FfiConverterTypeNetwork: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeNetwork_lift(_ buf: RustBuffer) throws -> Network {
+func FfiConverterTypeNetwork_lift(_ buf: RustBuffer) throws -> Network {
     return try FfiConverterTypeNetwork.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeNetwork_lower(_ value: Network) -> RustBuffer {
+func FfiConverterTypeNetwork_lower(_ value: Network) -> RustBuffer {
     return FfiConverterTypeNetwork.lower(value)
 }
 
@@ -3067,7 +3067,7 @@ extension Polygon: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypePolygon: FfiConverterRustBuffer {
+struct FfiConverterTypePolygon: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Polygon {
         return
             try Polygon(
@@ -3084,14 +3084,14 @@ public struct FfiConverterTypePolygon: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypePolygon_lift(_ buf: RustBuffer) throws -> Polygon {
+func FfiConverterTypePolygon_lift(_ buf: RustBuffer) throws -> Polygon {
     return try FfiConverterTypePolygon.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypePolygon_lower(_ value: Polygon) -> RustBuffer {
+func FfiConverterTypePolygon_lower(_ value: Polygon) -> RustBuffer {
     return FfiConverterTypePolygon.lower(value)
 }
 
@@ -3100,7 +3100,7 @@ public func FfiConverterTypePolygon_lower(_ value: Polygon) -> RustBuffer {
  * A call at a stop: where it is and when the vehicle arrives and leaves.
  * The fields follow the same rules as those of a ``Departure``.
  */
-public struct Stopover: Equatable, Hashable {
+public struct Stopover: Equatable, Hashable, Codable {
     /**
      * The stop, platform or other place.
      */
@@ -3182,7 +3182,7 @@ extension Stopover: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeStopover: FfiConverterRustBuffer {
+struct FfiConverterTypeStopover: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Stopover {
         return
             try Stopover(
@@ -3213,14 +3213,14 @@ public struct FfiConverterTypeStopover: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeStopover_lift(_ buf: RustBuffer) throws -> Stopover {
+func FfiConverterTypeStopover_lift(_ buf: RustBuffer) throws -> Stopover {
     return try FfiConverterTypeStopover.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeStopover_lower(_ value: Stopover) -> RustBuffer {
+func FfiConverterTypeStopover_lower(_ value: Stopover) -> RustBuffer {
     return FfiConverterTypeStopover.lower(value)
 }
 
@@ -3228,7 +3228,7 @@ public func FfiConverterTypeStopover_lower(_ value: Stopover) -> RustBuffer {
 /**
  * One way to get from the start to the destination.
  */
-public struct Trip: Equatable, Hashable {
+public struct Trip: Equatable, Hashable, Codable {
     /**
      * The parts of the trip in the order they are traveled. Never empty.
      */
@@ -3290,7 +3290,7 @@ extension Trip: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeTrip: FfiConverterRustBuffer {
+struct FfiConverterTypeTrip: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Trip {
         return
             try Trip(
@@ -3307,14 +3307,14 @@ public struct FfiConverterTypeTrip: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeTrip_lift(_ buf: RustBuffer) throws -> Trip {
+func FfiConverterTypeTrip_lift(_ buf: RustBuffer) throws -> Trip {
     return try FfiConverterTypeTrip.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeTrip_lower(_ value: Trip) -> RustBuffer {
+func FfiConverterTypeTrip_lower(_ value: Trip) -> RustBuffer {
     return FfiConverterTypeTrip.lower(value)
 }
 
@@ -3322,7 +3322,7 @@ public func FfiConverterTypeTrip_lower(_ value: Trip) -> RustBuffer {
 /**
  * The answer to a ``TripsQuery``.
  */
-public struct Trips: Equatable, Hashable {
+public struct Trips: Equatable, Hashable, Codable {
     /**
      * The trips, in the order the server ranks them.
      */
@@ -3378,7 +3378,7 @@ extension Trips: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeTrips: FfiConverterRustBuffer {
+struct FfiConverterTypeTrips: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Trips {
         return
             try Trips(
@@ -3399,14 +3399,14 @@ public struct FfiConverterTypeTrips: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeTrips_lift(_ buf: RustBuffer) throws -> Trips {
+func FfiConverterTypeTrips_lift(_ buf: RustBuffer) throws -> Trips {
     return try FfiConverterTypeTrips.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeTrips_lower(_ value: Trips) -> RustBuffer {
+func FfiConverterTypeTrips_lower(_ value: Trips) -> RustBuffer {
     return FfiConverterTypeTrips.lower(value)
 }
 
@@ -3414,7 +3414,7 @@ public func FfiConverterTypeTrips_lower(_ value: Trips) -> RustBuffer {
 /**
  * A request for trips from one place to another.
  */
-public struct TripsQuery: Equatable, Hashable {
+public struct TripsQuery: Equatable, Hashable, Codable {
     /**
      * Where the trip starts.
      */
@@ -3484,7 +3484,7 @@ extension TripsQuery: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeTripsQuery: FfiConverterRustBuffer {
+struct FfiConverterTypeTripsQuery: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TripsQuery {
         return
             try TripsQuery(
@@ -3509,14 +3509,14 @@ public struct FfiConverterTypeTripsQuery: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeTripsQuery_lift(_ buf: RustBuffer) throws -> TripsQuery {
+func FfiConverterTypeTripsQuery_lift(_ buf: RustBuffer) throws -> TripsQuery {
     return try FfiConverterTypeTripsQuery.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeTripsQuery_lower(_ value: TripsQuery) -> RustBuffer {
+func FfiConverterTypeTripsQuery_lower(_ value: TripsQuery) -> RustBuffer {
     return FfiConverterTypeTripsQuery.lower(value)
 }
 
@@ -3740,7 +3740,7 @@ extension BundledNetwork: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeBundledNetwork: FfiConverterRustBuffer {
+struct FfiConverterTypeBundledNetwork: FfiConverterRustBuffer {
     typealias SwiftType = BundledNetwork
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BundledNetwork {
@@ -4020,14 +4020,14 @@ public struct FfiConverterTypeBundledNetwork: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeBundledNetwork_lift(_ buf: RustBuffer) throws -> BundledNetwork {
+func FfiConverterTypeBundledNetwork_lift(_ buf: RustBuffer) throws -> BundledNetwork {
     return try FfiConverterTypeBundledNetwork.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeBundledNetwork_lower(_ value: BundledNetwork) -> RustBuffer {
+func FfiConverterTypeBundledNetwork_lower(_ value: BundledNetwork) -> RustBuffer {
     return FfiConverterTypeBundledNetwork.lower(value)
 }
 
@@ -4064,7 +4064,7 @@ extension CoverageTier: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeCoverageTier: FfiConverterRustBuffer {
+struct FfiConverterTypeCoverageTier: FfiConverterRustBuffer {
     typealias SwiftType = CoverageTier
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CoverageTier {
@@ -4104,14 +4104,14 @@ public struct FfiConverterTypeCoverageTier: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeCoverageTier_lift(_ buf: RustBuffer) throws -> CoverageTier {
+func FfiConverterTypeCoverageTier_lift(_ buf: RustBuffer) throws -> CoverageTier {
     return try FfiConverterTypeCoverageTier.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeCoverageTier_lower(_ value: CoverageTier) -> RustBuffer {
+func FfiConverterTypeCoverageTier_lower(_ value: CoverageTier) -> RustBuffer {
     return FfiConverterTypeCoverageTier.lower(value)
 }
 
@@ -4144,7 +4144,7 @@ extension HttpMethod: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeHttpMethod: FfiConverterRustBuffer {
+struct FfiConverterTypeHttpMethod: FfiConverterRustBuffer {
     typealias SwiftType = HttpMethod
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> HttpMethod {
@@ -4178,14 +4178,14 @@ public struct FfiConverterTypeHttpMethod: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeHttpMethod_lift(_ buf: RustBuffer) throws -> HttpMethod {
+func FfiConverterTypeHttpMethod_lift(_ buf: RustBuffer) throws -> HttpMethod {
     return try FfiConverterTypeHttpMethod.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeHttpMethod_lower(_ value: HttpMethod) -> RustBuffer {
+func FfiConverterTypeHttpMethod_lower(_ value: HttpMethod) -> RustBuffer {
     return FfiConverterTypeHttpMethod.lower(value)
 }
 
@@ -4217,7 +4217,7 @@ extension IdScheme: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeIdScheme: FfiConverterRustBuffer {
+struct FfiConverterTypeIdScheme: FfiConverterRustBuffer {
     typealias SwiftType = IdScheme
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> IdScheme {
@@ -4245,14 +4245,14 @@ public struct FfiConverterTypeIdScheme: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeIdScheme_lift(_ buf: RustBuffer) throws -> IdScheme {
+func FfiConverterTypeIdScheme_lift(_ buf: RustBuffer) throws -> IdScheme {
     return try FfiConverterTypeIdScheme.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeIdScheme_lower(_ value: IdScheme) -> RustBuffer {
+func FfiConverterTypeIdScheme_lower(_ value: IdScheme) -> RustBuffer {
     return FfiConverterTypeIdScheme.lower(value)
 }
 
@@ -4262,7 +4262,7 @@ public func FfiConverterTypeIdScheme_lower(_ value: IdScheme) -> RustBuffer {
  * How a ``Leg`` is traveled.
  */
 
-public enum LegKind: Equatable, Hashable {
+public enum LegKind: Equatable, Hashable, Codable {
     
     /**
      * A ride in a public transport vehicle.
@@ -4296,7 +4296,7 @@ extension LegKind: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeLegKind: FfiConverterRustBuffer {
+struct FfiConverterTypeLegKind: FfiConverterRustBuffer {
     typealias SwiftType = LegKind
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LegKind {
@@ -4339,14 +4339,14 @@ public struct FfiConverterTypeLegKind: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeLegKind_lift(_ buf: RustBuffer) throws -> LegKind {
+func FfiConverterTypeLegKind_lift(_ buf: RustBuffer) throws -> LegKind {
     return try FfiConverterTypeLegKind.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeLegKind_lower(_ value: LegKind) -> RustBuffer {
+func FfiConverterTypeLegKind_lower(_ value: LegKind) -> RustBuffer {
     return FfiConverterTypeLegKind.lower(value)
 }
 
@@ -4387,7 +4387,7 @@ extension LocationKind: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeLocationKind: FfiConverterRustBuffer {
+struct FfiConverterTypeLocationKind: FfiConverterRustBuffer {
     typealias SwiftType = LocationKind
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LocationKind {
@@ -4433,14 +4433,14 @@ public struct FfiConverterTypeLocationKind: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeLocationKind_lift(_ buf: RustBuffer) throws -> LocationKind {
+func FfiConverterTypeLocationKind_lift(_ buf: RustBuffer) throws -> LocationKind {
     return try FfiConverterTypeLocationKind.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeLocationKind_lower(_ value: LocationKind) -> RustBuffer {
+func FfiConverterTypeLocationKind_lower(_ value: LocationKind) -> RustBuffer {
     return FfiConverterTypeLocationKind.lower(value)
 }
 
@@ -4525,7 +4525,7 @@ extension Mode: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeMode: FfiConverterRustBuffer {
+struct FfiConverterTypeMode: FfiConverterRustBuffer {
     typealias SwiftType = Mode
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Mode {
@@ -4637,14 +4637,14 @@ public struct FfiConverterTypeMode: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeMode_lift(_ buf: RustBuffer) throws -> Mode {
+func FfiConverterTypeMode_lift(_ buf: RustBuffer) throws -> Mode {
     return try FfiConverterTypeMode.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeMode_lower(_ value: Mode) -> RustBuffer {
+func FfiConverterTypeMode_lower(_ value: Mode) -> RustBuffer {
     return FfiConverterTypeMode.lower(value)
 }
 
@@ -4681,7 +4681,7 @@ extension NetworkOperation: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeNetworkOperation: FfiConverterRustBuffer {
+struct FfiConverterTypeNetworkOperation: FfiConverterRustBuffer {
     typealias SwiftType = NetworkOperation
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> NetworkOperation {
@@ -4721,14 +4721,14 @@ public struct FfiConverterTypeNetworkOperation: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeNetworkOperation_lift(_ buf: RustBuffer) throws -> NetworkOperation {
+func FfiConverterTypeNetworkOperation_lift(_ buf: RustBuffer) throws -> NetworkOperation {
     return try FfiConverterTypeNetworkOperation.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeNetworkOperation_lower(_ value: NetworkOperation) -> RustBuffer {
+func FfiConverterTypeNetworkOperation_lower(_ value: NetworkOperation) -> RustBuffer {
     return FfiConverterTypeNetworkOperation.lower(value)
 }
 
@@ -4782,7 +4782,7 @@ extension NetworkProtocol: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeNetworkProtocol: FfiConverterRustBuffer {
+struct FfiConverterTypeNetworkProtocol: FfiConverterRustBuffer {
     typealias SwiftType = NetworkProtocol
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> NetworkProtocol {
@@ -4840,14 +4840,14 @@ public struct FfiConverterTypeNetworkProtocol: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeNetworkProtocol_lift(_ buf: RustBuffer) throws -> NetworkProtocol {
+func FfiConverterTypeNetworkProtocol_lift(_ buf: RustBuffer) throws -> NetworkProtocol {
     return try FfiConverterTypeNetworkProtocol.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeNetworkProtocol_lower(_ value: NetworkProtocol) -> RustBuffer {
+func FfiConverterTypeNetworkProtocol_lower(_ value: NetworkProtocol) -> RustBuffer {
     return FfiConverterTypeNetworkProtocol.lower(value)
 }
 
@@ -4859,7 +4859,7 @@ public func FfiConverterTypeNetworkProtocol_lower(_ value: NetworkProtocol) -> R
  * it.
  */
 
-public enum Place: Equatable, Hashable {
+public enum Place: Equatable, Hashable, Codable {
     
     /**
      * A ``Location/id`` from the same network, or another ID the network
@@ -4897,7 +4897,7 @@ extension Place: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypePlace: FfiConverterRustBuffer {
+struct FfiConverterTypePlace: FfiConverterRustBuffer {
     typealias SwiftType = Place
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Place {
@@ -4943,14 +4943,14 @@ public struct FfiConverterTypePlace: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypePlace_lift(_ buf: RustBuffer) throws -> Place {
+func FfiConverterTypePlace_lift(_ buf: RustBuffer) throws -> Place {
     return try FfiConverterTypePlace.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypePlace_lower(_ value: Place) -> RustBuffer {
+func FfiConverterTypePlace_lower(_ value: Place) -> RustBuffer {
     return FfiConverterTypePlace.lower(value)
 }
 
@@ -5083,7 +5083,7 @@ extension PublicTransportError: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypePublicTransportError: FfiConverterRustBuffer {
+struct FfiConverterTypePublicTransportError: FfiConverterRustBuffer {
     typealias SwiftType = PublicTransportError
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PublicTransportError {
@@ -5190,14 +5190,14 @@ public struct FfiConverterTypePublicTransportError: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypePublicTransportError_lift(_ buf: RustBuffer) throws -> PublicTransportError {
+func FfiConverterTypePublicTransportError_lift(_ buf: RustBuffer) throws -> PublicTransportError {
     return try FfiConverterTypePublicTransportError.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypePublicTransportError_lower(_ value: PublicTransportError) -> RustBuffer {
+func FfiConverterTypePublicTransportError_lower(_ value: PublicTransportError) -> RustBuffer {
     return FfiConverterTypePublicTransportError.lower(value)
 }
 
@@ -5206,7 +5206,7 @@ public func FfiConverterTypePublicTransportError_lower(_ value: PublicTransportE
  * The time a ``TripsQuery`` is bound to.
  */
 
-public enum TripTime: Equatable, Hashable {
+public enum TripTime: Equatable, Hashable, Codable {
     
     /**
      * Leave at this time or later.
@@ -5231,7 +5231,7 @@ extension TripTime: Sendable {}
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeTripTime: FfiConverterRustBuffer {
+struct FfiConverterTypeTripTime: FfiConverterRustBuffer {
     typealias SwiftType = TripTime
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TripTime {
@@ -5269,14 +5269,14 @@ public struct FfiConverterTypeTripTime: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeTripTime_lift(_ buf: RustBuffer) throws -> TripTime {
+func FfiConverterTypeTripTime_lift(_ buf: RustBuffer) throws -> TripTime {
     return try FfiConverterTypeTripTime.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeTripTime_lower(_ value: TripTime) -> RustBuffer {
+func FfiConverterTypeTripTime_lower(_ value: TripTime) -> RustBuffer {
     return FfiConverterTypeTripTime.lower(value)
 }
 
@@ -6024,7 +6024,7 @@ public typealias UtcTime = Date
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeUtcTime: FfiConverter {
+struct FfiConverterTypeUtcTime: FfiConverter {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UtcTime {
         return try FfiConverterTimestamp.read(from: &buf)
     }
@@ -6046,14 +6046,14 @@ public struct FfiConverterTypeUtcTime: FfiConverter {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeUtcTime_lift(_ value: RustBuffer) throws -> UtcTime {
+func FfiConverterTypeUtcTime_lift(_ value: RustBuffer) throws -> UtcTime {
     return try FfiConverterTypeUtcTime.lift(value)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeUtcTime_lower(_ value: UtcTime) -> RustBuffer {
+func FfiConverterTypeUtcTime_lower(_ value: UtcTime) -> RustBuffer {
     return FfiConverterTypeUtcTime.lower(value)
 }
 
@@ -6111,7 +6111,7 @@ private let initializationResult: InitializationResult = {
 
 // Make the ensure init function public so that other modules which have external type references to
 // our types can call it.
-public func uniffiEnsurePublictransportInitialized() {
+func uniffiEnsurePublictransportInitialized() {
     switch initializationResult {
     case .ok:
         break
@@ -6123,3 +6123,43 @@ public func uniffiEnsurePublictransportInitialized() {
 }
 
 // swiftlint:enable all
+// Enums without values are stored as one string, see Codable.swift.
+extension BundledNetwork: Codable {
+    public init(from decoder: any Decoder) throws {
+        self = try decodeCase(from: decoder, named: \.id)
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        try encodeCase(self, to: encoder, named: \.id)
+    }
+}
+
+extension IdScheme: Codable {
+    public init(from decoder: any Decoder) throws {
+        self = try decodeCase(from: decoder, named: { String(describing: $0) })
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        try encodeCase(self, to: encoder, named: { String(describing: $0) })
+    }
+}
+
+extension LocationKind: Codable {
+    public init(from decoder: any Decoder) throws {
+        self = try decodeCase(from: decoder, named: { String(describing: $0) })
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        try encodeCase(self, to: encoder, named: { String(describing: $0) })
+    }
+}
+
+extension Mode: Codable {
+    public init(from decoder: any Decoder) throws {
+        self = try decodeCase(from: decoder, named: { String(describing: $0) })
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        try encodeCase(self, to: encoder, named: { String(describing: $0) })
+    }
+}

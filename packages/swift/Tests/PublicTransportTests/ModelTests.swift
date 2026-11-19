@@ -3,7 +3,8 @@ import PublicTransport
 import Testing
 
 // The model is generated from the Rust core, which tests its values. These
-// tests cover what the Swift side adds: names, descriptions and conveniences.
+// tests cover what the Swift side adds: names, descriptions, conveniences and
+// storing values as JSON.
 
 private let dresden = Coordinate(latitude: 51.04, longitude: 13.73)
 private let secret = Header(name: "X-Api-Key", value: "hunter2")
@@ -139,4 +140,58 @@ private func stop(_ ifopt: String, timezone: String? = nil) -> Location {
         Issue.record("expected invalidNetwork, got \(String(describing: thrown))")
         return
     }
+}
+
+/// The value after an app stored it and read it back.
+private func stored<Value: Codable>(_ value: Value) throws -> Value {
+    try JSONDecoder().decode(Value.self, from: JSONEncoder().encode(value))
+}
+
+/// The text each value is stored as. In an array, because not every platform encodes a lone string.
+private func storedText(_ values: [some Encodable]) throws -> [String] {
+    try JSONDecoder().decode([String].self, from: JSONEncoder().encode(values))
+}
+
+@Test func enumsWithoutValuesAreStoredAsTheNamesOfTheirCases() throws {
+    #expect(try storedText([Mode.bus, Mode.regionalTrain]) == ["bus", "regionalTrain"])
+    #expect(try stored(Mode.allCases) == Mode.allCases)
+    #expect(throws: DecodingError.self) {
+        _ = try JSONDecoder().decode([Mode].self, from: Data(#"["noSuchCase"]"#.utf8))
+    }
+}
+
+@Test func bundledNetworkIsStoredAsItsID() throws {
+    #expect(try storedText([BundledNetwork.vvoEfa]) == ["vvo-efa"])
+    #expect(try storedText(BundledNetwork.allCases) == BundledNetwork.allCases.map(\.id))
+    #expect(try stored(BundledNetwork.allCases) == BundledNetwork.allCases)
+}
+
+@Test func storedAnswersAreReadBackEqual() throws {
+    let vvo = Network.bundled(.vvoEfa)
+    let locations = try vvo.parseLocations(response: answer("efa/vvo-stopfinder.json"))
+    let departures = try vvo.parseDepartures(response: answer("efa/vvo-departures.json"))
+    let trips = try vvo.parseTrips(response: answer("efa/vvo-trip.json"))
+    try #require(!locations.isEmpty && !departures.isEmpty && !trips.trips.isEmpty)
+
+    #expect(try stored(locations) == locations)
+    #expect(try stored(departures) == departures)
+    #expect(try stored([trips]) == [trips])
+}
+
+@Test func storedQueriesAreReadBackEqual() throws {
+    // Every kind of place and of time that a query can hold.
+    let time = Date(timeIntervalSince1970: 1_794_835_440)
+    let locations = LocationQuery(text: "Hauptbahnhof", limit: 3, kinds: [.stop, .poi])
+    let departures = DeparturesQuery(stop: .location(stop("de:14612:28")), time: time, limit: 7)
+    let trips = [
+        TripsQuery(
+            origin: .id("de:14612:28"), destination: .coordinate(dresden),
+            time: .departAt(time), limit: 3, page: "later"
+        ),
+        TripsQuery(origin: .coordinate(dresden), destination: .id("de:14612:13"), time: .arriveBy(time)),
+    ]
+
+    #expect(try stored([locations]) == [locations])
+    #expect(try stored([departures]) == [departures])
+    #expect(try stored(trips) == trips)
 }

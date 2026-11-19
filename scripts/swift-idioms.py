@@ -46,6 +46,28 @@ MEMBERS = {
     "Network/timezone": "Network/timeZoneIdentifier",
     "Network/fromJson": "Network/init(id:json:)",
 }
+# Types that are not `Codable`: they describe a network, which has its own
+# JSON form and can hold credentials, or an HTTP exchange.
+NOT_CODABLE = {
+    "Network",
+    "NetworkProtocol",
+    "NetworkOperation",
+    "HafasOptions",
+    "HafasProduct",
+    "Header",
+    "HttpRequest",
+    "HttpResponse",
+    "HttpMethod",
+    "Coverage",
+    "CoverageTier",
+    "Area",
+    "Polygon",
+    "Attribution",
+    "CoveringNetwork",
+}
+# Enums without values are stored as the name of their case, except these,
+# which are stored as the named property.
+CODING_NAMES = {"BundledNetwork": "id"}
 
 
 def fail(what: str) -> None:
@@ -141,6 +163,68 @@ def debug_text(code: Code) -> None:
         fail("debug text: an implementation is left without its type")
 
 
+def codable(code: Code) -> None:
+    """Make the values of queries and answers `Codable`. Swift writes the
+    code for a type with fields. An enum without values gets code that
+    stores it as one string; Swift's own form is an object per case."""
+    declaration = re.compile(r"^public (struct|enum) (\w+): Equatable, Hashable([^{\n]*) \{$", flags=re.MULTILINE)
+    seen = set()
+    extensions = []
+
+    def conform(match: re.Match[str]) -> str:
+        kind, name, rest = match.groups()
+        seen.add(name)
+        if name in NOT_CODABLE:
+            return match[0]
+        if "CaseIterable" not in rest:
+            return f"public {kind} {name}: Equatable, Hashable, Codable{rest} {{"
+        if "CustomStringConvertible" in rest and name not in CODING_NAMES:
+            fail(f"codable: {name} has a description, so the name of a case needs another source")
+        coding_name = f"\\.{CODING_NAMES[name]}" if name in CODING_NAMES else "{ String(describing: $0) }"
+        extensions.append(
+            f"extension {name}: Codable {{\n"
+            f"    public init(from decoder: any Decoder) throws {{\n"
+            f"        self = try decodeCase(from: decoder, named: {coding_name})\n"
+            f"    }}\n\n"
+            f"    public func encode(to encoder: any Encoder) throws {{\n"
+            f"        try encodeCase(self, to: encoder, named: {coding_name})\n"
+            f"    }}\n"
+            f"}}\n"
+        )
+        return match[0]
+
+    code.text = declaration.sub(conform, code.text)
+    if stale := (NOT_CODABLE | set(CODING_NAMES)) - seen:
+        fail(f"codable: no such types: {sorted(stale)}")
+    types = set(re.findall(r"^public (?:struct|enum) (\w+)", code.text, flags=re.MULTILINE))
+    if missed := {name for name in types - seen - {ERROR} if not name.startswith("FfiConverter")}:
+        fail(f"codable: decide for {sorted(missed)}")
+    if not extensions:
+        fail("codable: enums without values")
+    code.text += "\n// Enums without values are stored as one string, see Codable.swift.\n" + "\n".join(extensions)
+
+
+def hide_helpers(code: Code) -> None:
+    """Keep what only the generated code calls out of the public names."""
+    code.replace("converter types", r"^public struct (FfiConverterType\w+)", r"struct \1")
+    code.replace("converter functions", r"^public func (FfiConverterType\w+_(?:lift|lower))", r"func \1")
+    code.replace("initialization", r"^public func (uniffiEnsure\w+)", r"func \1", 1)
+    # Nobody outside can make a registry from a handle or a subclass of
+    # it, so the members UniFFI needs for that can stay inside.
+    code.replace("registry class", r"^open class Registry\b", "public final class Registry", 1)
+    code.replace("methods of the registry", r"^open func ", "public func ")
+    code.replace("empty handle", r"^    public struct NoHandle \{\n        public init\(\) \{\}", "    struct NoHandle {\n        init() {}", 1)
+    code.replace("initializer without a handle", r"^    public init\(noHandle:", "    init(noHandle:", 1)
+    code.replace("initializer from a handle", r"^    required public init\(unsafeFromHandle", "    required init(unsafeFromHandle", 1)
+    code.replace("handle clone", r"^    public func uniffiCloneHandle\(", "    func uniffiCloneHandle(", 1)
+    # Nothing takes the protocol of the registry, and nobody can adopt it.
+    code.replace("registry protocol", r"^public protocol RegistryProtocol\b", "protocol RegistryProtocol", 1)
+    declared = r"^(?:public|open) (?:final )?(?:struct|enum|class|protocol|func|typealias) (\w+)"
+    for name in re.findall(declared, code.text, flags=re.MULTILINE):
+        if re.search(r"Ffi|[Uu]niffi|Protocol$", name) and name not in RENAMED.values():
+            fail(f"{name} is a helper and still public")
+
+
 def documentation(code: Code) -> None:
     """Turn the links and words of rustdoc in the comments into Swift's."""
 
@@ -214,6 +298,8 @@ def main() -> None:
     error_cases(code)
     enums_without_values(code)
     debug_text(code)
+    codable(code)
+    hide_helpers(code)
     documentation(code)
 
     path.write_text(MARKER + code.text)
