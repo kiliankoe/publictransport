@@ -1,0 +1,255 @@
+name: Release
+
+# Publishes the version that Cargo.toml names: the Swift binary as an asset
+# of a GitHub release, the crates on crates.io and the Python package on
+# PyPI. CONTRIBUTING.md describes the steps before and after.
+#
+# The run makes the tag itself. The Swift package names the checksum of
+# its binary in Package.swift, so the tagged commit can only exist once
+# the binary is built.
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish. Without it the run builds and tests everything, and nothing leaves it.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: version
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          grep -q "^version = \"$version\"$" packages/python/pyproject.toml ||
+            { echo "::error::pyproject.toml has another version than Cargo.toml"; exit 1; }
+          grep -q "^## $version " CHANGELOG.md ||
+            { echo "::error::CHANGELOG.md has no section for $version"; exit 1; }
+      - if: inputs.publish
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::a release is published from main"; exit 1
+          fi
+          if git rev-parse --quiet --verify "refs/tags/v$VERSION" > /dev/null; then
+            echo "::error::the tag v$VERSION exists"; exit 1
+          fi
+
+  xcframework:
+    runs-on: macos-26
+    outputs:
+      checksum: ${{ steps.pack.outputs.checksum }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The network data of transport-apis.
+          submodules: true
+      # The development shell has the Rust targets of every Apple platform.
+      - uses: DeterminateSystems/nix-installer-action@v23
+      - uses: Swatinem/rust-cache@v2
+      - run: nix develop -c scripts/build-swift.sh xcframework
+      # Against the macOS part of the framework that gets published.
+      - run: swift test
+        env:
+          PUBLICTRANSPORT_LOCAL_BINARY: 1
+      - id: pack
+        working-directory: packages/swift
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent PublicTransportBinary.xcframework PublicTransportBinary.xcframework.zip
+          echo "checksum=$(swift package compute-checksum PublicTransportBinary.xcframework.zip)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: xcframework
+          path: packages/swift/PublicTransportBinary.xcframework.zip
+          if-no-files-found: error
+
+  wheels:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+          - macos-latest
+          - macos-15-intel
+          - windows-latest
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The network data of transport-apis.
+          submodules: true
+      # The oldest Python that the package supports. The wheel holds no
+      # code compiled against Python, so one wheel serves every version.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.10"
+      - uses: PyO3/maturin-action@v1
+        with:
+          working-directory: packages/python
+          args: --release --locked --out dist --compatibility pypi
+          manylinux: auto
+      - name: Test the wheel
+        shell: bash
+        working-directory: packages/python
+        run: |
+          pip install dist/*.whl pytest
+          pytest
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheel-${{ matrix.runner }}
+          path: packages/python/dist/*.whl
+          if-no-files-found: error
+
+  sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The network data of transport-apis.
+          submodules: true
+      - uses: PyO3/maturin-action@v1
+        with:
+          working-directory: packages/python
+          command: sdist
+          args: --out dist
+      # The source package has to hold everything the build reads.
+      - name: Build and test from the source package
+        working-directory: packages/python
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install dist/*.tar.gz pytest
+          "$RUNNER_TEMP/venv/bin/pytest"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sdist
+          path: packages/python/dist/*.tar.gz
+          if-no-files-found: error
+
+  crates-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The network data of transport-apis.
+          submodules: true
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Builds each crate from its packaged files, the client against the
+      # packaged core.
+      - run: cargo publish --workspace --locked --dry-run
+
+  # Everything above has passed. From here on the release is public, one
+  # part after the other. Each of the three jobs skips what an earlier
+  # attempt has published, so a failed one can be run again.
+  tag:
+    if: inputs.publish
+    needs: [version, xcframework, wheels, sdist, crates-check]
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      CHECKSUM: ${{ needs.xcframework.outputs.checksum }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: xcframework
+          path: ${{ runner.temp }}
+      - name: Point Package.swift at the binary
+        run: |
+          [[ $CHECKSUM =~ ^[0-9a-f]{64}$ ]] || { echo "::error::no checksum of the binary"; exit 1; }
+          sed -i "s|/releases/download/v[^/]*/|/releases/download/v$VERSION/|; s|^let binaryChecksum = \".*\"$|let binaryChecksum = \"$CHECKSUM\"|" Package.swift
+          grep -q "/releases/download/v$VERSION/" Package.swift
+          grep -q "^let binaryChecksum = \"$CHECKSUM\"$" Package.swift
+      - name: Commit and tag
+        run: |
+          if git ls-remote --exit-code origin "refs/tags/v$VERSION" > /dev/null; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --quiet -m "build(swift): point the package at the binary of $VERSION" Package.swift
+          git tag "v$VERSION"
+          # Fails if main has moved since the run began.
+          git push --atomic origin HEAD:main "v$VERSION"
+      - name: Create the release
+        run: |
+          # The section of this version, without its heading.
+          awk -v heading="## $VERSION " 'index($0, heading) == 1 { found = 1; next } /^## / { found = 0 } found' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          gh release view "v$VERSION" > /dev/null 2>&1 ||
+            gh release create "v$VERSION" "$RUNNER_TEMP/PublicTransportBinary.xcframework.zip" \
+              --title "$VERSION" --notes-file "$RUNNER_TEMP/notes.md" --verify-tag
+
+  crates:
+    needs: [version, tag]
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      # For the token that crates.io gives this workflow.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: v${{ needs.version.outputs.version }}
+          # The network data of transport-apis.
+          submodules: true
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      # The core first: the client needs it on the registry.
+      - run: |
+          for crate in publictransport publictransport-client; do
+            if curl --silent --fail --output /dev/null --user-agent "$GITHUB_REPOSITORY release workflow" \
+              "https://crates.io/api/v1/crates/$crate/$VERSION"; then
+              echo "$crate $VERSION is published"
+            else
+              cargo publish --locked --package "$crate"
+            fi
+          done
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+  pypi:
+    needs: [version, tag]
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+      url: https://pypi.org/project/publictransport/${{ needs.version.outputs.version }}/
+    permissions:
+      # For the token that PyPI gives this workflow.
+      id-token: write
+    steps:
+      # The wheels were built from the commit before the tagged one, which
+      # differs from it in Package.swift only.
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: wheel-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@v8
+        with:
+          name: sdist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true

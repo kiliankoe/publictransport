@@ -8,8 +8,9 @@
 #   scripts/build-swift.sh check         fails if those files are not current
 #   scripts/build-swift.sh xcframework   builds the Rust library for every
 #                                        Apple platform into an XCFramework
-#   scripts/build-swift.sh xcframework macos   the same for macOS only,
-#                                        which is enough to run the tests
+#   scripts/build-swift.sh xcframework macos   the same for macOS only and
+#                                        built faster, which is enough to
+#                                        run the tests
 set -euo pipefail
 cd "${0:A:h}/.."
 
@@ -31,7 +32,7 @@ generate() {
 # static <target> builds the static library alone: the shared one would
 # need the SDK of the platform to link.
 static() {
-  cargo rustc --quiet -p publictransport-uniffi --lib --release --target $1 --crate-type staticlib
+  cargo rustc --quiet -p publictransport-uniffi --lib --profile $profile --target $1 --crate-type staticlib
 }
 
 case ${1:-} in
@@ -64,8 +65,11 @@ case ${1:-} in
       "visionos aarch64-apple-visionos"
       "visionos-simulator aarch64-apple-visionos-sim"
     )
+    # The profile that Cargo.toml has for this framework.
+    profile=dist
     if [[ ${2:-} == macos ]]; then
       slices=("macos ${$(rustc --print host-tuple)}")
+      profile=release
     fi
     arguments=()
     for slice in $slices; do
@@ -74,7 +78,7 @@ case ${1:-} in
       archives=()
       for target in $parts[2,-1]; do
         static $target
-        archives+=(target/$target/release/$library)
+        archives+=(target/$target/$profile/$library)
       done
       mkdir -p $work/$name
       # Xcode's tools do not run with the SDK the development shell sets.

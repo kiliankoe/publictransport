@@ -6,19 +6,28 @@ import PackageDescription
 // repository.
 //
 // The Rust library is a static library. On Apple platforms it comes in an
-// XCFramework, which scripts/build-swift.sh builds. On Linux the same
-// script builds the library, and the linker gets its directory with
-// `-Xlinker -L<directory>`.
+// XCFramework: the one of the last release, or with
+// PUBLICTRANSPORT_LOCAL_BINARY=1 in the environment the one that
+// scripts/build-swift.sh built into the checkout. On Linux the linker gets
+// the directory of the library with `-Xlinker -L<directory>`.
+//
+// The release workflow writes these two lines. Between releases the code
+// can be ahead of that binary, so depend on a version, not on a branch.
+let binaryURL =
+    "https://github.com/kiliankoe/publictransport/releases/download/v0.0.0/PublicTransportBinary.xcframework.zip"
+let binaryChecksum = "0000000000000000000000000000000000000000000000000000000000000000"
+
 #if os(Linux)
 let library: [Target] = []
 let libraryDependency: [Target.Dependency] = []
 let libraryLinking: [LinkerSetting] = [.linkedLibrary("publictransport_uniffi")]
 #else
+// The environment and not a look at the directory: SwiftPM keeps the
+// manifest it evaluated and would not see the directory appear.
 let library: [Target] = [
-    .binaryTarget(
-        name: "PublicTransportBinary",
-        path: "packages/swift/PublicTransportBinary.xcframework"
-    ),
+    Context.environment["PUBLICTRANSPORT_LOCAL_BINARY"] != nil
+        ? .binaryTarget(name: "PublicTransportBinary", path: "packages/swift/PublicTransportBinary.xcframework")
+        : .binaryTarget(name: "PublicTransportBinary", url: binaryURL, checksum: binaryChecksum),
 ]
 let libraryDependency: [Target.Dependency] = ["PublicTransportBinary"]
 let libraryLinking: [LinkerSetting] = []

@@ -19,3 +19,12 @@ unwrap_used = "warn"
 expect_used = "warn"
 panic = "warn"
 indexing_slicing = "warn"
+
+# For the XCFramework of the Swift package, which holds the library once
+# per platform: a quarter of the size of a release build.
+[profile.dist]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = "debuginfo"
