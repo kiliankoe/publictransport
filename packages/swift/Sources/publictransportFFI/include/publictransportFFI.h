@@ -266,7 +266,7 @@ uint64_t uniffi_publictransport_fn_constructor_registry_new(RustBuffer networks,
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PUBLICTRANSPORT_FN_METHOD_REGISTRY_COVERING
 #define UNIFFI_FFIDEF_UNIFFI_PUBLICTRANSPORT_FN_METHOD_REGISTRY_COVERING
-RustBuffer uniffi_publictransport_fn_method_registry_covering(uint64_t ptr, RustBuffer position, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_publictransport_fn_method_registry_covering(uint64_t ptr, RustBuffer at, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PUBLICTRANSPORT_FN_METHOD_REGISTRY_GET

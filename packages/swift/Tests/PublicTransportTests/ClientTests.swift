@@ -22,7 +22,7 @@ private let foreignStop = Location(
     name: "Dresden Hbf",
     locality: nil,
     coordinate: nil,
-    timezone: nil,
+    timeZoneIdentifier: nil,
     network: "other"
 )
 private let hauptbahnhof = LocationQuery(text: "Hauptbahnhof")
@@ -41,7 +41,7 @@ private func ok(_ body: Data) -> HttpResponse {
 @Sendable private func efa(_ host: String) -> Network {
     Network(
         id: "vvo", name: "VVO", endpoint: "https://\(host)/std3", protocol: .efa,
-        timezone: "Europe/Berlin"
+        timeZoneIdentifier: "Europe/Berlin"
     )
 }
 
@@ -213,9 +213,9 @@ struct Refused: Sendable, CustomTestStringConvertible {
     var fixture: String?
 
     static let all = [
-        Refused(testDescription: "Moved", status: 302, headers: ["Location": "https://new.example/std3"]),
-        Refused(testDescription: "RateLimited", status: 429),
-        Refused(testDescription: "NotFound", status: 200, fixture: "efa/vvo-departures-unknown-stop.json"),
+        Refused(testDescription: "moved", status: 302, headers: ["Location": "https://new.example/std3"]),
+        Refused(testDescription: "rateLimited", status: 429),
+        Refused(testDescription: "notFound", status: 200, fixture: "efa/vvo-departures-unknown-stop.json"),
     ]
 }
 
@@ -254,6 +254,16 @@ func errorOfTheCoreComesOutUnchanged(answer: Refused) async throws {
     }
 
     #expect(thrown?.code == .cannotConnectToHost)
+}
+
+@Test func cancelledExchangeIsACancellationError() async {
+    // What `URLSession` reports for a task that was cancelled.
+    let stub = HTTPStub(.failure(.cancelled))
+
+    await #expect(throws: CancellationError.self) {
+        try await Client(userAgent: userAgent, session: stub.session)
+            .locations(in: efa(stub.host), query: hauptbahnhof)
+    }
 }
 
 @Test func tooLargeAnswerIsRefused() async {
@@ -300,15 +310,9 @@ func invalidPlainCallIsRefusedBeforeARequest(rejected: Rejected) async {
         try await rejected.call(Client(userAgent: userAgent, session: stub.session), efa(stub.host))
     }
 
-    guard case .InvalidQuery = thrown else {
-        Issue.record("expected InvalidQuery, got \(String(describing: thrown))")
+    guard case .invalidQuery = thrown else {
+        Issue.record("expected invalidQuery, got \(String(describing: thrown))")
         return
     }
     #expect(stub.sent.isEmpty)
-}
-
-@Test func bundledNetworkIsTheNetworkOfTheRegistry() {
-    // The last one: a case is sent to Rust as its position in the list.
-    #expect(BundledNetwork.transitous.id() == "transitous")
-    #expect(Network.bundled(.transitous) == Registry.bundled().get(id: "transitous"))
 }

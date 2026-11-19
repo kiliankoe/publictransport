@@ -8,3 +8,10 @@ Error = "PublicTransportError"
 Protocol = "NetworkProtocol"
 Operation = "NetworkOperation"
 Method = "HttpMethod"
+# Names and labels as Swift writes them. UniFFI renames the methods of an
+# object here, not those of a record; scripts/swift-idioms.py does those.
+"Registry.get" = "network"
+"Registry.covering.position" = "at"
+# `timeZone` is the `TimeZone` itself there.
+"Location.timezone" = "time_zone_identifier"
+"Network.timezone" = "time_zone_identifier"

@@ -3,7 +3,8 @@
 # Run it in the development shell (`nix develop`), which has the Rust targets.
 #
 #   scripts/build-swift.sh bindings      writes the generated Swift code and
-#                                        the C header into the package
+#                                        the C header into the package, the
+#                                        code adapted by swift-idioms.py
 #   scripts/build-swift.sh check         fails if those files are not current
 #   scripts/build-swift.sh xcframework   builds the Rust library for every
 #                                        Apple platform into an XCFramework
@@ -24,18 +25,7 @@ generate() {
   local built=(target/debug/libpublictransport_uniffi.(dylib|so)(N))
   cargo run --quiet -p publictransport-uniffi --bin uniffi-bindgen -- \
     generate --library $built[1] --language swift --out-dir $1
-  # UniFFI 0.32.2 renames the types named in crates/core/uniffi.toml, but
-  # not their converters where a method of a record throws the type or a
-  # trait of the type is exported. Without this the code does not compile.
-  local renamed=(Error:PublicTransportError Protocol:NetworkProtocol Operation:NetworkOperation Method:HttpMethod)
-  for pair in $renamed; do
-    sed -i.bak -E "s/FfiConverterType${pair%%:*}_(lift|lower)/FfiConverterType${pair##*:}_\\1/g" $1/publictransport.swift
-  done
-  # The message of an error is the one from Rust, which the generated code
-  # has as `description`, where it would print the case as Swift sees it.
-  sed -i.bak 's/String(reflecting: self)/description/' $1/publictransport.swift
-  grep --quiet 'errorDescription' $1/publictransport.swift
-  rm $1/publictransport.swift.bak
+  scripts/swift-idioms.py $1/publictransport.swift
 }
 
 # static <target> builds the static library alone: the shared one would

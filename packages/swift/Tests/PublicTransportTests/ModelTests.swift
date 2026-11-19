@@ -1,0 +1,142 @@
+import Foundation
+import PublicTransport
+import Testing
+
+// The model is generated from the Rust core, which tests its values. These
+// tests cover what the Swift side adds: names, descriptions and conveniences.
+
+private let dresden = Coordinate(latitude: 51.04, longitude: 13.73)
+private let secret = Header(name: "X-Api-Key", value: "hunter2")
+
+private func file(_ path: String, file: String = #filePath) throws -> Data {
+    var root = URL(fileURLWithPath: file)
+    // The file, then PublicTransportTests, Tests, swift and packages.
+    for _ in 1...5 { root.deleteLastPathComponent() }
+    return try Data(contentsOf: root.appendingPathComponent("crates/core/\(path)"))
+}
+
+private func answer(_ fixture: String) throws -> HttpResponse {
+    try HttpResponse(status: 200, headers: [], body: file("tests/fixtures/\(fixture)"))
+}
+
+private func stop(_ ifopt: String, timezone: String? = nil) -> Location {
+    Location(
+        id: ifopt, globalIds: [GlobalId(scheme: .ifopt, value: ifopt)], kind: .stop, name: "Stop",
+        locality: nil, coordinate: nil, timeZoneIdentifier: timezone, network: nil
+    )
+}
+
+@Test func derivedValuesOfDeparturesAndTripsAreProperties() throws {
+    let vvo = Network.bundled(.vvoEfa)
+    let departures = try vvo.parseDepartures(response: answer("efa/vvo-departures.json"))
+    let trips = try vvo.parseTrips(response: answer("efa/vvo-trip.json")).trips
+    try #require(!departures.isEmpty && !trips.isEmpty)
+
+    for departure in departures {
+        #expect(departure.expectedTime == departure.realtimeTime ?? departure.scheduledTime)
+    }
+    for trip in trips {
+        let rides = trip.legs.count { if case .transit = $0.kind { true } else { false } }
+        #expect(trip.departure == trip.legs.first?.departure)
+        #expect(trip.arrival == trip.legs.last?.arrival)
+        #expect(trip.transfers == UInt32(max(rides - 1, 0)))
+        for end in trip.legs.flatMap({ [$0.departure, $0.arrival] }) {
+            #expect(end.expectedTime == end.realtimeTime ?? end.scheduledTime)
+        }
+    }
+}
+
+@Test func locationKnowsItsStationAndItsTimeZone() {
+    let station = stop("de:14612:28", timezone: "Europe/Berlin")
+    let platform = stop("de:14612:28:3:2", timezone: "Nowhere/Nothing")
+    let elsewhere = stop("de:14612:13")
+
+    #expect(!station.stationIds.isEmpty)
+    #expect(platform.stationIds == station.stationIds)
+    #expect(platform.isSameStation(with: station))
+    #expect(!platform.isSameStation(with: elsewhere))
+
+    #expect(station.timeZone == TimeZone(identifier: "Europe/Berlin"))
+    #expect(station.timeZone != nil)
+    #expect(platform.timeZone == nil)
+    #expect(elsewhere.timeZone == nil)
+}
+
+@Test func registryFindsNetworksByIDAndByPosition() {
+    let registry = Registry.bundled()
+    let vvo = Network.bundled(.vvoEfa)
+
+    #expect(BundledNetwork.vvoEfa.id == "vvo-efa")
+    #expect(vvo == Network.bundled(.vvoEfa))
+    #expect(registry.network(id: "vvo-efa") == vvo)
+    #expect(registry.network(id: "no-such-network") == nil)
+    // A case is sent to Rust as its position in the list, so the order matters.
+    #expect(BundledNetwork.allCases.map(\.id) == registry.networks().map(\.id))
+
+    #expect(vvo.coverage.tier(at: dresden) == .realtime)
+    #expect(vvo.coverage.tier(at: Coordinate(latitude: 0, longitude: 0)) == nil)
+    #expect(registry.covering(at: dresden).contains(CoveringNetwork(network: vvo, tier: .realtime)))
+}
+
+@Test func enumsWithoutValuesListTheirCases() {
+    #expect(LocationKind.allCases == [.stop, .address, .poi, .other])
+    #expect(CoverageTier.allCases == [.realtime, .regular, .any])
+    #expect(IdScheme.allCases.contains(.ifopt))
+    #expect(Mode.allCases.contains(.regionalTrain))
+    #expect(NetworkProtocol.allCases.contains(.efa))
+    #expect(!NetworkOperation.allCases.isEmpty)
+}
+
+@Test func errorCasesAreLowerCamelCaseAndDescribeThemselves() {
+    // Naming every case is the test: it does not compile with another spelling.
+    let all: Set<PublicTransportError> = [
+        .invalidNetwork(message: ""), .invalidQuery(message: ""), .unsupported(message: ""),
+        .notFound(message: ""), .moved(location: ""), .blocked, .rateLimited, .unauthorized,
+        .unavailable, .server(status: 500, message: ""), .parse(message: ""),
+    ]
+    #expect(all.count == 11)
+
+    let thrown = #expect(throws: PublicTransportError.self) {
+        try Network.bundled(.vvoEfa)
+            .parseDepartures(response: HttpResponse(status: 429, headers: [], body: Data()))
+    }
+    #expect(thrown == .rateLimited)
+    #expect(thrown?.localizedDescription == "the server received too many requests")
+}
+
+@Test func descriptionsAreSwiftsOwnAndHideSecrets() throws {
+    #expect(String(describing: LocationKind.stop) == "stop")
+
+    let locations = try Network.bundled(.vvoEfa).parseLocations(response: answer("efa/vvo-stopfinder.json"))
+    let location = try #require(locations.first)
+    #expect(String(describing: location).contains("globalIds"))
+    #expect(!String(describing: location).contains("global_ids"))
+
+    var network = Network.bundled(.vvoEfa)
+    network.headers = [secret]
+    let printed = [
+        String(describing: secret), String(reflecting: secret),
+        String(describing: network), String(reflecting: network),
+    ]
+    for text in printed {
+        #expect(!text.contains("hunter2"))
+    }
+    // The name is no secret, and shows that the header is printed at all.
+    #expect(String(describing: secret).contains("X-Api-Key"))
+}
+
+@Test func networkIsReadFromAnEntryOfTransportAPIs() throws {
+    let json = try String(decoding: file("data/networks/vvo-efa.json"), as: UTF8.self)
+
+    #expect(try Network(id: "mine", json: json).id == "mine")
+    // The entry is the one of the bundled network.
+    #expect(try Network(id: "vvo-efa", json: json) == Network.bundled(.vvoEfa))
+
+    let thrown = #expect(throws: PublicTransportError.self) {
+        try Network(id: "mine", json: "no entry")
+    }
+    guard case .invalidNetwork = thrown else {
+        Issue.record("expected invalidNetwork, got \(String(describing: thrown))")
+        return
+    }
+}

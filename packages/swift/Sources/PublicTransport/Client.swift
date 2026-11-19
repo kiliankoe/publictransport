@@ -10,7 +10,7 @@ import Foundation
 /// Anything that names a place in a query: a ``Location`` from a search, a
 /// departure or a trip, a ``Coordinate``, a ``Place``, or a `String` with
 /// an ID of the network that is asked.
-public protocol PlaceConvertible {
+public protocol PlaceConvertible: Sendable {
     /// The value as a place.
     var place: Place { get }
 }
@@ -43,6 +43,14 @@ extension String: PlaceConvertible {
         }
     }
 
+    extension Registry {
+        /// The networks for a position of Core Location, as for a
+        /// ``Coordinate``.
+        public func covering(at position: CLLocationCoordinate2D) -> [CoveringNetwork] {
+            covering(at: Coordinate(position))
+        }
+    }
+
     extension CLLocationCoordinate2D {
         /// The position of this library as one of Core Location.
         public init(_ coordinate: Coordinate) {
@@ -57,6 +65,35 @@ extension Network {
     public static func bundled(_ network: BundledNetwork) -> Network {
         network.network()
     }
+
+    /// Reads a network from an entry in the JSON format of the
+    /// transport-apis repository.
+    ///
+    /// - Parameters:
+    ///   - id: The name of the entry's file without `.json`.
+    ///   - json: The entry.
+    /// - Throws: ``PublicTransportError/invalidNetwork(message:)`` if the
+    ///   text is no such entry or names a protocol the library lacks.
+    public init(id: String, json: String) throws {
+        self = try networkFromJson(id: id, json: json)
+    }
+}
+
+extension Location {
+    /// The time zone the location is in, for showing times there. `nil` if
+    /// neither the server nor the network names one, or if the system
+    /// does not know the name.
+    public var timeZone: TimeZone? {
+        timeZoneIdentifier.flatMap(TimeZone.init(identifier:))
+    }
+}
+
+extension Network {
+    /// The time zone the server works in. `nil` if the network names none,
+    /// or if the system does not know the name.
+    public var timeZone: TimeZone? {
+        timeZoneIdentifier.flatMap(TimeZone.init(identifier:))
+    }
 }
 
 // Both have an `id` already, which lists in SwiftUI ask for.
@@ -66,10 +103,16 @@ extension Network: Identifiable {}
 /// What can go wrong in the client itself. Failures that the server or the
 /// query cause are a ``PublicTransportError``, and failures of the HTTP
 /// exchange a `URLError`.
-public enum ClientError: Error, Equatable {
+public enum ClientError: Error, Equatable, LocalizedError {
     /// The answer was larger than 16 MB, more than any real one, so it was
     /// not handed on.
     case responseTooLarge
+
+    public var errorDescription: String? {
+        switch self {
+        case .responseTooLarge: "the response is larger than 16 MB"
+        }
+    }
 }
 
 /// Sends requests to public transport servers and waits for the answers.
@@ -101,7 +144,7 @@ public struct Client: Sendable {
     ///     proxy. Without it, a request fails when the server sends nothing
     ///     for 30 seconds. On Linux such a session has to refuse redirects
     ///     itself, in its delegate, so that a moved server is reported as
-    ///     ``PublicTransportError/Moved(location:)``; on Apple platforms
+    ///     ``PublicTransportError/moved(location:)``; on Apple platforms
     ///     the client sees to that.
     public init(userAgent: String, session: URLSession? = nil) {
         precondition(
@@ -128,8 +171,8 @@ public struct Client: Sendable {
     ///   - limit: The largest number wanted. EFA servers get no limit and
     ///     return every match.
     /// - Throws: ``PublicTransportError`` for what the server or the query
-    ///   got wrong, and `URLError` if the request got no answer. A
-    ///   cancelled task throws `URLError` with the code `cancelled`.
+    ///   got wrong, `URLError` if the request got no answer, and
+    ///   `CancellationError` if the task was cancelled.
     public func locations(
         in network: Network,
         matching text: String,
@@ -155,7 +198,7 @@ public struct Client: Sendable {
     ///   - time: The time from which on departures are wanted. Now if
     ///     left out.
     ///   - limit: How many departures are wanted.
-    /// - Throws: ``PublicTransportError``, such as `NotFound` for a stop
+    /// - Throws: ``PublicTransportError``, such as `notFound` for a stop
     ///   the network does not know, and `URLError` if the request got no
     ///   answer.
     public func departures(
@@ -190,7 +233,7 @@ public struct Client: Sendable {
     ///     that searches a window of time can answer with no trips and a
     ///     reference to later ones, as at night: follow it before telling
     ///     a user that there are none.
-    /// - Throws: ``PublicTransportError``, such as `NotFound` for a place
+    /// - Throws: ``PublicTransportError``, such as `notFound` for a place
     ///   the network does not know, and `URLError` if the request got no
     ///   answer.
     public func trips(
@@ -208,7 +251,7 @@ public struct Client: Sendable {
         case (nil, let arrival?): time = .arriveBy(arrival)
         case (nil, nil): time = nil
         case (.some, .some):
-            throw PublicTransportError.InvalidQuery(
+            throw PublicTransportError.invalidQuery(
                 message: "a trip is bound to its departure or to its arrival, not to both")
         }
         let query = TripsQuery(
@@ -231,7 +274,7 @@ public struct Client: Sendable {
     private func count(_ limit: Int?) throws -> UInt32? {
         guard let limit else { return nil }
         guard let count = UInt32(exactly: limit) else {
-            throw PublicTransportError.InvalidQuery(message: "the limit \(limit) is no number of results")
+            throw PublicTransportError.invalidQuery(message: "the limit \(limit) is no number of results")
         }
         return count
     }
@@ -252,7 +295,13 @@ public struct Client: Sendable {
         }
         urlRequest.httpBody = request.body
 
-        let (body, response) = try await load(urlRequest)
+        let (body, response): (Data, URLResponse)
+        do {
+            (body, response) = try await load(urlRequest)
+        } catch let error as URLError where error.code == .cancelled {
+            // What a cancelled task throws everywhere else in Swift.
+            throw CancellationError()
+        }
         guard let response = response as? HTTPURLResponse else {
             throw URLError(.badServerResponse)
         }
