@@ -22,3 +22,28 @@ Method = "HttpMethod"
 # `timeZone` is the `TimeZone` itself there.
 "Location.timezone" = "time_zone_identifier"
 "Network.timezone" = "time_zone_identifier"
+
+[bindings.kotlin]
+# Short like the names of the other packages, and no part of a domain.
+package_name = "publictransport"
+# Records are data classes with `val` fields; `copy` changes one.
+generate_immutable_records = true
+
+# A local time is an `OffsetDateTime` with the offset of its place.
+[bindings.kotlin.custom_types.LocalTime]
+type_name = "java.time.OffsetDateTime"
+lift = "java.time.OffsetDateTime.parse({})"
+lower = "{}.format(java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME)"
+
+[bindings.kotlin.rename]
+# UniFFI names an error `Error` after Kotlin's own `Exception`. With this
+# it becomes `PublicTransportException`.
+Error = "PublicTransportError"
+# An exception has a `message` already, so a field of that name does not
+# compile.
+"Error.InvalidNetwork.message" = "detail"
+"Error.InvalidQuery.message" = "detail"
+"Error.Unsupported.message" = "detail"
+"Error.NotFound.message" = "detail"
+"Error.Server.message" = "detail"
+"Error.Parse.message" = "detail"
