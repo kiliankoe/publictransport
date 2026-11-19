@@ -6,6 +6,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Also what only Cargo.lock names: the wheels and the XCFramework are
+    # built from it.
+    allow:
+      - dependency-type: all
     commit-message:
       prefix: build(deps)
     groups:
