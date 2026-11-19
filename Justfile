@@ -1,0 +1,44 @@
+# The commands of the project. Run them in the development shell
+# (`nix develop` or direnv); `just` alone lists them.
+
+_default:
+    @just --list
+
+# Everything CI checks in the Rust code
+check:
+    cargo fmt --all --check
+    cargo clippy --workspace --all-targets --all-features -- -D warnings
+    cargo test --workspace --all-features
+    cargo clippy -p publictransport --all-targets -- -D warnings
+    cargo test -p publictransport
+    cargo deny check
+    scripts/validate-xml-requests.sh
+    scripts/build-swift.sh check
+
+# Lint, type-check and test the Python package
+python:
+    cd packages/python && uv sync --quiet --reinstall-package publictransport
+    cd packages/python && ruff check . && ruff format --check . && pyright && uv run --no-sync pytest
+
+# Write the generated Swift code again, after a change to the Rust library
+swift-bindings:
+    scripts/build-swift.sh bindings
+
+# Build the Rust library for the Swift package: for macOS, or with `all` for every Apple platform
+swift-library platforms="macos":
+    scripts/build-swift.sh xcframework {{ if platforms == "all" { "" } else { platforms } }}
+
+# Test the Swift package against the library that `swift-library` built
+swift-test:
+    # Xcode's Swift does not run with the SDK that the development shell sets.
+    env -i PATH=/usr/bin:/bin:/usr/sbin HOME="$HOME" PUBLICTRANSPORT_LOCAL_BINARY=1 swift test
+    env -i PATH=/usr/bin:/bin:/usr/sbin HOME="$HOME" swift format lint --strict --recursive \
+        packages/swift/Sources/PublicTransport/Client.swift packages/swift/Sources/PublicTransport/Codable.swift packages/swift/Tests
+
+# Ask the live server of every bundled network for stops, departures and trips
+check-networks:
+    cargo run -p publictransport-client --example check
+
+# Prepare a release: set the version and write the changelog, see CONTRIBUTING.md
+release version:
+    scripts/prepare-release.sh {{ version }}

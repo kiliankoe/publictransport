@@ -64,6 +64,8 @@
               ];
             })
             pkgs.cargo-deny
+            # The commands in the Justfile
+            pkgs.just
             # The commit convention, see CONTRIBUTING.md
             pkgs.committed
             pkgs.git-cliff
