@@ -1,4 +1,4 @@
-# Public Transport SDK
+# 🚉 Public Transport SDK
 
 A client library for public transport APIs, for Rust, Python and Swift. The libraries use a shared model for stops, departures and trips that covers several server types, so an application can query any supported network the same way.
 
