@@ -6,4 +6,4 @@ line_length = 0
 # Subjects start in lower case after the type.
 subject_capitalized = false
 allowed_types = ["feat", "fix", "docs", "refactor", "perf", "test", "build", "ci", "chore"]
-allowed_scopes = ["core", "client", "uniffi", "python", "swift", "ci", "deps"]
+allowed_scopes = ["core", "client", "uniffi", "python", "swift", "kotlin", "ci", "deps"]
