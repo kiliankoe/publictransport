@@ -1,0 +1,70 @@
+name: Pull request
+
+# What only a pull request has: its title, which becomes the commit
+# subject when it is squashed, and the changes it makes to the Rust API.
+on:
+  pull_request:
+    # `edited` covers a change of the title.
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+# A new push or an edited title replaces the run before it.
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Not written into the scripts, where their text would run as shell code.
+  TITLE: ${{ github.event.pull_request.title }}
+  DESCRIPTION: ${{ github.event.pull_request.body }}
+
+jobs:
+  # A squash makes one commit from the title, the number that GitHub
+  # appends, and the description. It has to pass the check that CI runs on
+  # every commit of main.
+  message:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: DeterminateSystems/nix-installer-action@v23
+      - run: |
+          printf '%s (#%s)\n\n%s\n' "$TITLE" "${{ github.event.pull_request.number }}" "$DESCRIPTION" > "$RUNNER_TEMP/message"
+          nix develop -c committed --commit-file "$RUNNER_TEMP/message"
+
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      # The checkout is the pull request merged into main: its first
+      # parent is main, its second the pull request.
+      - uses: actions/checkout@v7
+        with:
+          # The network data of transport-apis.
+          submodules: true
+          # The commits of the pull request, for their messages.
+          fetch-depth: 0
+      # Outside the checkout, where cargo would find every crate twice.
+      - run: |
+          git worktree add "$RUNNER_TEMP/baseline" HEAD^1
+          git -C "$RUNNER_TEMP/baseline" submodule update --init
+      - uses: DeterminateSystems/nix-installer-action@v23
+      - uses: Swatinem/rust-cache@v2
+      # A break of the Rust API has to be marked with a `!`: in the title,
+      # for a squash, and in a commit, for a rebase. The next version
+      # follows from these marks, see "Releases" in CONTRIBUTING.md.
+      - run: |
+          status=0
+          nix develop -c cargo semver-checks --workspace --baseline-root "$RUNNER_TEMP/baseline" || status=$?
+          # 100 says that a check failed; anything else is another error.
+          if [[ $status != 100 ]]; then
+            exit $status
+          fi
+          marked='^[A-Za-z]+(\([^)]*\))?!:'
+          if [[ $TITLE =~ $marked ]] && git log --format=%s HEAD^1..HEAD^2 | grep -Eq "$marked"; then
+            echo "The Rust API breaks, and the pull request says so."
+          else
+            echo "::error::This breaks the Rust API. Mark it with a '!' in the title and in the subject of the commit that breaks it, e.g. 'feat(core)!: ...', see CONTRIBUTING.md."
+            exit 1
+          fi
