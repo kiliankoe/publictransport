@@ -29,7 +29,7 @@ Rust applications that do not want to bring their own HTTP client use `publictra
 | -------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Rust     | `cargo add publictransport-client`, or `publictransport` alone to bring your own HTTP client              | [crates/client](https://github.com/kiliankoe/publictransport/tree/main/crates/client), [crates/core](https://github.com/kiliankoe/publictransport/tree/main/crates/core) |
 | Python   | `uv add publictransport` or `pip install publictransport`                                                 | [packages/python](https://github.com/kiliankoe/publictransport/tree/main/packages/python)                                                                                |
-| Swift    | `.package(url: "https://github.com/kiliankoe/publictransport", from: "0.1.0")`, product `PublicTransport` | [packages/swift](https://github.com/kiliankoe/publictransport/tree/main/packages/swift)                                                                                  |
+| Swift    | `.package(url: "https://github.com/kiliankoe/publictransport", from: "0.1.1")`, product `PublicTransport` | [packages/swift](https://github.com/kiliankoe/publictransport/tree/main/packages/swift)                                                                                  |
 
 ## Shared Core
 

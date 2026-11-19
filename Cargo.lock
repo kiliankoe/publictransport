@@ -1253,7 +1253,7 @@ dependencies = [
 
 [[package]]
 name = "publictransport"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "form_urlencoded",
  "jiff",
@@ -1268,7 +1268,7 @@ dependencies = [
 
 [[package]]
 name = "publictransport-client"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "publictransport",
  "reqwest",
@@ -1279,7 +1279,7 @@ dependencies = [
 
 [[package]]
 name = "publictransport-examples"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "publictransport-client",
  "tokio",
@@ -1287,7 +1287,7 @@ dependencies = [
 
 [[package]]
 name = "publictransport-uniffi"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "publictransport",
  "uniffi",

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1 (2026-11-19)
+
+Also adds a rudimentary documentation page.
+
+### Features
+
+- core: Show a time on the clocks at a location
+
 ## 0.1.0 (2026-11-19)
 
 Initial release 🙌
