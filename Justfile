@@ -64,6 +64,18 @@ examples-swift:
 check-networks:
     cargo run -p publictransport-client --example check
 
+# Build the documentation site into site/book. mdBook only warns about a file it cannot include and says nothing about a missing anchor, so both are checked here
+site:
+    for file in README.md packages/python/README.md packages/swift/README.md; do \
+        grep -q "ANCHOR: site" $file; grep -q "ANCHOR_END: site" $file; \
+    done
+    cargo run --quiet -p publictransport --example network_table > site/src/networks.md
+    set -o pipefail; mdbook build site 2>&1 | tee /dev/stderr | (! grep -q "WARN\|ERROR")
+
+# Show the documentation site in a browser. It follows changes in site/src, not in the files it includes
+site-serve: site
+    mdbook serve --open site
+
 # Prepare a release, see CONTRIBUTING.md: set the version and write the changelog. Without a version, the next one by the commits
 release version="":
     scripts/prepare-release.sh {{ version }}

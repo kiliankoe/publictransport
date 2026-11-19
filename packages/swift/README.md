@@ -1,3 +1,4 @@
+<!-- ANCHOR: site -->
 # PublicTransport for Swift
 
 A Swift client for public transport APIs. It uses a shared model for stops, departures and trips that covers several server types, so an application can query any supported network the same way. It supports servers that speak EFA (used by many German transport associations), MOTIS (the routing engine behind [Transitous](https://transitous.org)), TRIAS 1.2, OJP 1.0, HAFAS mgate (the interface behind many operators' apps) and OpenTripPlanner 2 with its Transmodel API.
@@ -47,6 +48,8 @@ The stored form follows the model, so it can change where the model does: with a
 Failures that the server or the query cause are thrown as `PublicTransportError`, such as `.notFound` or `.rateLimited`; its `localizedDescription` is a sentence in English. Failures of the HTTP exchange are thrown as `URLError`, and a cancelled task throws `CancellationError`. An answer above 16 MB is `ClientError.responseTooLarge`. The client does not follow redirects: a moved server is `PublicTransportError.moved`. It does not retry, limit its request rate or cache.
 
 Some networks need more than their entry holds. Entur asks every client for its name in the header `ET-Client-Name` (`company-application`): add it to `network.headers`. An answer to `trips` from an OpenTripPlanner server can be empty at night and still have a `later` reference to follow.
+
+<!-- ANCHOR_END: site -->
 
 ## Development
 

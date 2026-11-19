@@ -153,12 +153,30 @@ jobs:
       # packaged core.
       - run: cargo publish --workspace --locked --dry-run
 
+  # The documentation site, built from the READMEs and the examples.
+  site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The network data of transport-apis.
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@v23
+      - uses: Swatinem/rust-cache@v2
+      - run: nix develop -c just site
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site/book
+          # The default is one day, and the jobs before the deployment
+          # wait for an approval.
+          retention-days: 30
+
   # Everything above has passed. From here on the release is public, one
   # part after the other. Each of the three jobs skips what an earlier
   # attempt has published, so a failed one can be run again.
   tag:
     if: inputs.publish
-    needs: [version, xcframework, wheels, sdist, crates-check]
+    needs: [version, xcframework, wheels, sdist, crates-check, site]
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -253,3 +271,18 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           skip-existing: true
+
+  # After the packages, so that the site never describes a version that
+  # the registries do not have.
+  pages:
+    needs: [crates, pypi]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v5

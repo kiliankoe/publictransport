@@ -1,3 +1,5 @@
+<!-- ANCHOR: site -->
+
 # 🚉 Public Transport SDK
 
 A client library for public transport APIs, for Rust, Python and Swift. The libraries use a shared model for stops, departures and trips that covers several server types, so an application can query any supported network the same way.
@@ -19,15 +21,15 @@ The core crate does no I/O. It builds HTTP requests and parses HTTP responses, a
 
 Rust applications that do not want to bring their own HTTP client use `publictransport-client`, which sends the requests with `reqwest`. Packages for Python and Swift wrap the same core, each with a client on its platform's HTTP stack, httpx and `URLSession`.
 
-[examples](examples) has a short program for each kind of request in every language.
+[examples](https://github.com/kiliankoe/publictransport/tree/main/examples) has a short program for each kind of request in every language.
 
 ## Install
 
-| Language | Package                                                                                                   |                                                            |
-| -------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Rust     | `cargo add publictransport-client`, or `publictransport` alone to bring your own HTTP client              | [crates/client](crates/client), [crates/core](crates/core) |
-| Python   | `uv add publictransport` or `pip install publictransport`                                                 | [packages/python](packages/python/README.md)               |
-| Swift    | `.package(url: "https://github.com/kiliankoe/publictransport", from: "0.1.0")`, product `PublicTransport` | [packages/swift](packages/swift/README.md)                 |
+| Language | Package                                                                                                   |                                                                                                                                                                          |
+| -------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Rust     | `cargo add publictransport-client`, or `publictransport` alone to bring your own HTTP client              | [crates/client](https://github.com/kiliankoe/publictransport/tree/main/crates/client), [crates/core](https://github.com/kiliankoe/publictransport/tree/main/crates/core) |
+| Python   | `uv add publictransport` or `pip install publictransport`                                                 | [packages/python](https://github.com/kiliankoe/publictransport/tree/main/packages/python)                                                                                |
+| Swift    | `.package(url: "https://github.com/kiliankoe/publictransport", from: "0.1.0")`, product `PublicTransport` | [packages/swift](https://github.com/kiliankoe/publictransport/tree/main/packages/swift)                                                                                  |
 
 ## Shared Core
 
@@ -36,6 +38,8 @@ Every language runs the same Rust core, so a request is built and an answer is r
 - The model is defined once, in Rust. Each language gets the types that [UniFFI](https://mozilla.github.io/uniffi-rs/) generates from it. To make things more idiomatic, the generator's settings and a small script adapt details, such as `scripts/swift-idioms.py`.
 - Written by hand in each language are the client on the platform's HTTP stack, and the bridges to the platform's own types, such as `TimeZone` in Swift.
 - A convenience that every language can use goes into the Rust code, not into one package.
+
+<!-- ANCHOR_END: site -->
 
 ## Development
 
@@ -50,7 +54,7 @@ cargo test --workspace --all-features
 cargo deny check
 ```
 
-The Python package in `packages/python` and the Swift package in `packages/swift` have their own READMEs. The Swift package has its `Package.swift` at the root of this repository, where SwiftPM looks for it. The crate in `bindings/uniffi` builds the library for both, and `scripts/build-swift.sh` generates the Swift code and builds the XCFramework.
+The Python package in `packages/python` and the Swift package in `packages/swift` have their own READMEs. The documentation site in `site` is an [mdBook](https://rust-lang.github.io/mdBook/) that includes the READMEs and the examples, so write user documentation there; `just site-serve` shows it, and a release publishes it. The Swift package has its `Package.swift` at the root of this repository, where SwiftPM looks for it. The crate in `bindings/uniffi` builds the library for both, and `scripts/build-swift.sh` generates the Swift code and builds the XCFramework.
 
 The tests replay responses recorded from real servers. `crates/core/tests/fixtures/record.sh` records them again. `just check-networks` asks every bundled network's live server for stops, departures and trips, to see which still work. `scripts/validate-xml-requests.sh` checks the TRIAS and OJP requests that the library builds against the official schemas, which it fetches from the VDV repositories.
 

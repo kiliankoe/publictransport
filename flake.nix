@@ -71,6 +71,8 @@
             # The commit convention, see CONTRIBUTING.md
             pkgs.committed
             pkgs.git-cliff
+            # Builds the documentation site in `site`
+            pkgs.mdbook
             # Finds OpenSSL for the native-tls feature of the client.
             pkgs.pkg-config
             # xmllint and the shell, for scripts/validate-xml-requests.sh

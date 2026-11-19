@@ -36,6 +36,8 @@ jobs:
       - run: nix develop -c scripts/validate-xml-requests.sh
       # The generated code of the Swift package is committed.
       - run: nix develop -c scripts/build-swift.sh check
+      # The site includes the READMEs and the examples.
+      - run: nix develop -c just site
       # Last, because they ask live servers, which can fail without a fault
       # in the code.
       - run: |

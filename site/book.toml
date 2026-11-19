@@ -1,0 +1,7 @@
+[book]
+title = "Public Transport SDK"
+language = "en"
+
+[output.html]
+git-repository-url = "https://github.com/kiliankoe/publictransport"
+site-url = "/publictransport/"
