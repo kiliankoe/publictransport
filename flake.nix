@@ -64,6 +64,8 @@
               ];
             })
             pkgs.cargo-deny
+            # Compares the API with the released crates, for scripts/prepare-release.sh
+            pkgs.cargo-semver-checks
             # The commands in the Justfile
             pkgs.just
             # The commit convention, see CONTRIBUTING.md

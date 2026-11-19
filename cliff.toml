@@ -37,3 +37,9 @@ commit_parsers = [
 filter_commits = true
 tag_pattern = "v[0-9].*"
 sort_commits = "oldest"
+
+# The next version, for `just release` without one. Before 1.0 a breaking
+# change raises the minor version and a feature the patch version.
+[bump]
+features_always_bump_minor = false
+breaking_always_bump_major = false

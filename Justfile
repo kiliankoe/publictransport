@@ -64,6 +64,6 @@ examples-swift:
 check-networks:
     cargo run -p publictransport-client --example check
 
-# Prepare a release: set the version and write the changelog, see CONTRIBUTING.md
-release version:
+# Prepare a release, see CONTRIBUTING.md: set the version and write the changelog. Without a version, the next one by the commits
+release version="":
     scripts/prepare-release.sh {{ version }}
