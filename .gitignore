@@ -9,3 +9,8 @@ __pycache__/
 /packages/swift/PublicTransportBinary.xcframework/
 .build/
 .swiftpm/
+# Written by Gradle for the Kotlin package.
+.gradle/
+.kotlin/
+/packages/kotlin/build/
+/examples/kotlin/build/

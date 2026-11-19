@@ -83,6 +83,9 @@
             pkgs.uv
             pkgs.ruff
             pkgs.pyright
+            # The Kotlin package in packages/kotlin. Gradle brings its own JDK.
+            pkgs.gradle_9
+            pkgs.ktlint
           ];
           # On Linux the native-tls feature of the client links OpenSSL.
           buildInputs = [ pkgs.openssl ];
