@@ -227,6 +227,9 @@ class Client:
         the call raises `Error.InvalidQuery`. `time` is when the list starts,
         now if left out, and `limit` how many departures are wanted. A
         `DeparturesQuery` carries the same and takes the place of all three.
+
+        `limit` is not a maximum: servers treat it as a guide and may return
+        more or fewer.
         """
         request = network.departures_request(_departures_query(stop, time, limit))
         return network.parse_departures(self._send(request))
@@ -251,6 +254,9 @@ class Client:
         are wanted, and `page` with `earlier` or `later` of an answer to
         continue that search with the same other arguments. A `TripsQuery`
         carries the same and takes the place of all of them.
+
+        `limit` is not a maximum: servers treat it as a guide and may return
+        more or fewer.
         """
         query = _trips_query(
             origin,
@@ -349,6 +355,9 @@ class AsyncClient:
         the call raises `Error.InvalidQuery`. `time` is when the list starts,
         now if left out, and `limit` how many departures are wanted. A
         `DeparturesQuery` carries the same and takes the place of all three.
+
+        `limit` is not a maximum: servers treat it as a guide and may return
+        more or fewer.
         """
         request = network.departures_request(_departures_query(stop, time, limit))
         return network.parse_departures(await self._send(request))
@@ -373,6 +382,9 @@ class AsyncClient:
         are wanted, and `page` with `earlier` or `later` of an answer to
         continue that search with the same other arguments. A `TripsQuery`
         carries the same and takes the place of all of them.
+
+        `limit` is not a maximum: servers treat it as a guide and may return
+        more or fewer.
         """
         query = _trips_query(
             origin,

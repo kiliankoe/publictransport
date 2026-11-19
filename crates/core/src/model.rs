@@ -240,8 +240,9 @@ pub struct DeparturesQuery {
     /// The time from which on departures are wanted. `None` means now.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub time: Option<Timestamp>,
-    /// How many departures are wanted. Servers treat this as a guide and may
-    /// return a few more or fewer. `None` leaves the number to the server.
+    /// How many departures are wanted. This is not a maximum: servers treat
+    /// it as a guide and may return more or fewer, so cut the list where a
+    /// fixed number matters. `None` leaves the number to the server.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub limit: Option<u32>,
 }
@@ -380,8 +381,9 @@ pub struct TripsQuery {
     /// When to leave or arrive. `None` means leaving now.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub time: Option<TripTime>,
-    /// How many trips are wanted. Servers treat this as a guide and may
-    /// return more or fewer. `None` leaves the number to the server.
+    /// How many trips are wanted. This is not a maximum: servers treat it
+    /// as a guide and may return more or fewer, so cut the list where a
+    /// fixed number matters. `None` leaves the number to the server.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     pub limit: Option<u32>,
     /// Continues an earlier search: [`Trips::earlier`] or [`Trips::later`]

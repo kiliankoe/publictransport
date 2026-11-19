@@ -1379,8 +1379,9 @@ public struct DeparturesQuery: Equatable, Hashable, Codable {
      */
     public var time: UtcTime?
     /**
-     * How many departures are wanted. Servers treat this as a guide and may
-     * return a few more or fewer. `nil` leaves the number to the server.
+     * How many departures are wanted. This is not a maximum: servers treat
+     * it as a guide and may return more or fewer, so cut the list where a
+     * fixed number matters. `nil` leaves the number to the server.
      */
     public var limit: UInt32?
 
@@ -1395,8 +1396,9 @@ public struct DeparturesQuery: Equatable, Hashable, Codable {
          * The time from which on departures are wanted. `nil` means now.
          */time: UtcTime? = nil, 
         /**
-         * How many departures are wanted. Servers treat this as a guide and may
-         * return a few more or fewer. `nil` leaves the number to the server.
+         * How many departures are wanted. This is not a maximum: servers treat
+         * it as a guide and may return more or fewer, so cut the list where a
+         * fixed number matters. `nil` leaves the number to the server.
          */limit: UInt32? = nil) {
         self.stop = stop
         self.time = time
@@ -3428,8 +3430,9 @@ public struct TripsQuery: Equatable, Hashable, Codable {
      */
     public var time: TripTime?
     /**
-     * How many trips are wanted. Servers treat this as a guide and may
-     * return more or fewer. `nil` leaves the number to the server.
+     * How many trips are wanted. This is not a maximum: servers treat it
+     * as a guide and may return more or fewer, so cut the list where a
+     * fixed number matters. `nil` leaves the number to the server.
      */
     public var limit: UInt32?
     /**
@@ -3455,8 +3458,9 @@ public struct TripsQuery: Equatable, Hashable, Codable {
          * When to leave or arrive. `nil` means leaving now.
          */time: TripTime? = nil, 
         /**
-         * How many trips are wanted. Servers treat this as a guide and may
-         * return more or fewer. `nil` leaves the number to the server.
+         * How many trips are wanted. This is not a maximum: servers treat it
+         * as a guide and may return more or fewer, so cut the list where a
+         * fixed number matters. `nil` leaves the number to the server.
          */limit: UInt32? = nil, 
         /**
          * Continues an earlier search: ``Trips/earlier`` or ``Trips/later``

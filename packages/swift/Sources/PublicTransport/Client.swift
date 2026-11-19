@@ -197,7 +197,8 @@ public struct Client: Sendable {
     ///     it, which EFA, TRIAS and OJP can for stops with a global ID.
     ///   - time: The time from which on departures are wanted. Now if
     ///     left out.
-    ///   - limit: How many departures are wanted.
+    ///   - limit: How many departures are wanted. This is not a maximum:
+    ///     servers treat it as a guide and may return more or fewer.
     /// - Throws: ``PublicTransportError``, such as `notFound` for a stop
     ///   the network does not know, and `URLError` if the request got no
     ///   answer.
@@ -227,7 +228,8 @@ public struct Client: Sendable {
     ///     left out.
     ///   - arrivingBy: Arrive at this time or earlier. Only one of the two
     ///     times can be given.
-    ///   - limit: How many trips are wanted.
+    ///   - limit: How many trips are wanted. This is not a maximum: servers
+    ///     treat it as a guide and may return more or fewer.
     ///   - page: ``Trips/earlier`` or ``Trips/later`` of an answer, to
     ///     continue that search with the same other arguments. A server
     ///     that searches a window of time can answer with no trips and a
