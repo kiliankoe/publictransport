@@ -38,8 +38,13 @@ swift-test:
     env -i PATH=/usr/bin:/bin:/usr/sbin HOME="$HOME" swift format lint --strict --recursive \
         packages/swift/Sources/PublicTransport/Client.swift packages/swift/Sources/PublicTransport/Codable.swift packages/swift/Tests
 
+# Lint and test the Kotlin package and compile its examples, with the Rust library built for them
+kotlin:
+    ktlint 'packages/kotlin/**/*.kt' 'packages/kotlin/**/*.kts' 'examples/kotlin/**/*.kt' 'examples/kotlin/**/*.kts' '!**/build/**'
+    gradle --project-dir packages/kotlin --quiet build
+
 # Run the examples of every language against their live servers
-examples: examples-rust examples-python examples-swift
+examples: examples-rust examples-python examples-swift examples-kotlin
 
 # Run the Rust examples
 examples-rust:
@@ -60,13 +65,17 @@ examples-swift:
             swift run --quiet --package-path examples/swift $name; \
     done
 
+# Run the Kotlin examples
+examples-kotlin:
+    for name in locations departures trips networks; do gradle --project-dir packages/kotlin --quiet :examples:$name; done
+
 # Ask the live server of every bundled network for stops, departures and trips
 check-networks:
     cargo run -p publictransport-client --example check
 
 # Build the documentation site into site/book. mdBook only warns about a file it cannot include and says nothing about a missing anchor, so both are checked here
 site:
-    for file in README.md packages/python/README.md packages/swift/README.md; do \
+    for file in README.md packages/python/README.md packages/swift/README.md packages/kotlin/README.md; do \
         grep -q "ANCHOR: site" $file; grep -q "ANCHOR_END: site" $file; \
     done
     cargo run --quiet -p publictransport --example network_table > site/src/networks.md
