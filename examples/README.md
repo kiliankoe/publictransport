@@ -35,4 +35,12 @@ PUBLICTRANSPORT_LOCAL_BINARY=1 swift run --package-path examples/swift trips
 
 Without the variable it uses the Rust library of the last release, which fits as long as the Swift code has not changed since.
 
-`just examples` runs all of them, and `just examples-rust`, `just examples-python` and `just examples-swift` those of one language.
+## Kotlin
+
+The programs in `examples/kotlin` are a subproject of the Gradle build in `packages/kotlin`, which builds the Rust library first. In the development shell:
+
+```sh
+gradle --project-dir packages/kotlin :examples:trips
+```
+
+`just examples` runs all of them, and `just examples-rust`, `just examples-python`, `just examples-swift` and `just examples-kotlin` those of one language.
