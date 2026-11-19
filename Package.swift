@@ -14,8 +14,8 @@ import PackageDescription
 // The release workflow writes these two lines. Between releases the code
 // can be ahead of that binary, so depend on a version, not on a branch.
 let binaryURL =
-    "https://github.com/kiliankoe/publictransport/releases/download/v0.0.0/PublicTransportBinary.xcframework.zip"
-let binaryChecksum = "0000000000000000000000000000000000000000000000000000000000000000"
+    "https://github.com/kiliankoe/publictransport/releases/download/v0.1.0/PublicTransportBinary.xcframework.zip"
+let binaryChecksum = "7f255c4933cb58a03a52e23ff6b71a119158f9d1b3b9c6311d11702550b84ce4"
 
 #if os(Linux)
 let library: [Target] = []
