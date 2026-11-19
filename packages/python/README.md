@@ -1,8 +1,8 @@
 # publictransport
 
-A Python client for public transport APIs. One shared model for stops, departures and trips covers several server types, so an application can query any supported network the same way. It supports servers that speak EFA (used by many German transport associations), MOTIS (the routing engine behind [Transitous](https://transitous.org)), TRIAS 1.2, OJP 1.0, HAFAS mgate (the interface behind many operators' apps) and OpenTripPlanner 2 with its Transmodel API.
+A Python client for public transport APIs. It uses a shared model for stops, departures and trips that covers several server types, so an application can query any supported network the same way. It supports servers that speak EFA (used by many German transport associations), MOTIS (the routing engine behind [Transitous](https://transitous.org)), TRIAS 1.2, OJP 1.0, HAFAS mgate (the interface behind many operators' apps) and OpenTripPlanner 2 with its Transmodel API.
 
-The package wraps the Rust library of the same name. The Rust code builds the requests and parses the answers, and [httpx](https://www.python-httpx.org) sends them.
+The package wraps the Rust library of the same name. The Rust code builds the requests and parses the answers, and [httpx](https://www.python-httpx.org) sends them. Install it with `uv add publictransport` or `pip install publictransport`; there are wheels for Linux (glibc), macOS and Windows on x86-64, and for the first two on ARM.
 
 ```python
 from publictransport import BundledNetwork, Client, LocationKind

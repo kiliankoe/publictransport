@@ -1,6 +1,6 @@
-# publictransport
+# Public Transport SDK
 
-A client library for public transport APIs. One shared model for stops, departures and trips covers several server types, so an application can query any supported network the same way.
+A client library for public transport APIs, for Rust, Python and Swift. The libraries use a shared model for stops, departures and trips that covers several server types, so an application can query any supported network the same way.
 
 The project is at an early stage. It can search for locations by name, list the departures at a stop and plan trips between two places on servers that speak one of six protocols:
 
@@ -23,13 +23,29 @@ Rust applications that do not want to bring their own HTTP client use `publictra
 cargo run -p publictransport-client --example trip -- vvo-efa "Dresden Hauptbahnhof" "Dresden Albertplatz"
 ```
 
-Packages for Python and Swift wrap the same core, each with a client on its platform's HTTP stack, httpx and `URLSession`. Neither is released yet. The Swift package has its `Package.swift` at the root of this repository.
+Packages for Python and Swift wrap the same core, each with a client on its platform's HTTP stack, httpx and `URLSession`.
+
+## Install
+
+| Language | Package                                                                                                   |                                                            |
+| -------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Rust     | `cargo add publictransport-client`, or `publictransport` alone to bring your own HTTP client              | [crates/client](crates/client), [crates/core](crates/core) |
+| Python   | `uv add publictransport` or `pip install publictransport`                                                 | [packages/python](packages/python/README.md)               |
+| Swift    | `.package(url: "https://github.com/kiliankoe/publictransport", from: "0.1.0")`, product `PublicTransport` | [packages/swift](packages/swift/README.md)                 |
+
+## Shared Core
+
+Every language runs the same Rust core, so a request is built and an answer is read the same way everywhere.
+
+- The model is defined once, in Rust. Each language gets the types that [UniFFI](https://mozilla.github.io/uniffi-rs/) generates from it. To make things more idiomatic, the generator's settings and a small script adapt details, such as `scripts/swift-idioms.py`.
+- Written by hand in each language are the client on the platform's HTTP stack, and the bridges to the platform's own types, such as `TimeZone` in Swift.
+- A convenience that every language can use goes into the Rust code, not into one package.
 
 ## Development
 
 Clone with `--recurse-submodules`, or run `git submodule update --init` afterwards: the network data of [transport-apis](https://github.com/public-transport/transport-apis) is a submodule under `crates/core/data`. Networks that repository does not have yet are in `crates/core/data/networks`, in the same format.
 
-The development environment is a nix flake; `direnv allow` or `nix develop` provides the toolchain. CI runs these checks:
+The development environment is a nix flake; `direnv allow` or `nix develop` provides the toolchain. The `Justfile` has the commands of the project, and `just` lists them. CI runs these checks, which `just check` runs too:
 
 ```sh
 cargo fmt --all --check
@@ -38,12 +54,12 @@ cargo test --workspace --all-features
 cargo deny check
 ```
 
-The Python package in `packages/python` and the Swift package in `packages/swift` wrap the library through [UniFFI](https://mozilla.github.io/uniffi-rs/); see their READMEs. The crate in `bindings/uniffi` builds the library for them, and `scripts/build-swift.sh` generates the Swift code and builds the XCFramework.
+The Python package in `packages/python` and the Swift package in `packages/swift` have their own READMEs. The Swift package has its `Package.swift` at the root of this repository, where SwiftPM looks for it. The crate in `bindings/uniffi` builds the library for both, and `scripts/build-swift.sh` generates the Swift code and builds the XCFramework.
 
 The tests replay responses recorded from real servers. `crates/core/tests/fixtures/record.sh` records them again. `cargo run --example check` asks every bundled network's live server for stops, departures and trips, to see which still work. `scripts/validate-xml-requests.sh` checks the TRIAS and OJP requests that the library builds against the official schemas, which it fetches from the VDV repositories.
 
-`CONTRIBUTING.md` describes the commit message format and how the changelog is made.
+Please also see `CONTRIBUTING.md` for further details.
 
 ## License
 
-Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT license](LICENSE-MIT) at your option.
+Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT license](LICENSE-MIT) at your option. [NOTICE](NOTICE) names the parts that have another license: the code that UniFFI generates and the network data.
