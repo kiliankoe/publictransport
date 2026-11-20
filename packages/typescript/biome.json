@@ -1,0 +1,19 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.5/schema.json",
+  "files": {
+    "includes": ["**", "!dist", "!src/generated"]
+  },
+  "formatter": {
+    "indentStyle": "space",
+    "lineWidth": 100
+  },
+  "linter": {
+    "rules": {
+      "preset": "recommended",
+      "suspicious": {
+        "noShadow": "error",
+        "useAwait": "error"
+      }
+    }
+  }
+}

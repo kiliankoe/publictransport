@@ -1,0 +1,38 @@
+{
+  "name": "@kiliankoe/publictransport",
+  "version": "0.1.1",
+  "description": "Client for public transport APIs: EFA, MOTIS, TRIAS, OJP, HAFAS and OpenTripPlanner",
+  "license": "MIT OR Apache-2.0",
+  "homepage": "https://kiliankoe.github.io/publictransport/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kiliankoe/publictransport.git",
+    "directory": "packages/typescript"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE-APACHE",
+    "LICENSE-MIT",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "./build.sh",
+    "lint": "biome check --error-on-warnings . ../../examples/typescript",
+    "typecheck": "tsc",
+    "test": "node --test 'test/*.test.ts'"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,0 +1,13 @@
+publictransport
+Licensed under either of the Apache License, Version 2.0 (LICENSE-APACHE)
+or the MIT license (LICENSE-MIT) at your option.
+
+Parts that have another license:
+
+The WebAssembly module in the package contains entries of networks from
+https://github.com/public-transport/transport-apis, which are in the
+public domain (CC0 1.0).
+
+The WebAssembly module also contains the Rust libraries that Cargo.lock
+in the repository lists for the crate publictransport-wasm, each under
+its own license.

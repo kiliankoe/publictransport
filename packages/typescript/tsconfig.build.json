@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // What browsers have too, so that nothing of Node gets into the package.
+    // The class that wasm-bindgen writes can be disposed of.
+    "lib": ["ES2022", "ESNext.Disposable", "DOM", "DOM.Iterable"],
+    "types": [],
+    "allowImportingTsExtensions": false,
+    "noEmit": false,
+    "declaration": true,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src"]
+}

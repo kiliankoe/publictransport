@@ -14,3 +14,7 @@ __pycache__/
 .kotlin/
 /packages/kotlin/build/
 /examples/kotlin/build/
+# Installed by pnpm and built by packages/typescript/build.sh.
+node_modules/
+/packages/typescript/dist/
+/packages/typescript/src/generated/
