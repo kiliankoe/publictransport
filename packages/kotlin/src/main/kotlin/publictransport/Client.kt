@@ -29,6 +29,12 @@ private const val LARGEST_BODY = 16L * 1024 * 1024
  */
 class ResponseTooLargeException : IOException("the response is larger than 16 MB")
 
+/** This location as an end of a trip, for [Client.trips] with a coordinate or an ID at the other end. */
+fun Location.asPlace(): Place = Place.Location(this)
+
+/** This position as an end of a trip, for [Client.trips]. */
+fun Coordinate.asPlace(): Place = Place.Coordinate(this)
+
 /**
  * Sends requests to public transport servers and waits for the answers.
  *
@@ -177,9 +183,10 @@ class Client(
     ): Trips = trips(network, Place.Location(origin), Place.Location(destination), departAt, arriveBy, limit, page)
 
     /**
-     * Plans trips between two places: each is a [Place.Location], a
-     * [Place.Coordinate], or a [Place.Id] on this network. The other
-     * arguments are those of the call with two locations.
+     * Plans trips between two places: each is a location or a coordinate,
+     * made a place with `asPlace()`, or a [Place.Id] on this network, as in
+     * `trips(network, stop.asPlace(), Coordinate(51.04, 13.73).asPlace())`.
+     * The other arguments are those of the call with two locations.
      */
     suspend fun trips(
         network: Network,
