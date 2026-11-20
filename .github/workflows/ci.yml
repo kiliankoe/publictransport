@@ -25,6 +25,7 @@ jobs:
       python: ${{ steps.filter.outputs.python }}
       swift: ${{ steps.filter.outputs.swift }}
       kotlin: ${{ steps.filter.outputs.kotlin }}
+      typescript: ${{ steps.filter.outputs.typescript }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -36,12 +37,12 @@ jobs:
               - Cargo.toml
               - Cargo.lock
               - crates/core/**
-              - bindings/**
               - flake.nix
               - flake.lock
             rust:
               - *shared
               - crates/**
+              - bindings/**
               - clippy.toml
               - deny.toml
               - Justfile
@@ -54,10 +55,12 @@ jobs:
               - '**/README.md'
             python:
               - *shared
+              - bindings/uniffi/**
               - packages/python/**
               - examples/python/**
             swift:
               - *shared
+              - bindings/uniffi/**
               - Package.swift
               - packages/swift/**
               - examples/swift/**
@@ -65,9 +68,15 @@ jobs:
               - scripts/swift-idioms.py
             kotlin:
               - *shared
+              - bindings/uniffi/**
               - packages/kotlin/**
               - examples/kotlin/**
               - scripts/kotlin-idioms.py
+            typescript:
+              - *shared
+              - bindings/wasm/**
+              - packages/typescript/**
+              - examples/typescript/**
 
   check:
     needs: changes
@@ -191,6 +200,34 @@ jobs:
       - run: |
           for name in locations departures trips networks; do
             nix develop -c gradle --project-dir packages/kotlin --quiet :examples:$name
+          done
+
+  typescript:
+    needs: changes
+    if: needs.changes.outputs.typescript == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The network data of transport-apis.
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@v23
+      - uses: Swatinem/rust-cache@v2
+      - run: nix develop -c pnpm --dir packages/typescript install --frozen-lockfile
+      # The examples use the package of the checkout through a link.
+      - run: nix develop -c pnpm --dir examples/typescript install --frozen-lockfile
+      # The hand-written code and the examples; the generated files are not checked.
+      - run: nix develop -c pnpm --dir packages/typescript lint
+      # Builds the Rust library as WebAssembly, generates the model from
+      # it and compiles the package.
+      - run: nix develop -c pnpm --dir packages/typescript build
+      - run: nix develop -c pnpm --dir packages/typescript typecheck
+      - run: nix develop -c pnpm --dir packages/typescript test
+      # Last, because they ask live servers, which can fail without a fault
+      # in the code.
+      - run: |
+          for name in locations departures trips networks; do
+            nix develop -c node examples/typescript/$name.ts
           done
 
   swift-macos:

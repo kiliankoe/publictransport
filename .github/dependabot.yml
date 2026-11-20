@@ -10,6 +10,13 @@ updates:
     # built from it.
     allow:
       - dependency-type: all
+    # wasm-bindgen is pinned to the version of its command line tool in
+    # the flake, and the crates released with it each ask for exactly
+    # one version of it. They are updated by hand, with the flake.
+    ignore:
+      - dependency-name: "wasm-bindgen*"
+      - dependency-name: js-sys
+      - dependency-name: web-sys
     commit-message:
       prefix: build(deps)
     groups:
@@ -34,6 +41,16 @@ updates:
       prefix: build(deps)
     groups:
       kotlin:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /packages/typescript
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build(deps)
+    groups:
+      typescript:
         patterns: ["*"]
 
   - package-ecosystem: github-actions
