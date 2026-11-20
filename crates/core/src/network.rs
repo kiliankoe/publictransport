@@ -9,6 +9,11 @@ use crate::{
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct Network {
     /// A short identifier, e.g. `vvo-efa`. It has to be unique among the
     /// networks an application uses, because a [`Location`] names its
@@ -32,31 +37,59 @@ pub struct Network {
     /// HAFAS for nearly all. Locations get it as their time zone where the
     /// server sends none per stop, as MOTIS and `OpenTripPlanner` do.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub timezone: Option<String>,
     /// Identifies the client to a TRIAS or OJP server, which refuses
     /// requests without it. Public servers document a value such as
     /// `OpenService`; others hand out a key.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub requestor_ref: Option<String>,
     /// Where the network has data.
     #[cfg_attr(feature = "uniffi", uniffi(default))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(default, deserialize_with = "crate::wasm::or_default")
+    )]
     pub coverage: Coverage,
     /// Whom to name as the source of the data.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub attribution: Option<Attribution>,
     /// The operations the server is known not to answer. Building a request
     /// for one of them fails with [`Error::Unsupported`].
     #[cfg_attr(feature = "uniffi", uniffi(default = []))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(default, deserialize_with = "crate::wasm::or_default")
+    )]
     pub unsupported: Vec<Operation>,
     /// Whether the server only answers with a key that its operator hands
     /// out on request. The application sets it as
     /// [`Network::requestor_ref`].
     #[cfg_attr(feature = "uniffi", uniffi(default = false))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(default, deserialize_with = "crate::wasm::or_default")
+    )]
     pub requires_key: bool,
     /// A link to usage terms that restrict who may use the server, for
     /// example to non-commercial projects. `None` if anyone may. The library
     /// does not enforce them: read them before using the network.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub terms: Option<String>,
     /// HTTP headers that every request to the server carries, for servers
     /// that want a key or the name of the client in one. A request to
@@ -67,6 +100,10 @@ pub struct Network {
     /// check names and values; the HTTP client rejects invalid ones. Debug
     /// output leaves the values out.
     #[cfg_attr(feature = "uniffi", uniffi(default = []))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(default, deserialize_with = "crate::wasm::or_default")
+    )]
     pub headers: Vec<Header>,
     /// The URL of a geocoder in the Pelias format, such as
     /// `https://api.entur.io/geocoder/v1`, for protocols without a search
@@ -76,10 +113,18 @@ pub struct Network {
     /// use of the format: stops are in the layer `venue`, everything else
     /// in `address`.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub geocoder: Option<String>,
     /// What a HAFAS mgate server needs. Requests to such a network fail
     /// without it.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub hafas: Option<HafasOptions>,
 }
 
@@ -88,6 +133,11 @@ pub struct Network {
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub enum Protocol {
     /// The JSON interface of MDV's EFA journey planner.
     Efa,

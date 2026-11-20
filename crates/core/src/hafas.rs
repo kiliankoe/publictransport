@@ -17,6 +17,11 @@ use crate::{
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug, Display))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct HafasOptions {
     /// The description of the client, a JSON object as text. Its fields
     /// differ from operator to operator, so the crate passes it on as it is.
@@ -26,6 +31,10 @@ pub struct HafasOptions {
     pub auth: String,
     /// The name of the operator's extension of the interface.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub ext: Option<String>,
     /// The version of the interface to ask for, such as `1.33`.
     pub version: String,
@@ -34,6 +43,10 @@ pub struct HafasOptions {
     pub language: String,
     /// The operator's kinds of vehicles, which give a line its mode.
     #[cfg_attr(feature = "uniffi", uniffi(default = []))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(default, deserialize_with = "crate::wasm::or_default")
+    )]
     pub products: Vec<HafasProduct>,
 }
 
@@ -104,6 +117,11 @@ impl std::fmt::Display for HafasOptions {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct HafasProduct {
     /// A name for programs, such as `suburban`. It decides the
     /// [`Mode`] of the lines; an ID the crate does not know gives

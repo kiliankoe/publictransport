@@ -68,6 +68,8 @@ mod otp;
 mod registry;
 mod time;
 mod trias;
+#[cfg(feature = "unstable-wasm")]
+mod wasm;
 
 pub use error::Error;
 pub use hafas::{HafasOptions, HafasProduct};

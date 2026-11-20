@@ -3,6 +3,13 @@
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Error))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Display))]
+// `Error` is JavaScript's own type for errors.
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, tsify::Tsify),
+    serde(tag = "type", rename_all = "camelCase"),
+    tsify(rename = "Failure")
+)]
 pub enum Error {
     /// The [`Network`](crate::Network) lacks something the request needs,
     /// such as a time zone, or its description cannot be read.
@@ -42,6 +49,10 @@ pub enum Error {
     )]
     Moved {
         /// The value of the `Location` header.
+        #[cfg_attr(
+            feature = "unstable-wasm",
+            serde(skip_serializing_if = "Option::is_none")
+        )]
         location: Option<String>,
     },
     /// The server refuses this client (status 403). Trying again does not

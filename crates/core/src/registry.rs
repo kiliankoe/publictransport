@@ -12,6 +12,11 @@ use crate::{Coordinate, Error, HafasOptions, HafasProduct, Network, Protocol};
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub enum Operation {
     /// A search for locations.
     Locations,
@@ -26,15 +31,32 @@ pub enum Operation {
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct Coverage {
     /// Where the network has real-time data.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub realtime: Option<Area>,
     /// Where it has complete timetables.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub regular: Option<Area>,
     /// Where it has any data.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub any: Option<Area>,
 }
 
@@ -43,12 +65,25 @@ pub struct Coverage {
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct Area {
     /// ISO 3166 codes of countries (`DE`) or their subdivisions (`DE-SN`).
     #[cfg_attr(feature = "uniffi", uniffi(default = []))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(default, deserialize_with = "crate::wasm::or_default")
+    )]
     pub regions: Vec<String>,
     /// The outlines of the area.
     #[cfg_attr(feature = "uniffi", uniffi(default = []))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(default, deserialize_with = "crate::wasm::or_default")
+    )]
     pub polygons: Vec<Polygon>,
 }
 
@@ -57,6 +92,11 @@ pub struct Area {
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct Polygon {
     /// Each ring is a closed line of positions.
     pub rings: Vec<Vec<Coordinate>>,
@@ -67,6 +107,11 @@ pub struct Polygon {
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub enum CoverageTier {
     /// Real-time data.
     Realtime,
@@ -81,14 +126,27 @@ pub enum CoverageTier {
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct Attribution {
     /// The name of the source.
     pub name: String,
     /// Its website.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub homepage: Option<String>,
     /// The license of the data, where the source has a single one.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub license: Option<String>,
 }
 
@@ -451,6 +509,11 @@ impl WireArea {
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct CoveringNetwork {
     /// The network.
     pub network: Network,
@@ -471,11 +534,13 @@ macro_rules! bundled {
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[non_exhaustive]
         #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+        #[cfg_attr(feature = "unstable-wasm", derive(serde::Serialize, serde::Deserialize, tsify::Tsify))]
         pub enum BundledNetwork {
             $(
                 // The documentation of a network is its ID. UniFFI cannot
                 // read a `concat!` there that would make a sentence of it.
                 #[doc = $id]
+                #[cfg_attr(feature = "unstable-wasm", serde(rename = $id))]
                 $variant,
             )*
         }

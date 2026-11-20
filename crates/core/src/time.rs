@@ -37,6 +37,36 @@ impl Timestamp {
     }
 }
 
+#[cfg(any(feature = "uniffi", feature = "unstable-wasm"))]
+impl LocalTime {
+    /// The time in ISO 8601 format, such as `2026-11-19T14:08:00+01:00`,
+    /// which is how it crosses into other languages.
+    pub(crate) fn iso_8601(self) -> String {
+        let offset = self.utc_offset_seconds.unsigned_abs();
+        // Zones had offsets with seconds before they agreed on whole minutes.
+        let seconds = match offset % 60 {
+            0 => String::new(),
+            seconds => format!(":{seconds:02}"),
+        };
+        format!(
+            "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}{}{:02}:{:02}{seconds}",
+            self.year,
+            self.month,
+            self.day,
+            self.hour,
+            self.minute,
+            self.second,
+            if self.utc_offset_seconds < 0 {
+                '-'
+            } else {
+                '+'
+            },
+            offset / 3600,
+            offset / 60 % 60,
+        )
+    }
+}
+
 impl Location {
     /// `time` on the clocks at this location. `None` if the location has
     /// no [`Location::timezone`] or one that is not a known IANA name, so

@@ -61,10 +61,24 @@ roxmltree = "0.21.2"
 [features]
 # Exports the types and functions to other languages through UniFFI.
 uniffi = ["dep:uniffi"]
+# Makes the types cross into JavaScript, with TypeScript declarations. It
+# exists for the WebAssembly binding of this repository in bindings/wasm
+# only and is outside the semver promise. Its serde implementations only
+# work with serde-wasm-bindgen: a time crosses as a JavaScript `Date`, so
+# any other serializer aborts on a `Timestamp`.
+unstable-wasm = ["dep:js-sys", "dep:serde-wasm-bindgen", "dep:serde_bytes", "dep:tsify", "dep:wasm-bindgen"]
 
 [dependencies]
 # Bindings and library must come from the same UniFFI version.
 uniffi = { version = "=0.32.2", optional = true, default-features = false }
+# The command line tool that writes the JavaScript side has to have the
+# version of the crate. It comes from nixpkgs, so after a flake update that
+# brings a new one, set its version here and in bindings/wasm/Cargo.toml.
+wasm-bindgen = { version = "=0.2.130", optional = true }
+js-sys = { version = "0.3.107", optional = true }
+serde-wasm-bindgen = { version = "0.6.5", optional = true }
+serde_bytes = { version = "0.11.19", optional = true }
+tsify = { version = "0.5.8", optional = true, default-features = false, features = ["js"] }
 form_urlencoded = "1.2.2"
 jiff = { version = "1.0.0", default-features = false, features = ["std", "tzdb-bundle-always"] }
 serde = { version = "1.0.229", features = ["derive"] }

@@ -4,6 +4,11 @@ use crate::Error;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct HttpRequest {
     /// The request method.
     pub method: Method,
@@ -12,6 +17,11 @@ pub struct HttpRequest {
     /// Headers the server needs. The caller may add its own.
     pub headers: Vec<Header>,
     /// The request body, if the method has one.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(default, skip_serializing_if = "Option::is_none", with = "serde_bytes"),
+        tsify(type = "Uint8Array")
+    )]
     pub body: Option<Vec<u8>>,
 }
 
@@ -19,6 +29,11 @@ pub struct HttpRequest {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "UPPERCASE")
+)]
 pub enum Method {
     /// `GET`
     Get,
@@ -31,12 +46,22 @@ pub enum Method {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct HttpResponse {
     /// The status code.
     pub status: u16,
     /// All response headers. Names are matched case-insensitively.
     pub headers: Vec<Header>,
     /// The raw response body.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(with = "serde_bytes"),
+        tsify(type = "Uint8Array")
+    )]
     pub body: Vec<u8>,
 }
 
@@ -45,6 +70,11 @@ pub struct HttpResponse {
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug, Display))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct Header {
     /// The header name.
     pub name: String,

@@ -1,0 +1,22 @@
+[package]
+name = "publictransport-wasm"
+description = "The publictransport library as a WebAssembly module for the TypeScript package"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+publictransport = { path = "../../crates/core", features = ["unstable-wasm"] }
+js-sys = "0.3.107"
+serde = { version = "1.0.229", features = ["derive"] }
+tsify = { version = "0.5.8", default-features = false, features = ["js"] }
+# The same version as in publictransport.
+wasm-bindgen = "=0.2.130"

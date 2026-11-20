@@ -3,6 +3,11 @@
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct LocationQuery {
     /// The text to search for, as a user typed it.
     pub text: String,
@@ -10,6 +15,10 @@ pub struct LocationQuery {
     /// has no limit that works for every search, so the request carries
     /// none there and the server returns every match.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub limit: Option<u32>,
     /// The kinds of location wanted. Empty asks for every kind. The request
     /// asks the server to filter, so `limit` counts only wanted locations.
@@ -20,6 +29,10 @@ pub struct LocationQuery {
     /// also has addresses and points of interest in one layer, so a search
     /// for one of the two returns both.
     #[cfg_attr(feature = "uniffi", uniffi(default = []))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(default, deserialize_with = "crate::wasm::or_default")
+    )]
     pub kinds: Vec<LocationKind>,
 }
 
@@ -83,26 +96,47 @@ impl LocationQuery {
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct Location {
     /// Identifies the location on the network that returned it. Other
     /// networks do not understand it.
     pub id: String,
     /// The identifiers of the location that are shared across networks.
     /// Empty if the server sends none in a scheme this crate knows.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(default, deserialize_with = "crate::wasm::or_default")
+    )]
     pub global_ids: Vec<GlobalId>,
     /// What kind of place this is.
     pub kind: LocationKind,
     /// The name, without the locality where the server tells them apart.
     pub name: String,
     /// The town or city the location is in.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub locality: Option<String>,
     /// The position.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub coordinate: Option<Coordinate>,
     /// The IANA name of the time zone the location is in, e.g.
     /// `Europe/Berlin`, for showing times there, as
     /// [`Location::local_time`] does. MOTIS sends it, and
     /// `OpenTripPlanner` for stops in departures and trips; otherwise it is
     /// [`Network::timezone`](crate::Network::timezone).
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub timezone: Option<String>,
     /// The [`Network::id`](crate::Network::id) of the network that returned
     /// the location. Its `id` belongs to that network;
@@ -111,6 +145,10 @@ pub struct Location {
     /// for another one. A location without a network, such as one an
     /// application built itself, is treated as one from another network.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub network: Option<String>,
 }
 
@@ -137,6 +175,11 @@ impl Location {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct GlobalId {
     /// The scheme that gives the value its meaning.
     pub scheme: IdScheme,
@@ -149,6 +192,11 @@ pub struct GlobalId {
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub enum IdScheme {
     /// IFOPT, the European standard for the identification of fixed
     /// objects in public transport: a country code, then parts separated by
@@ -200,6 +248,11 @@ impl GlobalId {
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub enum LocationKind {
     /// A stop or station.
     Stop,
@@ -215,6 +268,11 @@ pub enum LocationKind {
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct Coordinate {
     /// Latitude, positive to the north.
     pub latitude: f64,
@@ -225,6 +283,7 @@ pub struct Coordinate {
 /// An instant in UTC. [`Location::local_time`] gives it as the clocks at a
 /// stop show it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "unstable-wasm", derive(tsify::Tsify), tsify(type = "Date"))]
 pub struct Timestamp {
     /// Seconds since 1970-01-01T00:00:00Z.
     pub unix_seconds: i64,
@@ -234,6 +293,11 @@ pub struct Timestamp {
 /// prints as the time of day, such as `14:08`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(tsify::Tsify),
+    tsify(type = "string")
+)]
 pub struct LocalTime {
     /// The year.
     pub year: u16,
@@ -263,17 +327,30 @@ impl std::fmt::Display for LocalTime {
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct DeparturesQuery {
     /// The stop: its [`Location::id`] on the network that is asked, or a
     /// location of any network. A position is not a stop.
     pub stop: Place,
     /// The time from which on departures are wanted. `None` means now.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub time: Option<Timestamp>,
     /// How many departures are wanted. This is not a maximum: servers treat
     /// it as a guide and may return more or fewer, so cut the list where a
     /// fixed number matters. `None` leaves the number to the server.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub limit: Option<u32>,
 }
 
@@ -308,6 +385,11 @@ impl DeparturesQuery {
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct Departure {
     /// Where the vehicle leaves from. Servers name the platform here where
     /// they have one in their data and the station otherwise, so compare
@@ -316,17 +398,33 @@ pub struct Departure {
     /// The line the vehicle runs on.
     pub line: Line,
     /// Where the vehicle is headed, as shown on it.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub direction: Option<String>,
     /// The departure time according to the timetable.
     pub scheduled_time: Timestamp,
     /// The predicted departure time, which can be earlier than scheduled.
     /// `None` if the server has no prediction; a vehicle that is on time has
     /// the scheduled time here.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub realtime_time: Option<Timestamp>,
     /// The platform according to the timetable.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub scheduled_platform: Option<String>,
     /// The platform the vehicle leaves from as far as the server knows now.
     /// It equals the scheduled one unless the platform changed.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub realtime_platform: Option<String>,
     /// Whether the departure does not take place.
     pub cancelled: bool,
@@ -347,6 +445,11 @@ impl Departure {
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct Line {
     /// The short name shown on vehicles, e.g. `7`, `S1` or `RE13`. Trains
     /// without a line have their category and number here, e.g. `ICE 1652`.
@@ -355,8 +458,16 @@ pub struct Line {
     pub mode: Mode,
     /// The server's own name for the kind of vehicle, e.g. `Straßenbahn` or
     /// `PlusBus`. It can be finer than [`Mode`].
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub product: Option<String>,
     /// The name of the company that runs the line.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub operator: Option<String>,
 }
 
@@ -365,6 +476,11 @@ pub struct Line {
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub enum Mode {
     /// A high-speed train, e.g. ICE or TGV.
     HighSpeedTrain,
@@ -403,6 +519,11 @@ pub enum Mode {
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct TripsQuery {
     /// Where the trip starts.
     pub origin: Place,
@@ -410,11 +531,19 @@ pub struct TripsQuery {
     pub destination: Place,
     /// When to leave or arrive. `None` means leaving now.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub time: Option<TripTime>,
     /// How many trips are wanted. This is not a maximum: servers treat it
     /// as a guide and may return more or fewer, so cut the list where a
     /// fixed number matters. `None` leaves the number to the server.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub limit: Option<u32>,
     /// Continues an earlier search: [`Trips::earlier`] or [`Trips::later`]
     /// of its result, set on the query that led to it. On EFA, TRIAS and
@@ -423,6 +552,10 @@ pub struct TripsQuery {
     /// reference is only good for the network it came from, and its text
     /// has no meaning to rely on.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub page: Option<String>,
 }
 
@@ -600,6 +733,12 @@ impl From<&Location> for Place {
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+// Read by hand in wasm.rs, so that an object is told apart by its keys.
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, tsify::Tsify),
+    serde(untagged)
+)]
 pub enum Place {
     /// A [`Location::id`] from the same network, or another ID the network
     /// understands.
@@ -621,6 +760,11 @@ pub enum Place {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub enum TripTime {
     /// Leave at this time or later.
     DepartAt(Timestamp),
@@ -633,6 +777,11 @@ pub enum TripTime {
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct Trips {
     /// The trips, in the order the server ranks them.
     pub trips: Vec<Trip>,
@@ -641,11 +790,19 @@ pub struct Trips {
     /// of its own, if there are no trips to continue from. The trips of an
     /// earlier page are in the same order as these, so they belong in
     /// front of them as a whole.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub earlier: Option<String>,
     /// A reference for the trips after these, with the same rules. An
     /// `OpenTripPlanner` server searches a window of an hour or two, so at
     /// night its answer can have no trips and this reference: follow it,
     /// a few times if need be, before telling a user that there are none.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub later: Option<String>,
 }
 
@@ -673,6 +830,11 @@ impl Trips {
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct Trip {
     /// The parts of the trip in the order they are traveled. Never empty.
     pub legs: Vec<Leg>,
@@ -708,6 +870,11 @@ impl Trip {
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct Leg {
     /// How this part is traveled.
     pub kind: LegKind,
@@ -727,12 +894,21 @@ pub struct Leg {
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(tag = "type", rename_all = "camelCase")
+)]
 pub enum LegKind {
     /// A ride in a public transport vehicle.
     Transit {
         /// The line the vehicle runs on.
         line: Line,
         /// Where the vehicle is headed, as shown on it.
+        #[cfg_attr(
+            feature = "unstable-wasm",
+            serde(skip_serializing_if = "Option::is_none")
+        )]
         direction: Option<String>,
     },
     /// A walk, including one inside a station to change vehicles.
@@ -747,6 +923,11 @@ pub enum LegKind {
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct LegEnd {
     /// The stop, platform or other place.
     pub stop: Location,
@@ -756,10 +937,22 @@ pub struct LegEnd {
     /// The predicted time. `None` if the server has no prediction, which is
     /// always the case for a walk. A walk after a late ride therefore keeps
     /// its planned times and can start before the ride arrives.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub realtime_time: Option<Timestamp>,
     /// The platform according to the timetable.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub scheduled_platform: Option<String>,
     /// The platform as far as the server knows now.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub realtime_platform: Option<String>,
     /// Whether the vehicle skips this stop although the timetable has it.
     pub cancelled: bool,
@@ -806,20 +999,49 @@ impl Stopover {
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct Stopover {
     /// The stop, platform or other place.
     pub stop: Location,
     /// The arrival time according to the timetable.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub scheduled_arrival: Option<Timestamp>,
     /// The predicted arrival time. `None` if the server has no prediction.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub realtime_arrival: Option<Timestamp>,
     /// The departure time according to the timetable.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub scheduled_departure: Option<Timestamp>,
     /// The predicted departure time. `None` if the server has no prediction.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub realtime_departure: Option<Timestamp>,
     /// The platform according to the timetable.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub scheduled_platform: Option<String>,
     /// The platform as far as the server knows now.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     pub realtime_platform: Option<String>,
     /// Whether the vehicle skips this stop although the timetable has it.
     pub cancelled: bool,
