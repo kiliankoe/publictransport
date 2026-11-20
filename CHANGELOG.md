@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2 (2026-11-20)
+
+### Features
+
+- kotlin: Add a Kotlin package
+- typescript: Add a TypeScript package
+
 ## 0.1.1 (2026-11-19)
 
 Also adds a rudimentary documentation page.

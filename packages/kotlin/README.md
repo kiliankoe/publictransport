@@ -9,7 +9,7 @@ The package is on Maven Central, for macOS and Linux (with glibc, so not Alpine)
 
 ```kotlin
 dependencies {
-    implementation("io.github.kiliankoe:publictransport:0.1.1")
+    implementation("io.github.kiliankoe:publictransport:0.1.2")
 }
 ```
 

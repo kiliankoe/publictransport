@@ -1,6 +1,6 @@
 {
   "name": "@kiliankoe/publictransport",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Client for public transport APIs: EFA, MOTIS, TRIAS, OJP, HAFAS and OpenTripPlanner",
   "license": "MIT OR Apache-2.0",
   "homepage": "https://kiliankoe.github.io/publictransport/",

@@ -8,7 +8,7 @@ The package wraps the Rust library of the same name. The Rust code builds the re
 Add it to a project by the URL of this repository, and depend on a version:
 
 ```swift
-.package(url: "https://github.com/kiliankoe/publictransport", from: "0.1.1")
+.package(url: "https://github.com/kiliankoe/publictransport", from: "0.1.2")
 ```
 
 On Apple platforms the package downloads the Rust library as a binary from the release. Between releases the code on a branch can be ahead of that binary, so a dependency on a branch does not work. On Linux the package links the library from a directory you name, see "Development". On watchOS the library covers only the watches with a 64-bit processor (Series 9 and later), so an app for all watches does not link yet.
