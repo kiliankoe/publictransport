@@ -3290,7 +3290,8 @@ public var departure: LegEnd? {
 }
     
     /**
-     * The number of rides minus one. Walks do not count.
+     * How often the traveler changes vehicles: the number of rides minus
+     * one, and zero for a trip without a ride. Walks are not rides.
      */
 public var transfers: UInt32 {
     return try!  FfiConverterUInt32.lift(try! rustCall() {

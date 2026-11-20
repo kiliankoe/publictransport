@@ -118,7 +118,8 @@ impl Trip {
         self.arrival().cloned()
     }
 
-    /// The number of rides minus one. Walks do not count.
+    /// How often the traveler changes vehicles: the number of rides minus
+    /// one, and zero for a trip without a ride. Walks are not rides.
     #[uniffi::method(name = "transfers")]
     fn ffi_transfers(&self) -> u32 {
         u32::try_from(self.transfers()).unwrap_or(u32::MAX)
