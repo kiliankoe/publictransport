@@ -1,7 +1,8 @@
 style = "conventional"
-subject_length = 72
-# No limit for the lines of a body: a squash takes the description of a
-# pull request as the body, and that is Markdown with a paragraph per line.
+# No limit for the subject: the titles that Dependabot writes are long. No
+# limit for the lines of a body either: a squash takes the description of
+# a pull request as the body, and that is Markdown with a paragraph per line.
+subject_length = 0
 line_length = 0
 # Subjects start in lower case after the type.
 subject_capitalized = false

@@ -9,7 +9,7 @@
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org), so that the history shows which part of the project a change belongs to and the changelog can be generated from it. CI checks the format with [committed](https://github.com/crate-ci/committed), configured in `committed.toml`.
 
 ```
-type(scope): subject in the imperative, lower case, at most 72 characters
+type(scope): short subject in the imperative, lower case
 
 A body that says why, and what the diff does not show. Lines wrap at 72
 characters.
