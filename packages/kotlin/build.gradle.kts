@@ -1,7 +1,11 @@
+import com.vanniktech.maven.publish.JavadocJar
+import com.vanniktech.maven.publish.KotlinJvm
+import com.vanniktech.maven.publish.SourcesJar
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.maven.publish)
     `java-library`
 }
 
@@ -105,9 +109,17 @@ val nativeLibrary =
         eachFile { path = "$jnaPlatform/$name" }
     }
 
+// A release passes a directory with the libraries of every platform, each
+// in the directory that JNA searches, see the release workflow.
+val nativeLibraries = providers.gradleProperty("nativeLibraries")
+
 sourceSets.main {
     kotlin.srcDir(adaptBindings)
-    resources.srcDir(nativeLibrary)
+}
+
+// Not a source directory, which would put the libraries into the sources jar.
+tasks.processResources {
+    from(nativeLibraries.orNull ?: nativeLibrary)
 }
 
 tasks.test {
@@ -116,4 +128,40 @@ tasks.test {
     inputs.dir(repository.dir("crates/core/tests/fixtures"))
     // JNA loads the Rust library, which newer JVMs warn about otherwise.
     jvmArgs("--enable-native-access=ALL-UNNAMED")
+}
+
+// Signing is switched on by the release workflow, so that publishing to the
+// local Maven repository needs no key.
+mavenPublishing {
+    publishToMavenCentral()
+    coordinates(group.toString(), "publictransport", version.toString())
+    // The documentation is in the sources. Maven Central asks for the file.
+    configure(KotlinJvm(javadocJar = JavadocJar.Empty(), sourcesJar = SourcesJar.Sources()))
+    pom {
+        name = "publictransport"
+        description = "A client for public transport APIs with one model for stops, departures and trips"
+        url = "https://kiliankoe.github.io/publictransport/"
+        licenses {
+            license {
+                name = "MIT"
+                url = "https://opensource.org/license/mit"
+            }
+            license {
+                name = "Apache-2.0"
+                url = "https://www.apache.org/licenses/LICENSE-2.0"
+            }
+        }
+        developers {
+            developer {
+                id = "kiliankoe"
+                name = "Kilian Koeltzsch"
+                url = "https://github.com/kiliankoe"
+            }
+        }
+        scm {
+            url = "https://github.com/kiliankoe/publictransport"
+            connection = "scm:git:https://github.com/kiliankoe/publictransport.git"
+            developerConnection = "scm:git:ssh://git@github.com/kiliankoe/publictransport.git"
+        }
+    }
 }

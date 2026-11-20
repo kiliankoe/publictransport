@@ -10,3 +10,4 @@ jna = "net.java.dev.jna:jna:5.19.1"
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+maven-publish = "com.vanniktech.maven.publish:0.37.0"
