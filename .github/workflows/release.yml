@@ -1,8 +1,9 @@
 name: Release
 
 # Publishes the version that Cargo.toml names: the Swift binary as an asset
-# of a GitHub release, the crates on crates.io and the Python package on
-# PyPI. CONTRIBUTING.md describes the steps before and after.
+# of a GitHub release, the crates on crates.io, the Python package on PyPI
+# and the Kotlin package on Maven Central. CONTRIBUTING.md describes the
+# steps before and after.
 #
 # The run makes the tag itself. The Swift package names the checksum of
 # its binary in Package.swift, so the tagged commit can only exist once
@@ -153,6 +154,31 @@ jobs:
       # packaged core.
       - run: cargo publish --workspace --locked --dry-run
 
+  # The jar of the Kotlin package, with the Rust library of every platform
+  # from the wheels. The tests run against the library of this runner.
+  maven-check:
+    needs: wheels
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The network data of transport-apis.
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@v23
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: wheel-*
+          path: ${{ runner.temp }}/wheels
+          merge-multiple: true
+      - run: scripts/kotlin-natives.sh "$RUNNER_TEMP/wheels" "$RUNNER_TEMP/natives"
+      - run: nix develop -c gradle --project-dir packages/kotlin build publishToMavenLocal -PnativeLibraries="$RUNNER_TEMP/natives"
+      - name: Check the jar
+        run: |
+          jar=$(echo ~/.m2/repository/io/github/kiliankoe/publictransport/*/publictransport-*[0-9].jar)
+          [ "$(unzip -Z1 "$jar" '*publictransport_uniffi.*' | wc -l)" -eq 5 ] ||
+            { echo "::error::the jar does not hold five libraries"; exit 1; }
+
   # The documentation site, built from the READMEs and the examples.
   site:
     runs-on: ubuntu-latest
@@ -172,11 +198,11 @@ jobs:
           retention-days: 30
 
   # Everything above has passed. From here on the release is public, one
-  # part after the other. Each of the three jobs skips what an earlier
+  # part after the other. Each of the four jobs skips what an earlier
   # attempt has published, so a failed one can be run again.
   tag:
     if: inputs.publish
-    needs: [version, xcframework, wheels, sdist, crates-check, site]
+    needs: [version, xcframework, wheels, sdist, crates-check, maven-check, site]
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -272,10 +298,55 @@ jobs:
         with:
           skip-existing: true
 
+  maven:
+    needs: [version, tag]
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+      url: https://central.sonatype.com/artifact/io.github.kiliankoe/publictransport/${{ needs.version.outputs.version }}
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: v${{ needs.version.outputs.version }}
+          # The network data of transport-apis.
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@v23
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: wheel-*
+          path: ${{ runner.temp }}/wheels
+          merge-multiple: true
+      - run: scripts/kotlin-natives.sh "$RUNNER_TEMP/wheels" "$RUNNER_TEMP/natives"
+      # Maven Central takes a version once, and the whole of it or nothing.
+      - id: published
+        run: |
+          if curl --silent --fail --output /dev/null --user-agent "$GITHUB_REPOSITORY release workflow" \
+            "https://repo1.maven.org/maven2/io/github/kiliankoe/publictransport/$VERSION/publictransport-$VERSION.pom"; then
+            echo "publictransport $VERSION is published"
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          fi
+      # On its own, so that only the upload runs with the secrets.
+      - if: steps.published.outputs.published != 'true'
+        run: nix develop -c gradle --project-dir packages/kotlin build -PnativeLibraries="$RUNNER_TEMP/natives"
+      - if: steps.published.outputs.published != 'true'
+        run: nix develop -c gradle --project-dir packages/kotlin publishAndReleaseToMavenCentral -PnativeLibraries="$RUNNER_TEMP/natives"
+        env:
+          # Waits until the version can be downloaded, not only until
+          # Maven Central has accepted it.
+          ORG_GRADLE_PROJECT_mavenCentralDeploymentValidation: PUBLISHED
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signAllPublications: true
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+
   # After the packages, so that the site never describes a version that
   # the registries do not have.
   pages:
-    needs: [crates, pypi]
+    needs: [crates, pypi, maven]
     runs-on: ubuntu-latest
     environment:
       name: github-pages

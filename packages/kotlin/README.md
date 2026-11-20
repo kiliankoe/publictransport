@@ -5,7 +5,13 @@ A Kotlin client for public transport APIs. It uses a shared model for stops, dep
 
 The package wraps the Rust library of the same name. The Rust code builds the requests and parses the answers, and [OkHttp](https://square.github.io/okhttp/) sends them from suspend functions. It runs on the JVM from Java 11.
 
-The package is not published yet. Until it is on Maven Central, build it from a checkout of the repository, as its [README](https://github.com/kiliankoe/publictransport/tree/main/packages/kotlin#development) describes. An Android library is planned.
+The package is on Maven Central, for macOS and Linux (with glibc, so not Alpine) on x86-64 and ARM and for Windows on x86-64. An Android library is planned.
+
+```kotlin
+dependencies {
+    implementation("io.github.kiliankoe:publictransport:0.1.1")
+}
+```
 
 ```kotlin
 import publictransport.BundledNetwork
@@ -73,4 +79,4 @@ gradle :examples:trips     # run an example
 
 `just kotlin` runs ktlint and the build from the root of the repository. The examples in `examples/kotlin` are a subproject of this build.
 
-The group ID in `gradle.properties` is a placeholder until the package is published.
+A release publishes the package to Maven Central with the Rust library of every platform in the jar. The release workflow takes these libraries from the wheels of the Python package and passes their directory as `-PnativeLibraries`.

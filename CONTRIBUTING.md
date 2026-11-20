@@ -63,11 +63,13 @@ A squash turns the title and the description of a pull request into the commit m
 
 ## Releases
 
-The crates, the Python package and the Swift package share one version.
+The crates and the Python, Swift and Kotlin packages share one version.
 
 1. `just release` sets the next version, which follows from the commits, and writes the new section into `CHANGELOG.md`. `just release 0.2.0` sets another version. Edit the section, commit the result as `chore: release 0.2.0` and push to `main`.
-2. Start the workflow "Release" on `main` with "Publish". It builds and tests everything, tags the release, and publishes to crates.io, PyPI, GitHub releases and the documentation site.
+2. Start the workflow "Release" on `main` with "Publish". It builds and tests everything, tags the release, and publishes to crates.io, PyPI, Maven Central, GitHub releases and the documentation site.
 
 Without "Publish" the workflow only builds and tests, on any branch.
+
+crates.io and PyPI trust the workflow itself. Maven Central needs secrets in the `release` environment: a user token of the Central Portal as `MAVEN_CENTRAL_USERNAME` and `MAVEN_CENTRAL_PASSWORD`, and the armored GPG key with its passphrase as `SIGNING_KEY` and `SIGNING_PASSWORD`.
 
 If a job fails after the tag exists, run the failed jobs of that run again: each skips what is already published. A new run cannot finish the release.
