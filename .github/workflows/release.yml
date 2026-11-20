@@ -1,9 +1,9 @@
 name: Release
 
 # Publishes the version that Cargo.toml names: the Swift binary as an asset
-# of a GitHub release, the crates on crates.io, the Python package on PyPI
-# and the Kotlin package on Maven Central. CONTRIBUTING.md describes the
-# steps before and after.
+# of a GitHub release, the crates on crates.io, the Python package on PyPI,
+# the Kotlin package on Maven Central and the TypeScript package on npm.
+# CONTRIBUTING.md describes the steps before and after.
 #
 # The run makes the tag itself. The Swift package names the checksum of
 # its binary in Package.swift, so the tagged commit can only exist once
@@ -37,6 +37,8 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           grep -q "^version = \"$version\"$" packages/python/pyproject.toml ||
             { echo "::error::pyproject.toml has another version than Cargo.toml"; exit 1; }
+          grep -q "^  \"version\": \"$version\",$" packages/typescript/package.json ||
+            { echo "::error::package.json has another version than Cargo.toml"; exit 1; }
           grep -q "^## $version " CHANGELOG.md ||
             { echo "::error::CHANGELOG.md has no section for $version"; exit 1; }
       - if: inputs.publish
@@ -179,6 +181,26 @@ jobs:
           [ "$(unzip -Z1 "$jar" '*publictransport_uniffi.*' | wc -l)" -eq 5 ] ||
             { echo "::error::the jar does not hold five libraries"; exit 1; }
 
+  # The package for npm, as the tarball that gets published.
+  npm-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The network data of transport-apis.
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@v23
+      - uses: Swatinem/rust-cache@v2
+      - run: nix develop -c pnpm --dir packages/typescript install --frozen-lockfile
+      - run: nix develop -c pnpm --dir packages/typescript build
+      - run: nix develop -c pnpm --dir packages/typescript test
+      - run: nix develop -c pnpm --dir packages/typescript pack --out "$RUNNER_TEMP/package.tgz"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: npm
+          path: ${{ runner.temp }}/package.tgz
+          if-no-files-found: error
+
   # The documentation site, built from the READMEs and the examples.
   site:
     runs-on: ubuntu-latest
@@ -198,11 +220,11 @@ jobs:
           retention-days: 30
 
   # Everything above has passed. From here on the release is public, one
-  # part after the other. Each of the four jobs skips what an earlier
+  # part after the other. Each of the five jobs skips what an earlier
   # attempt has published, so a failed one can be run again.
   tag:
     if: inputs.publish
-    needs: [version, xcframework, wheels, sdist, crates-check, maven-check, site]
+    needs: [version, xcframework, wheels, sdist, crates-check, maven-check, npm-check, site]
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -343,10 +365,39 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
 
+  npm:
+    needs: [version, tag]
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+      url: https://www.npmjs.com/package/@kiliankoe/publictransport/v/${{ needs.version.outputs.version }}
+    permissions:
+      # For the token that npm gives this workflow.
+      id-token: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      # The tarball was built from the commit before the tagged one, which
+      # differs from it in Package.swift only.
+      - uses: actions/download-artifact@v8
+        with:
+          name: npm
+      # npm gives its token to npm 11.5.1 or newer, which this Node brings.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: |
+          if npm view "@kiliankoe/publictransport@$VERSION" version > /dev/null 2>&1; then
+            echo "@kiliankoe/publictransport $VERSION is published"
+          else
+            npm publish package.tgz --access public
+          fi
+
   # After the packages, so that the site never describes a version that
   # the registries do not have.
   pages:
-    needs: [crates, pypi, maven]
+    needs: [crates, pypi, maven, npm]
     runs-on: ubuntu-latest
     environment:
       name: github-pages
