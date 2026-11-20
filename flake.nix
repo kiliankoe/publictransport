@@ -41,15 +41,19 @@
         default = pkgs.mkShell {
           # Use the Python of this shell, not one that uv downloads.
           UV_PYTHON_PREFERENCE = "only-system";
-          packages = [
-            (pkgs.rust-bin.stable.latest.default.override {
+          packages = with pkgs; [
+            (rust-bin.stable.latest.default.override {
               extensions = [
                 "rust-src"
                 "rust-analyzer"
               ];
+              targets = [
+                # The WebAssembly module of the TypeScript package
+                "wasm32-unknown-unknown"
+              ]
               # For the XCFramework of the Swift package, see
               # scripts/build-swift.sh
-              targets = pkgs.lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
+              ++ lib.optionals stdenv.hostPlatform.isDarwin [
                 "aarch64-apple-darwin"
                 "x86_64-apple-darwin"
                 "aarch64-apple-ios"
@@ -63,29 +67,39 @@
                 "aarch64-apple-visionos-sim"
               ];
             })
-            pkgs.cargo-deny
+            cargo-deny
             # Compares the API with the released crates, for scripts/prepare-release.sh
-            pkgs.cargo-semver-checks
+            cargo-semver-checks
             # The commands in the Justfile
-            pkgs.just
+            just
             # The commit convention, see CONTRIBUTING.md
-            pkgs.committed
-            pkgs.git-cliff
+            committed
+            git-cliff
             # Builds the documentation site in `site`
-            pkgs.mdbook
+            mdbook
             # Finds OpenSSL for the native-tls feature of the client.
-            pkgs.pkg-config
+            pkg-config
             # xmllint and the shell, for scripts/validate-xml-requests.sh
-            pkgs.libxml2
-            pkgs.zsh
+            libxml2
+            zsh
             # The Python package in packages/python
-            pkgs.python3
-            pkgs.uv
-            pkgs.ruff
-            pkgs.pyright
+            python3
+            uv
+            ruff
+            pyright
             # The Kotlin package in packages/kotlin. Gradle brings its own JDK.
-            pkgs.gradle_9
-            pkgs.ktlint
+            gradle_9
+            ktlint
+            # The TypeScript package in packages/typescript. The tool that
+            # writes the JavaScript side of the WebAssembly module has to
+            # have the version of the wasm-bindgen crate in Cargo.lock, which
+            # packages/typescript/build.sh checks.
+            wasm-bindgen-cli
+            # wasm-opt
+            binaryen
+            nodejs
+            pnpm
+            biome
           ];
           # On Linux the native-tls feature of the client links OpenSSL.
           buildInputs = [ pkgs.openssl ];
