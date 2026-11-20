@@ -1,0 +1,8 @@
+{
+  "name": "publictransport-examples",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@kiliankoe/publictransport": "link:../../packages/typescript"
+  }
+}

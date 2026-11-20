@@ -8,6 +8,7 @@
 - [Python](python.md)
 - [Swift](swift.md)
 - [Kotlin](kotlin.md)
+- [TypeScript](typescript.md)
 
 # Reference
 

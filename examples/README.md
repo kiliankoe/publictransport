@@ -43,4 +43,12 @@ The programs in `examples/kotlin` are a subproject of the Gradle build in `packa
 gradle --project-dir packages/kotlin :examples:trips
 ```
 
-`just examples` runs all of them, and `just examples-rust`, `just examples-python`, `just examples-swift` and `just examples-kotlin` those of one language.
+## TypeScript
+
+The programs in `examples/typescript` use the package in `packages/typescript` through a link, so build that first, see [Development](../packages/typescript/README.md#development), and run `pnpm install` in `examples/typescript`. Node.js runs them as they are, and so do Deno and Bun:
+
+```sh
+node examples/typescript/trips.ts
+```
+
+`just examples` runs all of them, and `just examples-rust`, `just examples-python`, `just examples-swift`, `just examples-kotlin` and `just examples-typescript` those of one language.
