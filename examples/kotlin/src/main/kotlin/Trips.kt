@@ -46,7 +46,8 @@ suspend fun main() {
     val destination = client.locations(network, "Lillehammer stasjon", kinds = listOf(LocationKind.STOP)).first()
 
     // Leaving now. `departAt =` and `arriveBy =` ask for another time.
-    // An end can also be a coordinate or the ID of a stop, as a `Place`.
+    // An end can also be a coordinate, with `asPlace()` on both ends, or the
+    // ID of a stop as a `Place.Id`.
     val found = client.trips(network, origin, destination, limit = 3)
     println("Trips from ${origin.name} to ${destination.name}:")
     found.trips.forEach(::printTrip)

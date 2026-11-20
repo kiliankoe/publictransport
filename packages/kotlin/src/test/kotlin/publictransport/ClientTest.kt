@@ -178,7 +178,7 @@ private val calls =
         trips(
             "trips from an ID to a coordinate, arriving by a time",
             { TripsQuery(hbf, Place.Coordinate(Coordinate(51.04, 13.73)), TripTime.ArriveBy(time)) },
-        ) { trips(it, hbf, Place.Coordinate(Coordinate(51.04, 13.73)), arriveBy = time) },
+        ) { trips(it, hbf, Coordinate(51.04, 13.73).asPlace(), arriveBy = time) },
         trips("trips of the next page", { TripsQuery(hbf, albertplatz, page = later) }) {
             trips(it, hbf, albertplatz, page = later)
         },
