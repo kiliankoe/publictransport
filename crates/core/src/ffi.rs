@@ -107,16 +107,18 @@ impl Location {
 
 #[uniffi::export]
 impl Trip {
-    /// Where and when the trip starts.
+    /// Where and when the trip starts. A trip always has a leg: for one made
+    /// by hand without any, this is an error of the program.
     #[uniffi::method(name = "departure")]
-    fn ffi_departure(&self) -> Option<LegEnd> {
-        self.departure().cloned()
+    fn ffi_departure(&self) -> LegEnd {
+        self.departure().clone()
     }
 
-    /// Where and when the trip ends.
+    /// Where and when the trip ends. A trip always has a leg: for one made
+    /// by hand without any, this is an error of the program.
     #[uniffi::method(name = "arrival")]
-    fn ffi_arrival(&self) -> Option<LegEnd> {
-        self.arrival().cloned()
+    fn ffi_arrival(&self) -> LegEnd {
+        self.arrival().clone()
     }
 
     /// How often the traveler changes vehicles: the number of rides minus
@@ -127,11 +129,10 @@ impl Trip {
     }
 
     /// How long the trip takes, in seconds: from the expected time of its
-    /// departure to the expected time of its arrival. A walk has no
-    /// real-time data, so a trip that starts or ends with one counts that
-    /// end as planned, even if the ride next to it is late.
+    /// departure to the expected time of its arrival. A trip always has a
+    /// leg: for one made by hand without any, this is an error of the program.
     #[uniffi::method(name = "duration_seconds")]
-    fn ffi_duration_seconds(&self) -> Option<i64> {
+    fn ffi_duration_seconds(&self) -> i64 {
         self.duration_seconds()
     }
 }

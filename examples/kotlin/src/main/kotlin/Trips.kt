@@ -18,10 +18,10 @@ private val clock = DateTimeFormatter.ofPattern("HH:mm")
 private fun localTime(end: LegEnd): String = end.localExpectedTime?.format(clock) ?: "??:??"
 
 private fun printTrip(trip: Trip) {
-    val departure = trip.departure ?: return
-    val arrival = trip.arrival ?: return
-    val duration = trip.durationSeconds ?: return
-    println("  ${localTime(departure)} to ${localTime(arrival)}, ${duration / 60} min, ${trip.transfers} change(s)")
+    println(
+        "  ${localTime(trip.departure)} to ${localTime(trip.arrival)}," +
+            " ${trip.durationSeconds / 60} min, ${trip.transfers} change(s)",
+    )
     for (leg in trip.legs) {
         val how =
             when (val kind = leg.kind) {

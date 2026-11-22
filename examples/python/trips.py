@@ -32,8 +32,6 @@ def print_trip(trip: Trip) -> None:
     """Print a trip and its legs."""
     departure, arrival = trip.departure(), trip.arrival()
     duration = trip.duration_seconds()
-    if not departure or not arrival or duration is None:
-        return
     times = f"{local_time(departure)} to {local_time(arrival)}"
     print(f"  {times}, {int(duration / 60)} min, {trip.transfers()} change(s)")
     for leg in trip.legs:

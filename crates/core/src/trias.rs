@@ -303,9 +303,7 @@ pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<
             .into_iter()
             .filter_map(|leg| leg.into_leg(network).transpose())
             .collect::<Result<Vec<_>, _>>()?;
-        if !legs.is_empty() {
-            trips.push(Trip { legs });
-        }
+        trips.extend(Trip::new(legs));
     }
     Ok(Trips::paged_by_time(trips))
 }

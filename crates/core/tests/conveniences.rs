@@ -132,7 +132,7 @@ proptest! {
 
         prop_assert_eq!(
             trip.duration_seconds(),
-            Some(arrival + arrival_delay.unwrap_or(0) - departure - departure_delay.unwrap_or(0))
+            arrival + arrival_delay.unwrap_or(0) - departure - departure_delay.unwrap_or(0)
         );
     }
 }
@@ -185,11 +185,4 @@ fn each_end_of_a_leg_answers_from_its_own_fields() {
             (clock("09:24"), clock("09:24"), None, Some("5")),
         ]
     );
-}
-
-#[test]
-fn trip_without_legs_has_no_duration() {
-    let mut trip = trip();
-    trip.legs.clear();
-    assert_eq!(trip.duration_seconds(), None);
 }

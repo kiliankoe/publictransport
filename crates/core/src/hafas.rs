@@ -463,8 +463,9 @@ pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<
                 .iter()
                 .map(|section| reader.leg(&connection.date, section))
                 .collect::<Result<_, _>>()?;
-            Ok(Trip { legs })
+            Ok(Trip::new(legs))
         })
+        .filter_map(Result::transpose)
         .collect::<Result<_, Error>>()?;
     Ok(Trips {
         trips,

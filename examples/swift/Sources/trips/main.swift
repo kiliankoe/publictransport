@@ -18,11 +18,9 @@ func localTime(_ end: LegEnd) -> String {
 }
 
 func printTrip(_ trip: Trip) {
-    guard let departure = trip.departure, let arrival = trip.arrival, let duration = trip.durationSeconds
-    else { return }
     print(
-        "  \(localTime(departure)) to \(localTime(arrival)),"
-            + " \(duration / 60) min, \(trip.transfers) change(s)")
+        "  \(localTime(trip.departure)) to \(localTime(trip.arrival)),"
+            + " \(trip.durationSeconds / 60) min, \(trip.transfers) change(s)")
     for leg in trip.legs {
         let how =
             switch leg.kind {

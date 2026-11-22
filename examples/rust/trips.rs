@@ -49,16 +49,11 @@ async fn first_stop(
 }
 
 fn print_trip(trip: &Trip) {
-    let (Some(departure), Some(arrival), Some(duration)) =
-        (trip.departure(), trip.arrival(), trip.duration_seconds())
-    else {
-        return;
-    };
     println!(
         "  {} to {}, {} min, {} change(s)",
-        local_time(departure),
-        local_time(arrival),
-        duration / 60,
+        local_time(trip.departure()),
+        local_time(trip.arrival()),
+        trip.duration_seconds() / 60,
         trip.transfers()
     );
     for leg in &trip.legs {

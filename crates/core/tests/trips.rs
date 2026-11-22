@@ -796,7 +796,7 @@ fn both_protocols_describe_the_same_ride_alike() {
 fn both_protocols_describe_the_same_transfer_alike() {
     let shared = |protocol, body, index: usize| {
         let trip = parse(protocol, body).unwrap().trips.swap_remove(index);
-        let ends = [trip.departure(), trip.arrival()].map(|end| end.unwrap().scheduled_time);
+        let ends = [trip.departure(), trip.arrival()].map(|end| end.scheduled_time);
         assert_eq!(ends, [utc(13, 30), utc(13, 43)]);
         let legs: Vec<_> = trip
             .legs
@@ -885,14 +885,14 @@ fn reference_of_a_server_without_cursors_continues_the_search_past_the_trips_at_
         let latest_departure = found
             .trips
             .iter()
-            .filter_map(Trip::departure)
+            .map(Trip::departure)
             .map(LegEnd::expected_time)
             .max()
             .unwrap();
         let earliest_arrival = found
             .trips
             .iter()
-            .filter_map(Trip::arrival)
+            .map(Trip::arrival)
             .map(LegEnd::expected_time)
             .min()
             .unwrap();

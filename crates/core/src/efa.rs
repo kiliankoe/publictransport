@@ -221,9 +221,7 @@ pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<
             transfer = next_transfer;
             legs.push(leg);
         }
-        if !legs.is_empty() {
-            trips.push(Trip { legs });
-        }
+        trips.extend(Trip::new(legs));
     }
     Ok(Trips::paged_by_time(trips))
 }

@@ -595,7 +595,13 @@ fn sections_that_are_no_rides_become_walks_and_other_legs() {
     };
     let answer = json!({"err": "OK", "svcResL": [{"meth": "TripSearch", "err": "OK", "res": {
         "common": {"locL": [stop("1"), stop("2"), stop("3")], "prodL": [], "opL": []},
+        // A connection without sections is no trip.
         "outConL": [{
+            "date": "20261117",
+            "dep": {"locX": 0, "dTimeS": "235800"},
+            "arr": {"locX": 2, "aTimeS": "01000300"},
+            "secL": []
+        }, {
             "date": "20261117",
             "dep": {"locX": 0, "dTimeS": "235800"},
             "arr": {"locX": 2, "aTimeS": "01000300"},

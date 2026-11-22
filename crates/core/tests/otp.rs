@@ -609,7 +609,8 @@ fn legs_without_a_line_are_walks_or_other_and_a_dropped_call_cancels_the_ride() 
         "2026-11-17T10:15:00Z",
         &json!({"realtime": false, "cancellation": true})
     )]);
-    let answer = json!({"data": {"trip": {"tripPatterns": [{"legs": [
+    // A pattern without legs is no trip.
+    let answer = json!({"data": {"trip": {"tripPatterns": [{"legs": []}, {"legs": [
         leg("foot", &address, &at_quay("NSR:Quay:1")),
         ride,
         leg("bicycle", &at_quay("NSR:Quay:3"), &address),

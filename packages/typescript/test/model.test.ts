@@ -140,6 +140,7 @@ test("derived values come from the core", () => {
   assert.equal(delaySeconds(start), 60);
   assert.equal(platform(start), "14");
   assert.equal(durationSeconds(trip), 840);
+  assert.throws(() => departure({ legs: [] }), TypeError);
   assert.deepEqual(stationIds(foreignStop), [{ scheme: "ifopt", value: "de:14612:28" }]);
   assert.ok(sameStation(foreignStop, start.stop));
 });

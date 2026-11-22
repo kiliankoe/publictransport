@@ -846,11 +846,9 @@ impl Trips {
     /// arrive before the first. A minute apart, so that a server which
     /// counts in minutes does not return the same trip again.
     pub(crate) fn paged_by_time(trips: Vec<Trip>) -> Self {
-        let time = |end: Option<&LegEnd>| {
-            end.map(|end| end.realtime_time.unwrap_or(end.scheduled_time).unix_seconds)
-        };
-        let last = trips.iter().filter_map(|trip| time(trip.departure())).max();
-        let first = trips.iter().filter_map(|trip| time(trip.arrival())).min();
+        let time = |end: &LegEnd| end.expected_time().unix_seconds;
+        let last = trips.iter().map(|trip| time(trip.departure())).max();
+        let first = trips.iter().map(|trip| time(trip.arrival())).min();
         Self {
             later: last.map(|time| format!("{LATER}{}", time.saturating_add(60))),
             earlier: first.map(|time| format!("{EARLIER}{}", time.saturating_sub(60))),
@@ -875,17 +873,32 @@ pub struct Trip {
 }
 
 impl Trip {
-    /// Where and when the trip starts. `None` only if `legs` is empty, which
-    /// it never is in a trip this crate parsed.
-    #[must_use]
-    pub fn departure(&self) -> Option<&LegEnd> {
-        self.legs.first().map(|leg| &leg.departure)
+    /// A trip of the given legs, or `None` without any: a trip always has a
+    /// leg.
+    pub(crate) fn new(legs: Vec<Leg>) -> Option<Self> {
+        (!legs.is_empty()).then_some(Self { legs })
     }
 
-    /// Where and when the trip ends. `None` only if `legs` is empty.
+    /// Where and when the trip starts.
+    ///
+    /// # Panics
+    ///
+    /// If `legs` is empty, which it never is in a trip this crate parsed.
     #[must_use]
-    pub fn arrival(&self) -> Option<&LegEnd> {
-        self.legs.last().map(|leg| &leg.arrival)
+    #[expect(clippy::expect_used, reason = "no parsed trip is without legs")]
+    pub fn departure(&self) -> &LegEnd {
+        &self.legs.first().expect("a trip has a leg").departure
+    }
+
+    /// Where and when the trip ends.
+    ///
+    /// # Panics
+    ///
+    /// If `legs` is empty, which it never is in a trip this crate parsed.
+    #[must_use]
+    #[expect(clippy::expect_used, reason = "no parsed trip is without legs")]
+    pub fn arrival(&self) -> &LegEnd {
+        &self.legs.last().expect("a trip has a leg").arrival
     }
 
     /// How often the traveler changes vehicles: the number of rides minus
@@ -900,19 +913,18 @@ impl Trip {
     }
 
     /// How long the trip takes, in seconds: from the expected time of
-    /// [`Trip::departure`] to the expected time of [`Trip::arrival`]. A walk
-    /// has no real-time data, so a trip that starts or ends with one counts
-    /// that end as planned, even if the ride next to it is late. `None`
-    /// only if `legs` is empty.
+    /// [`Trip::departure`] to the expected time of [`Trip::arrival`].
+    ///
+    /// # Panics
+    ///
+    /// If `legs` is empty, which it never is in a trip this crate parsed.
     #[must_use]
-    pub fn duration_seconds(&self) -> Option<i64> {
-        let start = self.departure()?.expected_time().unix_seconds;
-        Some(
-            self.arrival()?
-                .expected_time()
-                .unix_seconds
-                .saturating_sub(start),
-        )
+    pub fn duration_seconds(&self) -> i64 {
+        let start = self.departure().expected_time().unix_seconds;
+        self.arrival()
+            .expected_time()
+            .unix_seconds
+            .saturating_sub(start)
     }
 }
 

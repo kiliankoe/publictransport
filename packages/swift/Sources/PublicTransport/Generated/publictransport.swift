@@ -3388,10 +3388,11 @@ public struct Trip: Equatable, Hashable, Codable {
 
     
     /**
-     * Where and when the trip ends.
+     * Where and when the trip ends. A trip always has a leg: for one made
+     * by hand without any, this is an error of the program.
      */
-public var arrival: LegEnd? {
-    return try!  FfiConverterOptionTypeLegEnd.lift(try! rustCall() {
+public var arrival: LegEnd {
+    return try!  FfiConverterTypeLegEnd_lift(try! rustCall() {
         uniffiCallStatus in
     uniffi_publictransport_fn_method_trip_arrival(
             FfiConverterTypeTrip_lower(self),uniffiCallStatus
@@ -3400,10 +3401,11 @@ public var arrival: LegEnd? {
 }
     
     /**
-     * Where and when the trip starts.
+     * Where and when the trip starts. A trip always has a leg: for one made
+     * by hand without any, this is an error of the program.
      */
-public var departure: LegEnd? {
-    return try!  FfiConverterOptionTypeLegEnd.lift(try! rustCall() {
+public var departure: LegEnd {
+    return try!  FfiConverterTypeLegEnd_lift(try! rustCall() {
         uniffiCallStatus in
     uniffi_publictransport_fn_method_trip_departure(
             FfiConverterTypeTrip_lower(self),uniffiCallStatus
@@ -3413,12 +3415,11 @@ public var departure: LegEnd? {
     
     /**
      * How long the trip takes, in seconds: from the expected time of its
-     * departure to the expected time of its arrival. A walk has no
-     * real-time data, so a trip that starts or ends with one counts that
-     * end as planned, even if the ride next to it is late.
+     * departure to the expected time of its arrival. A trip always has a
+     * leg: for one made by hand without any, this is an error of the program.
      */
-public var durationSeconds: Int64? {
-    return try!  FfiConverterOptionInt64.lift(try! rustCall() {
+public var durationSeconds: Int64 {
+    return try!  FfiConverterInt64.lift(try! rustCall() {
         uniffiCallStatus in
     uniffi_publictransport_fn_method_trip_duration_seconds(
             FfiConverterTypeTrip_lower(self),uniffiCallStatus
@@ -5629,30 +5630,6 @@ fileprivate struct FfiConverterOptionTypeHafasOptions: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeHafasOptions.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-fileprivate struct FfiConverterOptionTypeLegEnd: FfiConverterRustBuffer {
-    typealias SwiftType = LegEnd?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeLegEnd.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeLegEnd.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }

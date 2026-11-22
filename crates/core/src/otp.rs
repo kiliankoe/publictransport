@@ -287,8 +287,9 @@ pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<
                 .into_iter()
                 .map(|leg| leg.into_leg(network))
                 .collect::<Result<_, _>>()?;
-            Ok(Trip { legs })
+            Ok(Trip::new(legs))
         })
+        .filter_map(Result::transpose)
         .collect::<Result<_, Error>>()?;
     Ok(Trips {
         trips,

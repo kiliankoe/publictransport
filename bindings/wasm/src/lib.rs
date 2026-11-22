@@ -244,13 +244,10 @@ pub fn platform(
 }
 
 /// How long the trip takes, in seconds: from the expected time of its
-/// departure to the expected time of its arrival. A walk has no real-time
-/// data, so a trip that starts or ends with one counts that end as planned,
-/// even if the ride next to it is late. `undefined` only if the trip has no
-/// legs.
+/// departure to the expected time of its arrival.
 #[wasm_bindgen(js_name = durationSeconds)]
-pub fn duration_seconds(trip: &Ts<Trip>) -> Result<Option<f64>, JsValue> {
-    Ok(read("trip", trip)?.duration_seconds().map(number))
+pub fn duration_seconds(trip: &Ts<Trip>) -> Result<f64, JsValue> {
+    Ok(number(trip_with_legs(trip)?.duration_seconds()))
 }
 
 /// Seconds as a JavaScript number. An `i64` would be a `BigInt` there, and
@@ -260,17 +257,26 @@ fn number(seconds: i64) -> f64 {
     seconds as f64
 }
 
-/// Where and when the trip starts. `undefined` only if the trip has no
-/// legs, which a trip from the package always has.
+/// Where and when the trip starts.
 #[wasm_bindgen]
-pub fn departure(trip: &Ts<Trip>) -> Result<Option<Ts<LegEnd>>, JsValue> {
-    read("trip", trip)?.departure().map(write).transpose()
+pub fn departure(trip: &Ts<Trip>) -> Result<Ts<LegEnd>, JsValue> {
+    write(trip_with_legs(trip)?.departure())
 }
 
-/// Where and when the trip ends. `undefined` only if the trip has no legs.
+/// Where and when the trip ends.
 #[wasm_bindgen]
-pub fn arrival(trip: &Ts<Trip>) -> Result<Option<Ts<LegEnd>>, JsValue> {
-    read("trip", trip)?.arrival().map(write).transpose()
+pub fn arrival(trip: &Ts<Trip>) -> Result<Ts<LegEnd>, JsValue> {
+    write(trip_with_legs(trip)?.arrival())
+}
+
+/// A trip from the package always has a leg. One written by hand without
+/// any is refused here, where the core would panic.
+fn trip_with_legs(trip: &Ts<Trip>) -> Result<Trip, JsValue> {
+    let trip = read("trip", trip)?;
+    if trip.legs.is_empty() {
+        return Err(js_sys::TypeError::new("the trip is not valid: it has no legs").into());
+    }
+    Ok(trip)
 }
 
 /// How often the traveler changes vehicles: the number of rides minus one,

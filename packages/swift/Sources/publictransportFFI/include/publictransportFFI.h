@@ -506,7 +506,7 @@ RustBuffer uniffi_publictransport_fn_method_trip_departure(RustBuffer ptr, RustC
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PUBLICTRANSPORT_FN_METHOD_TRIP_DURATION_SECONDS
 #define UNIFFI_FFIDEF_UNIFFI_PUBLICTRANSPORT_FN_METHOD_TRIP_DURATION_SECONDS
-RustBuffer uniffi_publictransport_fn_method_trip_duration_seconds(RustBuffer ptr, RustCallStatus *_Nonnull out_status
+int64_t uniffi_publictransport_fn_method_trip_duration_seconds(RustBuffer ptr, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PUBLICTRANSPORT_FN_METHOD_TRIP_TRANSFERS

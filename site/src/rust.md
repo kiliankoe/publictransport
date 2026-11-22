@@ -32,7 +32,7 @@ for departure in client.departures(&network, DeparturesQuery::new(from).with_lim
 let query = TripsQuery::new(from, to).with_limit(5);
 let found = client.trips(&network, &query).await?;
 for trip in &found.trips {
-    println!("{:?} seconds, {} changes", trip.duration_seconds(), trip.transfers());
+    println!("{} seconds, {} changes", trip.duration_seconds(), trip.transfers());
 }
 
 // The same query again, with the reference to the trips after these.

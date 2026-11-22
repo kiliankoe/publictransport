@@ -30,7 +30,7 @@ The [documentation](https://kiliankoe.github.io/publictransport/swift.html) has 
 ```swift
 let found = try await client.trips(in: network, from: from, to: to, limit: 5)
 for trip in found.trips {
-    print(trip.durationSeconds ?? 0, "seconds,", trip.transfers, "changes")
+    print(trip.durationSeconds, "seconds,", trip.transfers, "changes")
 }
 
 // The same arguments again, with the reference to the trips after these.

@@ -204,9 +204,7 @@ pub(crate) fn parse_trips(response: &HttpResponse) -> Result<Trips, Error> {
             .into_iter()
             .map(WireLeg::into_leg)
             .collect::<Result<Vec<_>, _>>()?;
-        if !legs.is_empty() {
-            trips.push(Trip { legs });
-        }
+        trips.extend(Trip::new(legs));
     }
     Ok(Trips {
         trips,
