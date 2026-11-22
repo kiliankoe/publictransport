@@ -726,3 +726,16 @@ fn answers_without_a_result_are_told_apart() {
         (Some("before"), None)
     );
 }
+
+#[test]
+fn empty_platform_code_is_no_platform() {
+    let quay = quay("NSR:Quay:555", &json!({"publicCode": ""}));
+    let calls = json!([call(&quay, "2026-11-16T14:24:00+01:00", &json!({}))]);
+
+    let platforms: Vec<_> = parse_calls(&entur(), &calls)
+        .into_iter()
+        .map(|departure| (departure.scheduled_platform, departure.realtime_platform))
+        .collect();
+
+    assert_eq!(platforms, [(None, None)]);
+}

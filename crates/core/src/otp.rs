@@ -378,7 +378,10 @@ impl Call {
 
     /// The platforms according to the timetable and as known now.
     fn platforms(&self) -> (Option<String>, Option<String>) {
-        let code = |quay: &Option<Quay>| quay.as_ref().and_then(|quay| quay.public_code.clone());
+        let code = |quay: &Option<Quay>| {
+            let code = quay.as_ref()?.public_code.clone()?;
+            (!code.is_empty()).then_some(code)
+        };
         let now = code(&self.quay);
         (
             code(&self.scheduled_quay).or_else(|| now.clone()),
