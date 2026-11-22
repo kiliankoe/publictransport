@@ -65,10 +65,10 @@ Times are timezone-aware `datetime` objects in UTC. A departure and an end of a 
 
 ```python
 departure.local_scheduled_time()  # None where the time zone of the stop is unknown
-departure.local_expected_time()   # the real-time one, if there is one
-departure.delay_seconds()         # None without real-time data
-departure.platform()              # the real-time platform, otherwise the scheduled one
-stop.local_time(any_time)         # the same for any time at a location
+departure.local_expected_time()  # the real-time one, if there is one
+departure.delay_seconds()  # None without real-time data
+departure.platform()  # the real-time platform, otherwise the scheduled one
+stop.local_time(any_time)  # the same for any time at a location
 ```
 
 ## Errors
@@ -93,7 +93,7 @@ What the server or the query cause is a subclass of `publictransport.Error`. A f
 An application with another HTTP stack skips the clients. The network builds each request and reads its answer, and the same pair exists for departures and trips:
 
 ```python
-request = network.locations_request(query)   # a LocationQuery
+request = network.locations_request(query)  # a LocationQuery
 locations = network.parse_locations(response)
 ```
 

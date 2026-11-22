@@ -66,7 +66,10 @@ The [list of bundled networks](https://kiliankoe.github.io/publictransport/netwo
 
 ```ts
 const entur = bundledNetwork("entur");
-const named = { ...entur, headers: [...(entur.headers ?? []), { name: "ET-Client-Name", value: "mycompany-myapp" }] };
+const named = {
+  ...entur,
+  headers: [...(entur.headers ?? []), { name: "ET-Client-Name", value: "mycompany-myapp" }],
+};
 ```
 
 ## The model
@@ -74,11 +77,16 @@ const named = { ...entur, headers: [...(entur.headers ?? []), { name: "ET-Client
 The model types are interfaces for plain objects. A value that the server did not send is a missing key, not `null`. Enumerations are strings, such as `"stop"` or `"highSpeedTrain"`, and the kind of a leg is told apart by `leg.kind.type`. What the other languages have as methods are functions here:
 
 ```ts
-import { delaySeconds, expectedTime, localScheduledTime, platform } from "@kiliankoe/publictransport";
+import {
+  delaySeconds,
+  expectedTime,
+  localScheduledTime,
+  platform,
+} from "@kiliankoe/publictransport";
 
-expectedTime(departure);       // the real-time one, if there is one
-delaySeconds(departure);       // undefined without real-time data
-platform(departure);           // the real-time platform, otherwise the scheduled one
+expectedTime(departure); // the real-time one, if there is one
+delaySeconds(departure); // undefined without real-time data
+platform(departure); // the real-time platform, otherwise the scheduled one
 localScheduledTime(departure); // "2026-11-19T14:08:00+01:00", on the clocks at the stop
 ```
 
@@ -87,7 +95,10 @@ The others are `localExpectedTime`, `localTime(location, time)`, `departure(trip
 Times are `Date` values. The local times are text in ISO 8601 format, because JavaScript has no type for a time with an offset. To print a time, `Intl` does it from the `Date` and the time zone of the stop:
 
 ```ts
-departure.scheduledTime.toLocaleTimeString("en-GB", { timeZone: departure.stop.timezone, timeStyle: "short" });
+departure.scheduledTime.toLocaleTimeString("en-GB", {
+  timeZone: departure.stop.timezone,
+  timeStyle: "short",
+});
 ```
 
 ## Errors
