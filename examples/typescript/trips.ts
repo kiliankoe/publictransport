@@ -6,6 +6,7 @@ import {
   bundledNetwork,
   Client,
   departure,
+  durationSeconds,
   expectedTime,
   type LegEnd,
   type Trip,
@@ -25,10 +26,12 @@ function clock(end: LegEnd): string {
 function printTrip(trip: Trip) {
   const start = departure(trip);
   const end = arrival(trip);
-  if (!(start && end)) {
+  const duration = durationSeconds(trip);
+  if (!(start && end) || duration === undefined) {
     return;
   }
-  console.log(`  ${clock(start)} to ${clock(end)}, ${transfers(trip)} change(s)`);
+  const minutes = Math.trunc(duration / 60);
+  console.log(`  ${clock(start)} to ${clock(end)}, ${minutes} min, ${transfers(trip)} change(s)`);
   for (const leg of trip.legs) {
     const how =
       leg.kind.type === "transit"

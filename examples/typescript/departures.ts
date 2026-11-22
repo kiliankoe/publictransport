@@ -1,7 +1,7 @@
 // Lists the next departures at a stop on the HAFAS server of VBB, the
 // transport association of Berlin and Brandenburg.
 
-import { bundledNetwork, Client } from "@kiliankoe/publictransport";
+import { bundledNetwork, Client, delaySeconds } from "@kiliankoe/publictransport";
 
 // Servers want to know who asks: name your application and a way to reach you.
 const client = new Client(
@@ -27,9 +27,8 @@ for (const departure of await client.departures(network, stop, { limit: 10 })) {
       })
     : "??:??";
   // Only departures with real-time data have a delay.
-  const late = departure.realtimeTime
-    ? Math.trunc((departure.realtimeTime.getTime() - departure.scheduledTime.getTime()) / 60_000)
-    : undefined;
+  const seconds = delaySeconds(departure);
+  const late = seconds === undefined ? undefined : Math.trunc(seconds / 60);
   const delay = late === undefined ? "" : `${late < 0 ? "" : "+"}${late}`;
   console.log(
     `  ${time} ${delay.padStart(3)} ${departure.line.name.padEnd(5)} ${departure.direction ?? "?"}${

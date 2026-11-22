@@ -22,8 +22,8 @@ print("Departures at \(stop.name):")
 for departure in try await client.departures(in: network, at: stop, limit: 10) {
     // Only departures with real-time data have a delay.
     var delay = ""
-    if let realtime = departure.realtimeTime {
-        let minutes = Int(realtime.timeIntervalSince(departure.scheduledTime) / 60)
+    if let seconds = departure.delaySeconds {
+        let minutes = seconds / 60
         delay = minutes < 0 ? "\(minutes)" : "+\(minutes)"
     }
     print(

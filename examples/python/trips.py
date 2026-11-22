@@ -20,20 +20,22 @@ USER_AGENT = "publictransport-example (+https://github.com/kiliankoe/publictrans
 def local_time(end: LegEnd) -> str:
     """Give the expected time of day on the clocks at the stop.
 
-    That is the real-time one if there is one. Times are in UTC, and a
-    location knows the time zone to show them in, where the server names it.
+    That is the real-time one if there is one. Times are in UTC, and an end
+    of a leg also gives them as on the clocks at its stop, where the server
+    names the time zone.
     """
-    local = end.stop.local_time(end.expected_time())
+    local = end.local_expected_time()
     return local.strftime("%H:%M") if local else "??:??"
 
 
 def print_trip(trip: Trip) -> None:
     """Print a trip and its legs."""
     departure, arrival = trip.departure(), trip.arrival()
-    if not departure or not arrival:
+    duration = trip.duration_seconds()
+    if not departure or not arrival or duration is None:
         return
     times = f"{local_time(departure)} to {local_time(arrival)}"
-    print(f"  {times}, {trip.transfers()} change(s)")
+    print(f"  {times}, {int(duration / 60)} min, {trip.transfers()} change(s)")
     for leg in trip.legs:
         if isinstance(leg.kind, LegKind.TRANSIT):
             how = f"{leg.kind.line.name} to {leg.kind.direction or '?'}"

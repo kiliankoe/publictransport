@@ -2,8 +2,7 @@
 //! transport association of Berlin and Brandenburg.
 
 use publictransport_client::{
-    BundledNetwork, Client, DeparturesQuery, Location, LocationKind, LocationQuery, Network,
-    Timestamp,
+    BundledNetwork, Client, DeparturesQuery, LocationKind, LocationQuery, Network,
 };
 
 // Servers want to know who asks: name your application and a way to reach you.
@@ -23,13 +22,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Departures at {}:", stop.name);
     for departure in client.departures(&network, &query).await? {
         // Only departures with real-time data have a delay.
-        let delay = departure.realtime_time.map_or_else(String::new, |time| {
-            let seconds = time.unix_seconds - departure.scheduled_time.unix_seconds;
-            format!("{:+}", seconds / 60)
-        });
+        let delay = departure
+            .delay_seconds()
+            .map_or_else(String::new, |seconds| format!("{:+}", seconds / 60));
+        // Times are in UTC. A departure also gives them as on the clocks at
+        // its stop, where the server names the time zone.
+        let time = departure
+            .local_scheduled_time()
+            .map_or_else(|| "??:??".to_owned(), |time| time.to_string());
         println!(
-            "  {} {delay:>3} {:<5} {}{}",
-            local_time(&departure.stop, departure.scheduled_time),
+            "  {time} {delay:>3} {:<5} {}{}",
             departure.line.name,
             departure.direction.as_deref().unwrap_or("?"),
             if departure.cancelled {
@@ -40,11 +42,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
     Ok(())
-}
-
-/// The time of day on the clocks at the stop. Times are in UTC, and a
-/// location knows the time zone to show them in, where the server names it.
-fn local_time(stop: &Location, time: Timestamp) -> String {
-    stop.local_time(time)
-        .map_or_else(|| "??:??".to_owned(), |time| time.to_string())
 }

@@ -49,13 +49,16 @@ async fn first_stop(
 }
 
 fn print_trip(trip: &Trip) {
-    let (Some(departure), Some(arrival)) = (trip.departure(), trip.arrival()) else {
+    let (Some(departure), Some(arrival), Some(duration)) =
+        (trip.departure(), trip.arrival(), trip.duration_seconds())
+    else {
         return;
     };
     println!(
-        "  {} to {}, {} change(s)",
+        "  {} to {}, {} min, {} change(s)",
         local_time(departure),
         local_time(arrival),
+        duration / 60,
         trip.transfers()
     );
     for leg in &trip.legs {
@@ -77,10 +80,9 @@ fn print_trip(trip: &Trip) {
 }
 
 /// The expected time of day on the clocks at the stop: the real-time one
-/// if there is one. Times are in UTC, and a location knows the time zone to
-/// show them in, where the server names it.
+/// if there is one. Times are in UTC, and an end of a leg also gives them
+/// as on the clocks at its stop, where the server names the time zone.
 fn local_time(end: &LegEnd) -> String {
-    end.stop
-        .local_time(end.expected_time())
+    end.local_expected_time()
         .map_or_else(|| "??:??".to_owned(), |time| time.to_string())
 }

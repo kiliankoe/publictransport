@@ -19,7 +19,7 @@ let stops = client.locations(&vvo, query).await?;
 if let [from, to, ..] = stops.as_slice() {
     for departure in client.departures(&vvo, from).await? {
         // The time on the clocks at the stop, where its time zone is known.
-        if let Some(time) = departure.stop.local_time(departure.scheduled_time) {
+        if let Some(time) = departure.local_scheduled_time() {
             println!("{time} {} to {:?}", departure.line.name, departure.direction);
         }
     }
@@ -31,7 +31,7 @@ if let [from, to, ..] = stops.as_slice() {
 
 A stop or a place in a query is a `Location` from a search, a departure or a trip, or an ID as text; a place in a trips query can be a `Coordinate` too. A location that another network returned works as well.
 
-Times are `Timestamp` values in UTC. `Location::local_time` gives one as the clocks at that location show it, or `None` where no time zone is known for it.
+Times are `Timestamp` values in UTC. `Location::local_time` gives one as the clocks at that location show it, or `None` where no time zone is known for it. A departure and an end of a leg give their own times that way with `local_scheduled_time` and `local_expected_time`. Their `delay_seconds` is how late the vehicle is, or `None` without real-time data, and `platform` is the real-time platform if there is one, otherwise the scheduled one. `Trip::duration_seconds` is how long a trip takes.
 
 An answer to a trips query has the list in `trips`, and `earlier` and `later` are references for more: pass one to `TripsQuery::with_page` on the same query. The `limit` of a query is not a maximum, servers treat it as a guide.
 

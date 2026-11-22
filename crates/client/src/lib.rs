@@ -25,7 +25,7 @@
 //! if let [from, to, ..] = stops.as_slice() {
 //!     for departure in client.departures(&vvo, from).await? {
 //!         // The time on the clocks at the stop, where its time zone is known.
-//!         if let Some(time) = departure.stop.local_time(departure.scheduled_time) {
+//!         if let Some(time) = departure.local_scheduled_time() {
 //!             println!("{time} {} to {:?}", departure.line.name, departure.direction);
 //!         }
 //!     }

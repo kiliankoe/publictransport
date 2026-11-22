@@ -26,7 +26,7 @@ val (from, to) = stops
 
 for (departure in client.departures(network, from, limit = 10)) {
     // The time on the clocks at the stop, where its time zone is known.
-    val time = departure.stop.localTime(departure.scheduledTime)
+    val time = departure.localScheduledTime
     println("${time?.toLocalTime() ?: "?"} ${departure.line.name} ${departure.direction ?: ""}")
 }
 
@@ -43,7 +43,7 @@ The model types are data classes with `val` properties, so `copy` makes a change
 
 `departures` takes a `Location` from a search, a departure or a trip, or the ID of a stop as a `String`. `trips` takes two locations, or two `Place` values for other ends: `asPlace()` makes one from a location or a `Coordinate`, as in `client.trips(network, stop.asPlace(), Coordinate(51.04, 13.73).asPlace())`, and `Place.Id` names a stop by its ID on the network that is asked. A location that another network returned works as well: for a trip always if it has a coordinate, for departures where the asked network can name the stop, which EFA, TRIAS and OJP can for stops with a global ID. Each call also takes a query of the Rust library (`LocationQuery`, `DeparturesQuery`, `TripsQuery`) in place of the plain values.
 
-Times are `java.time.Instant` values. `Location.localTime(time)` gives one as the clocks at that location show it, an `OffsetDateTime` with the offset that holds there at that time, or `null` where no time zone is known for it. An EFA network needs its `timezone` to send a query time. A TRIAS or OJP network needs a `requestorRef`, which public servers document, e.g. `OpenService`. A HAFAS network needs `hafas = HafasOptions(...)` and its `timezone`; the bundled ones have both.
+Times are `java.time.Instant` values. `Location.localTime(time)` gives one as the clocks at that location show it, an `OffsetDateTime` with the offset that holds there at that time, or `null` where no time zone is known for it. A departure and an end of a leg give their own times that way as `localScheduledTime` and `localExpectedTime`. Their `delaySeconds` is how late the vehicle is, or `null` without real-time data, and `platform` is the real-time platform if there is one, otherwise the scheduled one. `Trip.durationSeconds` is how long a trip takes. An EFA network needs its `timezone` to send a query time. A TRIAS or OJP network needs a `requestorRef`, which public servers document, e.g. `OpenService`. A HAFAS network needs `hafas = HafasOptions(...)` and its `timezone`; the bundled ones have both.
 
 `trips` returns a `Trips` value: the list is in `trips`, and `earlier` and `later` are references for more. Pass one as `page` with the same other arguments to continue the search. An answer from an OpenTripPlanner server can be empty at night and still have a `later` reference to follow.
 

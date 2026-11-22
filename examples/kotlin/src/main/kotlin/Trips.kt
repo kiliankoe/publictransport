@@ -13,14 +13,15 @@ import java.time.format.DateTimeFormatter
 private val clock = DateTimeFormatter.ofPattern("HH:mm")
 
 // The expected time of day at the stop: the real-time one if there is one.
-// Times are `Instant` values, and a location gives the time on the clocks
-// there, where the server names its time zone.
-private fun localTime(end: LegEnd): String = end.stop.localTime(end.expectedTime)?.format(clock) ?: "??:??"
+// Times are `Instant` values. An end of a leg also gives them as on the
+// clocks at its stop, where the server names the time zone.
+private fun localTime(end: LegEnd): String = end.localExpectedTime?.format(clock) ?: "??:??"
 
 private fun printTrip(trip: Trip) {
     val departure = trip.departure ?: return
     val arrival = trip.arrival ?: return
-    println("  ${localTime(departure)} to ${localTime(arrival)}, ${trip.transfers} change(s)")
+    val duration = trip.durationSeconds ?: return
+    println("  ${localTime(departure)} to ${localTime(arrival)}, ${duration / 60} min, ${trip.transfers} change(s)")
     for (leg in trip.legs) {
         val how =
             when (val kind = leg.kind) {

@@ -37,7 +37,7 @@ The [documentation](https://kiliankoe.github.io/publictransport/swift.html) has 
 
 A stop or a place is a `Location` from a search, a departure or a trip, or a `String` with an ID; a place in `trips` can be a `Coordinate` too, or a `CLLocationCoordinate2D` where Core Location exists. A location that another network returned works as well: for a trip always if it has a coordinate, for departures where the asked network can name the stop, which EFA, TRIAS and OJP can for stops with a global ID. Each call also takes a query of the Rust library (`LocationQuery`, `DeparturesQuery`, `TripsQuery`) with the label `query:`.
 
-Times are `Date` values. `Location.timeZone` is the time zone to show them in.
+Times are `Date` values. `Location.timeZone` is the time zone to show them in. On a departure and an end of a leg, `delaySeconds` is how late the vehicle is, or `nil` without real-time data, and `platform` is the real-time platform if there is one, otherwise the scheduled one. `Trip.durationSeconds` is how long a trip takes.
 
 `Location` and `Network` are `Identifiable`. A `Departure` and a `Trip` have no identifier from the server; they are `Hashable`, so a list can use `id: \.self`. 
 

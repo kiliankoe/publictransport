@@ -1,22 +1,9 @@
 """List the next departures at a stop on the HAFAS server of VBB in Berlin."""
 
-from datetime import datetime
-
-from publictransport import BundledNetwork, Client, Location, LocationKind
+from publictransport import BundledNetwork, Client, LocationKind
 
 # Servers want to know who asks: name your application and a way to reach you.
 USER_AGENT = "publictransport-example (+https://github.com/kiliankoe/publictransport)"
-
-
-def local_time(stop: Location, time: datetime) -> str:
-    """Give the time of day on the clocks at the stop.
-
-    Times are in UTC, and a location knows the time zone to show them in,
-    where the server names it.
-    """
-    local = stop.local_time(time)
-    return local.strftime("%H:%M") if local else "??:??"
-
 
 network = BundledNetwork.VBB_HAFAS.network()
 
@@ -27,13 +14,15 @@ with Client(user_agent=USER_AGENT) as client:
 
 print(f"Departures at {stop.name}:")
 for departure in departures:
+    # Times are in UTC. A departure also gives them as on the clocks at its
+    # stop, where the server names the time zone.
+    local = departure.local_scheduled_time()
+    time = f"{local:%H:%M}" if local else "??:??"
     # Only departures with real-time data have a delay.
-    delay = ""
-    if departure.realtime_time:
-        seconds = (departure.realtime_time - departure.scheduled_time).total_seconds()
-        delay = f"{int(seconds / 60):+d}"
+    seconds = departure.delay_seconds()
+    delay = "" if seconds is None else f"{int(seconds / 60):+d}"
     print(
-        f"  {local_time(departure.stop, departure.scheduled_time)} {delay:>3}"
+        f"  {time} {delay:>3}"
         f" {departure.line.name:<5} {departure.direction or '?'}"
         f"{' (cancelled)' if departure.cancelled else ''}",
     )
