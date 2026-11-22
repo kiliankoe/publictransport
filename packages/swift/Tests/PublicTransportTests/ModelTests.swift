@@ -50,6 +50,15 @@ private func stop(_ ifopt: String, timezone: String? = nil) -> Location {
     }
 }
 
+@Test func remarksCrossTheBoundary() throws {
+    let departures = try Network.bundled(.vrrEfa).parseDepartures(response: answer("efa/vrr-departures.json"))
+
+    let remark = try #require(departures.flatMap(\.remarks).first { $0.id == "314433" })
+    #expect(remark.kind == .disruption)
+    #expect(remark.title?.hasPrefix("Fahrleitungsarbeiten in Heerdt") == true)
+    #expect(remark.validFrom == Date(timeIntervalSince1970: 1_794_812_400))
+}
+
 @Test func locationKnowsItsStationAndItsTimeZone() {
     let station = stop("de:14612:28", timezone: "Europe/Berlin")
     let platform = stop("de:14612:28:3:2", timezone: "Nowhere/Nothing")

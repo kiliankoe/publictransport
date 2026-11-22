@@ -1,6 +1,6 @@
 """List the next departures at a stop on the HAFAS server of VBB in Berlin."""
 
-from publictransport import BundledNetwork, Client, LocationKind
+from publictransport import BundledNetwork, Client, LocationKind, RemarkKind
 
 # Servers want to know who asks: name your application and a way to reach you.
 USER_AGENT = "publictransport-example (+https://github.com/kiliankoe/publictransport)"
@@ -26,3 +26,7 @@ for departure in departures:
         f" {departure.line.name:<5} {departure.direction or '?'}"
         f"{' (cancelled)' if departure.cancelled else ''}",
     )
+    # What the operator reports about the ride, such as a closed road.
+    for remark in departure.remarks:
+        if remark.kind == RemarkKind.DISRUPTION and remark.title:
+            print(f"            ! {remark.title}")

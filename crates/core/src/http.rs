@@ -99,6 +99,25 @@ impl std::fmt::Display for Header {
     }
 }
 
+/// A list of which every entry of another shape than `T` is left out, and
+/// which is empty if the value is no list. For data next to the answer, such
+/// as remarks, that must not cost the answer when a server writes it in a
+/// way no recorded response showed.
+pub(crate) fn lenient_list<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::de::DeserializeOwned,
+{
+    let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)?;
+    let serde_json::Value::Array(entries) = value else {
+        return Ok(Vec::new());
+    };
+    Ok(entries
+        .into_iter()
+        .filter_map(|entry| serde_json::from_value(entry).ok())
+        .collect())
+}
+
 impl HttpRequest {
     /// A `GET` request for `path` below `endpoint` with the given query
     /// parameters.

@@ -389,6 +389,7 @@ impl StopTime {
             scheduled_platform: stopover.scheduled_platform,
             realtime_platform: stopover.realtime_platform,
             cancelled,
+            remarks: Vec::new(),
         })
     }
 }
@@ -430,6 +431,7 @@ impl WireLeg {
                     LegKind::Transit { line, direction }
                 }
             },
+            remarks: Vec::new(),
         })
     }
 }

@@ -105,9 +105,10 @@ curl --silent --show-error --fail --max-time 30 --user-agent "$user_agent" --hea
 
 quay='fragment quay on Quay{id name publicCode latitude longitude timeZone stopPlace{name}}'
 line='fragment line on Line{publicCode name transportMode transportSubmode authority{name}}'
-call="fragment call on EstimatedCall{aimedArrivalTime expectedArrivalTime aimedDepartureTime expectedDepartureTime realtime cancellation destinationDisplay{frontText} quay{...quay} scheduledQuay{publicCode} serviceJourney{line{...line}}} $quay $line"
-departures="query(\$id:String!,\$limit:Int,\$start:DateTime){stopPlace(id:\$id){estimatedCalls(numberOfDepartures:\$limit,startTime:\$start,includeCancelledTrips:true){...call}}} $call"
-trips="query(\$from:Location!,\$to:Location!,\$time:DateTime,\$arriveBy:Boolean,\$limit:Int,\$page:String){trip(from:\$from,to:\$to,dateTime:\$time,arriveBy:\$arriveBy,numTripPatterns:\$limit,pageCursor:\$page){previousPageCursor nextPageCursor tripPatterns{legs{mode aimedStartTime expectedStartTime aimedEndTime expectedEndTime realtime fromPlace{...place} toPlace{...place} line{...line} fromEstimatedCall{...call} toEstimatedCall{...call} intermediateEstimatedCalls{...call}}}}} fragment place on Place{name latitude longitude quay{...quay}} $call"
+situation='fragment situation on PtSituationElement{situationNumber summary{value} description{value} infoLinks{uri} validityPeriods{startTime endTime}}'
+call="fragment call on EstimatedCall{aimedArrivalTime expectedArrivalTime aimedDepartureTime expectedDepartureTime realtime cancellation destinationDisplay{frontText} quay{...quay} scheduledQuay{publicCode} serviceJourney{line{...line}}} $quay $line $situation"
+departures="query(\$id:String!,\$limit:Int,\$start:DateTime){stopPlace(id:\$id){estimatedCalls(numberOfDepartures:\$limit,startTime:\$start,includeCancelledTrips:true){...call situations{...situation} notices{text}}}} $call"
+trips="query(\$from:Location!,\$to:Location!,\$time:DateTime,\$arriveBy:Boolean,\$limit:Int,\$page:String){trip(from:\$from,to:\$to,dateTime:\$time,arriveBy:\$arriveBy,numTripPatterns:\$limit,pageCursor:\$page){previousPageCursor nextPageCursor tripPatterns{legs{mode aimedStartTime expectedStartTime aimedEndTime expectedEndTime realtime fromPlace{...place} toPlace{...place} line{...line} situations{...situation} fromEstimatedCall{...call notices{text}} toEstimatedCall{...call} intermediateEstimatedCalls{...call}}}}} fragment place on Place{name latitude longitude quay{...quay}} $call"
 
 # otp <output file> <query> <variables>
 otp() {

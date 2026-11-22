@@ -428,6 +428,177 @@ pub struct Departure {
     pub realtime_platform: Option<String>,
     /// Whether the departure does not take place.
     pub cancelled: bool,
+    /// What the server says about it: disruptions and hints. Empty if it
+    /// says nothing.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(default, deserialize_with = "crate::wasm::or_default")
+    )]
+    pub remarks: Vec<Remark>,
+}
+
+/// A text that a server sends with a departure or with a leg of a trip.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
+pub struct Remark {
+    /// What the text is about.
+    pub kind: RemarkKind,
+    /// A short headline.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub title: Option<String>,
+    /// The message as plain text, in the language of the server. Paragraphs
+    /// are separated by line breaks, and a link is followed by its target
+    /// in brackets. At least one of `title` and `text` is set.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub text: Option<String>,
+    /// A page with more about it.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub url: Option<String>,
+    /// The identifier that the server gives the message. The same message
+    /// comes with every departure and leg it is about, so this tells an
+    /// application which ones to show once. `None` for a hint.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub id: Option<String>,
+    /// The code that the server has for a hint of this kind, such as
+    /// `A__KL` or `FK`, for an application that shows an icon for the ones
+    /// it knows. Operators define their own codes, so the same property has
+    /// another code on another network. `None` for a disruption.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub code: Option<String>,
+    /// From when the message holds, if the server says so.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub valid_from: Option<Timestamp>,
+    /// Until when the message holds, if the server says so. Servers write a
+    /// date centuries ahead for a message without an end.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub valid_until: Option<Timestamp>,
+}
+
+impl Remark {
+    /// A fixed property of a ride, with the code of the server for it.
+    pub(crate) fn hint(text: String, code: Option<String>) -> Self {
+        Self {
+            kind: RemarkKind::Hint,
+            text: Some(text),
+            code: code
+                .map(|code| code.trim().to_owned())
+                .filter(|code| !code.is_empty()),
+            ..Self::disruption()
+        }
+    }
+
+    /// A message from the incident system, with nothing set yet.
+    pub(crate) fn disruption() -> Self {
+        Self {
+            kind: RemarkKind::Disruption,
+            title: None,
+            text: None,
+            url: None,
+            id: None,
+            code: None,
+            valid_from: None,
+            valid_until: None,
+        }
+    }
+
+    /// The remark, or `None` if it says nothing.
+    pub(crate) fn if_any(self) -> Option<Self> {
+        (self.title.is_some() || self.text.is_some()).then_some(self)
+    }
+}
+
+/// The text of a message without the HTML that servers often write it in,
+/// or `None` if nothing is left of it. Text without tags and entities is
+/// kept as it is: the conversion would join its lines and take `<words>`
+/// for tags.
+pub(crate) fn plain_text(text: &str) -> Option<String> {
+    let text = if looks_like_html(text) {
+        let converted = nanohtml2text::html2text(text);
+        // Servers pad with lines that hold only a no-break space.
+        let mut lines: Vec<&str> = Vec::new();
+        for line in converted.lines().map(str::trim) {
+            if !(line.is_empty() && lines.last().is_none_or(|last| last.is_empty())) {
+                lines.push(line);
+            }
+        }
+        lines.join("\n").replace('\u{a0}', " ")
+    } else {
+        text.replace("\r\n", "\n")
+    };
+    let text = text.trim();
+    (!text.is_empty()).then(|| text.to_owned())
+}
+
+/// Whether the text holds a tag such as `<p>` or `</a>`, or an entity such
+/// as `&nbsp;`.
+fn looks_like_html(text: &str) -> bool {
+    let name = |rest: &str, more: &[char]| {
+        let end = rest
+            .find(|character: char| {
+                !character.is_ascii_alphanumeric() && !more.contains(&character)
+            })
+            .unwrap_or(rest.len());
+        (end > 0).then(|| rest.get(end..).unwrap_or_default().chars().next())
+    };
+    let tag = text.match_indices('<').any(|(start, _)| {
+        let rest = text.get(start + 1..).unwrap_or_default();
+        let rest = rest.strip_prefix('/').unwrap_or(rest);
+        rest.starts_with(|character: char| character.is_ascii_alphabetic())
+            && matches!(name(rest, &[]), Some(Some('>' | '/' | ' ')))
+            && rest.contains('>')
+    });
+    let entity = text.match_indices('&').any(|(start, _)| {
+        let rest = text.get(start + 1..).unwrap_or_default();
+        matches!(name(rest, &['#']), Some(Some(';')))
+    });
+    tag || entity
+}
+
+/// What a [`Remark`] is about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
+pub enum RemarkKind {
+    /// A message from the operator about something out of the ordinary,
+    /// such as a closed road, a broken elevator or a cancelled stop.
+    Disruption,
+    /// A fixed property of the ride, such as air conditioning or how to
+    /// board with a wheelchair.
+    Hint,
 }
 
 #[cfg_attr(feature = "uniffi", uniffi::export)]
@@ -950,6 +1121,13 @@ pub struct Leg {
     /// Whether the ride does not take place, or does not call at the stop
     /// where the leg starts or ends.
     pub cancelled: bool,
+    /// What the server says about it: disruptions and hints. Empty if it
+    /// says nothing.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(default, deserialize_with = "crate::wasm::or_default")
+    )]
+    pub remarks: Vec<Remark>,
 }
 
 /// How a [`Leg`] is traveled.

@@ -2,7 +2,7 @@
 //! transport association of Berlin and Brandenburg.
 
 use publictransport_client::{
-    BundledNetwork, Client, DeparturesQuery, LocationKind, LocationQuery, Network,
+    BundledNetwork, Client, DeparturesQuery, LocationKind, LocationQuery, Network, RemarkKind,
 };
 
 // Servers want to know who asks: name your application and a way to reach you.
@@ -40,6 +40,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ""
             },
         );
+        // What the operator reports about the ride, such as a closed road.
+        for remark in &departure.remarks {
+            if let (RemarkKind::Disruption, Some(title)) = (remark.kind, &remark.title) {
+                println!("            ! {title}");
+            }
+        }
     }
     Ok(())
 }

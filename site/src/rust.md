@@ -78,6 +78,22 @@ departure.platform();             // the real-time platform, otherwise the sched
 stop.local_time(any_time);        // the same for any time at a location
 ```
 
+## Disruptions and hints
+
+A departure and a leg of a trip have `remarks`: the texts that the server sends with them. Every protocol but MOTIS fills them. A remark is one of two kinds. A disruption is a message from the incident system of the operator, such as a closed road or a broken elevator. A hint is a fixed property of the ride, such as air conditioning or a note for wheelchair users.
+
+```rust,ignore
+for remark in &departure.remarks {
+    if remark.kind == RemarkKind::Disruption {
+        println!("{:?}", remark.title.as_ref().or(remark.text.as_ref()));
+        println!("{:?}", remark.url); // a page with more about it, or None
+        println!("{:?} {:?}", remark.valid_from, remark.valid_until); // None where the server does not say
+    }
+}
+```
+
+At least one of `title` and `text` is set. `text` is plain text without HTML, in the language of the server. The server sends a disruption with every departure and leg it concerns, so an application that shows each message once tells them apart by `id`. A hint has no `id`. It has the `code` that the server gives its kind, such as `A__KL` for air conditioning on German EFA servers, for an application that shows icons for the ones it knows. Operators define these codes, so they differ between networks.
+
 ## Errors
 
 ```rust,ignore

@@ -7,12 +7,16 @@ use serde_json::{Value, json};
 
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, Header, HttpRequest, HttpResponse, Leg, LegEnd,
-    LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, Network, Place, Stopover,
-    Timestamp, Trip, TripTime, Trips, TripsQuery, model::Target, time::WireTime,
+    LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, Network, Place, Remark,
+    Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
+    http::lenient_list,
+    model::{Target, plain_text},
+    time::WireTime,
 };
 
-// The queries name only fields that OTP has had for long: a server answers
-// a query with a field it does not know with an error and no data.
+// The queries name only fields of OTP's current schema that are not marked
+// as deprecated: a server answers a query with a field it does not know
+// with an error and no data.
 const QUAY: &str =
     "fragment quay on Quay{id name publicCode latitude longitude timeZone stopPlace{name}}";
 const LINE: &str =
@@ -21,14 +25,19 @@ const CALL: &str = "fragment call on EstimatedCall{aimedArrivalTime expectedArri
     aimedDepartureTime expectedDepartureTime realtime cancellation \
     destinationDisplay{frontText} quay{...quay} scheduledQuay{publicCode} \
     serviceJourney{line{...line}}}";
+// Only the calls that become a departure or start a leg ask for remarks:
+// every call of a ride would repeat the same ones.
+const SITUATION: &str = "fragment situation on PtSituationElement{situationNumber \
+    summary{value} description{value} infoLinks{uri} validityPeriods{startTime endTime}}";
 const CALLS: &str = "estimatedCalls(numberOfDepartures:$limit,startTime:$start,\
-    includeCancelledTrips:true){...call}";
+    includeCancelledTrips:true){...call situations{...situation} notices{text}}";
 const TRIPS: &str = "query($from:Location!,$to:Location!,$time:DateTime,$arriveBy:Boolean,\
     $limit:Int,$page:String){trip(from:$from,to:$to,dateTime:$time,arriveBy:$arriveBy,\
     numTripPatterns:$limit,pageCursor:$page){previousPageCursor nextPageCursor routingErrors{code} \
     tripPatterns{legs{mode aimedStartTime expectedStartTime aimedEndTime expectedEndTime \
     realtime fromPlace{...place} toPlace{...place} line{...line} \
-    fromEstimatedCall{...call} toEstimatedCall{...call} \
+    situations{...situation} fromEstimatedCall{...call notices{text}} \
+    toEstimatedCall{...call} \
     intermediateEstimatedCalls{...call}}}}} \
     fragment place on Place{name latitude longitude quay{...quay}}";
 
@@ -43,7 +52,7 @@ fn request<const N: usize>(
         .into_iter()
         .filter_map(|(name, value)| Some((name.to_owned(), value?)))
         .collect();
-    let body = json!({"query": format!("{query} {CALL} {QUAY} {LINE}"), "variables": variables});
+    let body = json!({"query": format!("{query} {CALL} {QUAY} {LINE} {SITUATION}"), "variables": variables});
     HttpRequest {
         method: Method::Post,
         url: network.endpoint.trim_end_matches('/').to_owned(),
@@ -239,6 +248,10 @@ pub(crate) fn parse_departures(
     let mut departures = explained(place.estimated_calls, error)?
         .into_iter()
         .map(|mut call| {
+            let remarks = remarks(
+                std::mem::take(&mut call.situations),
+                std::mem::take(&mut call.notices),
+            );
             let line = call.service_journey.take().and_then(|journey| journey.line);
             let direction = call.direction();
             let stopover = call.into_stopover(network)?;
@@ -254,6 +267,7 @@ pub(crate) fn parse_departures(
                 scheduled_platform: stopover.scheduled_platform,
                 realtime_platform: stopover.realtime_platform,
                 cancelled: stopover.cancelled,
+                remarks,
             })
         })
         .collect::<Result<Vec<_>, Error>>()?;
@@ -368,6 +382,82 @@ struct Call {
     quay: Option<Quay>,
     scheduled_quay: Option<Quay>,
     service_journey: Option<ServiceJourney>,
+    #[serde(default, deserialize_with = "lenient_list")]
+    notices: Vec<Notice>,
+    /// Asked for with the calls of a stop only, a leg has its own.
+    #[serde(default, deserialize_with = "lenient_list")]
+    situations: Vec<Situation>,
+}
+
+/// A message of the incident system. Each text comes once per language,
+/// and the first one is taken.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Situation {
+    #[serde(rename = "situationNumber")]
+    number: Option<String>,
+    #[serde(default, deserialize_with = "lenient_list")]
+    summary: Vec<Translated>,
+    #[serde(default, deserialize_with = "lenient_list")]
+    description: Vec<Translated>,
+    #[serde(default, deserialize_with = "lenient_list")]
+    info_links: Vec<InfoLink>,
+    #[serde(default, deserialize_with = "lenient_list")]
+    validity_periods: Vec<ValidityPeriod>,
+}
+
+#[derive(Deserialize)]
+struct Translated {
+    value: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct InfoLink {
+    uri: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ValidityPeriod {
+    start_time: Option<WireTime>,
+    end_time: Option<WireTime>,
+}
+
+/// A note of the timetable about a ride.
+#[derive(Deserialize)]
+struct Notice {
+    text: Option<String>,
+}
+
+/// The remarks of a call: its situations as disruptions and its notices as
+/// hints.
+fn remarks(situations: Vec<Situation>, notices: Vec<Notice>) -> Vec<Remark> {
+    let first =
+        |texts: Vec<Translated>| texts.into_iter().find_map(|text| plain_text(&text.value?));
+    let disruptions = situations.into_iter().filter_map(|situation| {
+        let period = situation.validity_periods.into_iter().next();
+        Remark {
+            title: first(situation.summary),
+            text: first(situation.description),
+            url: situation
+                .info_links
+                .into_iter()
+                .find_map(|link| link.uri.filter(|uri| !uri.is_empty())),
+            id: situation.number.filter(|number| !number.is_empty()),
+            valid_from: period
+                .as_ref()
+                .and_then(|period| Some(period.start_time.as_ref()?.0)),
+            valid_until: period
+                .as_ref()
+                .and_then(|period| Some(period.end_time.as_ref()?.0)),
+            ..Remark::disruption()
+        }
+        .if_any()
+    });
+    let hints = notices
+        .into_iter()
+        .filter_map(|notice| Some(Remark::hint(plain_text(&notice.text?)?, None)));
+    disruptions.chain(hints).collect()
 }
 
 impl Call {
@@ -550,13 +640,23 @@ struct WireLeg {
     to_place: WirePlace,
     line: Option<WireLine>,
     from_estimated_call: Option<Call>,
+    #[serde(default, deserialize_with = "lenient_list")]
+    situations: Vec<Situation>,
     to_estimated_call: Option<Call>,
     #[serde(default)]
     intermediate_estimated_calls: Vec<Call>,
 }
 
 impl WireLeg {
-    fn into_leg(self, network: &Network) -> Result<Leg, Error> {
+    fn into_leg(mut self, network: &Network) -> Result<Leg, Error> {
+        let notices = self
+            .from_estimated_call
+            .as_mut()
+            .map(|call| std::mem::take(&mut call.notices));
+        let remarks = remarks(
+            std::mem::take(&mut self.situations),
+            notices.unwrap_or_default(),
+        );
         let direction = self.from_estimated_call.as_ref().and_then(Call::direction);
         let cancelled = |call: &Option<Call>| call.as_ref().is_some_and(|call| call.cancellation);
         let end =
@@ -600,6 +700,7 @@ impl WireLeg {
                 .into_iter()
                 .map(|call| call.into_stopover(network))
                 .collect::<Result<_, _>>()?,
+            remarks,
         })
     }
 }

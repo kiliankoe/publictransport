@@ -55,4 +55,14 @@ class BindingsTest {
         assertEquals(listOf(GlobalId(IdScheme.IFOPT, "de:14612:28")), foreignStop.stationIds)
         assertEquals(network.id, BundledNetwork.VVO_EFA.id)
     }
+
+    @Test
+    fun `remarks cross the boundary`() {
+        val departures = BundledNetwork.VRR_EFA.network().parseDepartures(ok(fixture("efa/vrr-departures.json")))
+
+        val remark = departures.flatMap { it.remarks }.first { it.id == "314433" }
+        assertEquals(RemarkKind.DISRUPTION, remark.kind)
+        assertTrue(remark.title.orEmpty().startsWith("Fahrleitungsarbeiten in Heerdt"))
+        assertEquals(Instant.parse("2026-11-16T07:00:00Z"), remark.validFrom)
+    }
 }

@@ -4,7 +4,8 @@
 use proptest::prelude::*;
 use publictransport::{
     Coordinate, Departure, DeparturesQuery, Error, HttpRequest, HttpResponse, LegKind,
-    LocationKind, LocationQuery, Method, Mode, Network, Place, Protocol, Timestamp, TripsQuery,
+    LocationKind, LocationQuery, Method, Mode, Network, Place, Protocol, RemarkKind, Timestamp,
+    TripsQuery,
 };
 use serde_json::{Value, json};
 
@@ -739,4 +740,95 @@ fn empty_platform_code_is_no_platform() {
         .collect();
 
     assert_eq!(platforms, [(None, None)]);
+}
+
+/// The situation is one that Entur sent for line 5 at Tøyen. A text comes
+/// once per language, the operator's first.
+#[test]
+fn situations_are_disruptions_and_notices_are_hints() {
+    let quay = quay("NSR:Quay:555", &json!({}));
+    let remarks = json!({
+        "situations": [{
+            "situationNumber": "RUT:SituationNumber:823910",
+            "summary": [
+                {"value": "Tøyen: Linje 5 retning sentrum "},
+                {"value": "Tøyen: Line 5 towards city centre"}
+            ],
+            "description": [
+                {"value": "På grunn av bygging av ny inngang,  ber vi reisende benytte fremre del av toget ved avstigning. "},
+                {"value": "Due to construction of a new entrance, passengers are advised to use the front part of the train when getting off."}
+            ],
+            "infoLinks": [],
+            "validityPeriods": [{"startTime": "2026-10-02T04:00:00+02:00", "endTime": "2026-12-31T23:59:00+01:00"}]
+        }],
+        "notices": [{"text": "Bestilles senest 1 time før"}]
+    });
+    let calls = json!([call(&quay, "2026-11-16T14:24:00+01:00", &remarks)]);
+    let departures = parse_calls(&entur(), &calls);
+    let found: Vec<_> = departures
+        .iter()
+        .flat_map(|departure| &departure.remarks)
+        .map(|remark| {
+            (
+                remark.kind,
+                remark.title.as_deref(),
+                remark.text.as_deref(),
+                remark.url.as_deref(),
+                remark.id.as_deref(),
+                remark.valid_from,
+                remark.valid_until,
+            )
+        })
+        .collect();
+
+    assert_eq!(
+        found,
+        [
+            (
+                RemarkKind::Disruption,
+                Some("Tøyen: Linje 5 retning sentrum"),
+                Some(
+                    "På grunn av bygging av ny inngang,  ber vi reisende benytte fremre del av toget ved avstigning."
+                ),
+                None,
+                Some("RUT:SituationNumber:823910"),
+                Some(utc(-29, 2, 0, 0)),
+                Some(utc(61, 22, 59, 0)),
+            ),
+            (
+                RemarkKind::Hint,
+                None,
+                Some("Bestilles senest 1 time før"),
+                None,
+                None,
+                None,
+                None,
+            ),
+        ]
+    );
+}
+
+/// A remark comes next to a departure, so one of a shape that no recorded
+/// answer showed must not cost the departure.
+#[test]
+fn remark_of_an_unknown_shape_costs_only_itself() {
+    let quay = quay("NSR:Quay:555", &json!({}));
+    let odd = json!({
+        "situations": [null, {"summary": {"value": "x"}, "situationNumber": 5}, {"summary": [{"value": "Kept"}], "validityPeriods": [{"startTime": "soon"}]}],
+        "notices": {"text": "x"}
+    });
+    let calls = json!([call(&quay, "2026-11-16T14:24:00+01:00", &odd)]);
+
+    let titles: Vec<Vec<_>> = parse_calls(&entur(), &calls)
+        .into_iter()
+        .map(|departure| {
+            departure
+                .remarks
+                .into_iter()
+                .map(|remark| remark.title)
+                .collect()
+        })
+        .collect();
+
+    assert_eq!(titles, [[Some("Kept".to_owned())]]);
 }

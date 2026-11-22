@@ -23,6 +23,7 @@ from publictransport import (
     Place,
     Protocol,
     Registry,
+    RemarkKind,
     TripsQuery,
     network_from_json,
 )
@@ -106,13 +107,13 @@ def test_local_time_is_the_same_instant_on_the_clocks_of_the_location(
     assert result.isoformat() == on_the_clock
 
 
-def test_conveniences_of_departures_and_trips_cross_the_boundary() -> None:
+def answer(name: str) -> HttpResponse:
     fixtures = Path(__file__).parents[3] / "crates/core/tests/fixtures/efa"
-    vvo = BundledNetwork.VVO_EFA.network()
+    return HttpResponse(status=200, headers=[], body=(fixtures / name).read_bytes())
 
-    def answer(name: str) -> HttpResponse:
-        body = (fixtures / name).read_bytes()
-        return HttpResponse(status=200, headers=[], body=body)
+
+def test_conveniences_of_departures_and_trips_cross_the_boundary() -> None:
+    vvo = BundledNetwork.VVO_EFA.network()
 
     departure = vvo.parse_departures(answer("vvo-departures.json"))[0]
     trip = vvo.parse_trips(answer("vvo-trip.json")).trips[0]
@@ -126,6 +127,19 @@ def test_conveniences_of_departures_and_trips_cross_the_boundary() -> None:
     assert expected.isoformat() == "2026-11-16T14:25:00+01:00"
     assert (start.delay_seconds(), start.platform()) == (60, "14")
     assert trip.duration_seconds() == 840
+
+
+def test_remarks_cross_the_boundary() -> None:
+    departures = BundledNetwork.VRR_EFA.network().parse_departures(
+        answer("vrr-departures.json")
+    )
+
+    remarks = [remark for departure in departures for remark in departure.remarks]
+    remark = next(remark for remark in remarks if remark.id == "314433")
+    assert remark.kind == RemarkKind.DISRUPTION
+    assert remark.title is not None
+    assert remark.title.startswith("Fahrleitungsarbeiten in Heerdt")
+    assert remark.valid_from == datetime(2026, 11, 16, 7, tzinfo=timezone.utc)
 
 
 def test_local_time_is_none_without_a_time_zone() -> None:

@@ -4,8 +4,11 @@ use serde::Deserialize;
 
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, Leg,
-    LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Mode, Network, Stopover,
-    Timestamp, Trip, TripTime, Trips, TripsQuery, model::Target, time::WireTime,
+    LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Mode, Network, Remark, Stopover,
+    Timestamp, Trip, TripTime, Trips, TripsQuery,
+    http::lenient_list,
+    model::{Target, plain_text},
+    time::WireTime,
 };
 
 /// Parameters of every request.
@@ -169,6 +172,7 @@ fn walk_between(previous: &Leg, next: &Leg, seconds: i64) -> Option<Leg> {
         arrival: end(&next.departure.stop, arrival),
         intermediate_stops: Vec::new(),
         cancelled: false,
+        remarks: Vec::new(),
     })
 }
 
@@ -316,6 +320,110 @@ struct WireLeg {
     is_realtime_controlled: bool,
     #[serde(default)]
     foot_path_info: Vec<FootPath>,
+    /// Messages of the incident system.
+    #[serde(default, deserialize_with = "lenient_list")]
+    infos: Vec<Info>,
+    /// Properties of the ride.
+    #[serde(default, deserialize_with = "lenient_list")]
+    hints: Vec<Hint>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Info {
+    id: Option<String>,
+    #[serde(default, rename = "infoLinks")]
+    links: Vec<InfoLink>,
+    properties: Option<InfoProperties>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct InfoLink {
+    title: Option<String>,
+    subtitle: Option<String>,
+    url_text: Option<String>,
+    url: Option<String>,
+    /// The message, often as HTML.
+    content: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct InfoProperties {
+    /// Two local times, as in `16/11/2026 08:00 - 20/11/2026 14:00`.
+    incident_date_time: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Hint {
+    content: Option<String>,
+    provider_code: Option<String>,
+}
+
+/// The remarks of a stop event or a leg.
+fn remarks(network: &Network, infos: Vec<Info>, hints: Vec<Hint>) -> Vec<Remark> {
+    let plain = |text: Option<String>| text.as_deref().and_then(plain_text);
+    let disruptions = infos.into_iter().filter_map(|info| {
+        let link = info.links.into_iter().next()?;
+        let (from, until) = info
+            .properties
+            .and_then(|properties| properties.incident_date_time)
+            .and_then(|period| validity(network, &period))
+            .unzip();
+        let subtitle = plain(link.subtitle);
+        let title = match plain(link.title) {
+            Some(title) => match subtitle {
+                Some(subtitle) if subtitle != title => Some(format!("{title} {subtitle}")),
+                _ => Some(title),
+            },
+            None => plain(link.url_text),
+        };
+        Remark {
+            title,
+            text: plain(link.content),
+            url: non_empty(link.url).filter(|url| !is_internal(url)),
+            id: non_empty(info.id),
+            valid_from: from,
+            valid_until: until,
+            ..Remark::disruption()
+        }
+        .if_any()
+    });
+    let hints = hints
+        .into_iter()
+        .filter_map(|hint| Some(Remark::hint(plain(hint.content)?, hint.provider_code)));
+    disruptions.chain(hints).collect()
+}
+
+/// The two times of a period that the server writes on the clocks of the
+/// network.
+fn validity(network: &Network, period: &str) -> Option<(Timestamp, Timestamp)> {
+    let zone = network.zone().ok()?;
+    let time = |text: &str| {
+        let local = jiff::civil::DateTime::strptime("%d/%m/%Y %H:%M", text.trim()).ok()?;
+        Some(Timestamp {
+            unix_seconds: zone
+                .to_ambiguous_timestamp(local)
+                .compatible()
+                .ok()?
+                .as_second(),
+        })
+    };
+    let (from, until) = period.split_once(" - ")?;
+    Some((time(from)?, time(until)?))
+}
+
+/// Whether the URL names a host by an address of a private network, which
+/// some servers send from inside the operator's network and nobody outside
+/// can open.
+fn is_internal(url: &str) -> bool {
+    let host = url.split_once("://").map_or(url, |(_, rest)| rest);
+    let host = host.split(['/', ':', '?']).next().unwrap_or_default();
+    host.parse::<std::net::Ipv4Addr>().is_ok_and(|address| {
+        address.is_private() || address.is_loopback() || address.is_link_local()
+    })
 }
 
 /// A walk that belongs to a leg.
@@ -387,6 +495,12 @@ struct StopEvent {
     is_cancelled: Option<bool>,
     #[serde(default)]
     realtime_status: Vec<String>,
+    /// Messages of the incident system.
+    #[serde(default, deserialize_with = "lenient_list")]
+    infos: Vec<Info>,
+    /// Properties of the ride.
+    #[serde(default, deserialize_with = "lenient_list")]
+    hints: Vec<Hint>,
 }
 
 #[derive(Deserialize)]
@@ -554,6 +668,7 @@ impl StopEvent {
                 .and_then(|platforms| non_empty(platforms.planned_platform_name.clone())),
             realtime_platform: platforms.and_then(|platforms| non_empty(platforms.platform_name)),
             cancelled: is_cancelled(self.is_cancelled, &self.realtime_status),
+            remarks: remarks(network, self.infos, self.hints),
         }
     }
 }
@@ -606,6 +721,7 @@ impl WireLeg {
                 .map(|call| call.into_stopover(network))
                 .collect(),
             cancelled: is_cancelled(self.is_cancelled, &self.realtime_status),
+            remarks: remarks(network, self.infos, self.hints),
         })
     }
 }

@@ -146,6 +146,19 @@ test("derived values come from the core", () => {
   assert.ok(sameStation(foreignStop, start.stop));
 });
 
+test("remarks cross the boundary", () => {
+  const departures = parseDepartures(
+    bundledNetwork("vrr-efa"),
+    ok(fixture("efa/vrr-departures.json")),
+  );
+
+  const remarks = departures.flatMap((each) => each.remarks ?? []);
+  const remark = remarks.find((each) => each.id === "314433");
+  assert.equal(remark?.kind, "disruption");
+  assert.ok(remark.title?.startsWith("Fahrleitungsarbeiten in Heerdt"));
+  assert.deepEqual(remark.validFrom, new Date("2026-11-16T07:00:00Z"));
+});
+
 test("registry finds networks by ID and by position", () => {
   const registry = Registry.bundled();
   const duesseldorf = { latitude: 51.2198, longitude: 6.7943 };

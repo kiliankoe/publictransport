@@ -76,6 +76,20 @@ departure.platform        // the real-time platform, otherwise the scheduled one
 
 An end of a leg has the same properties.
 
+## Disruptions and hints
+
+A departure and a leg of a trip have `remarks`: the texts that the server sends with them. Every protocol but MOTIS fills them. A remark is one of two kinds. A disruption is a message from the incident system of the operator, such as a closed road or a broken elevator. A hint is a fixed property of the ride, such as air conditioning or a note for wheelchair users.
+
+```swift
+for remark in departure.remarks where remark.kind == .disruption {
+    print(remark.title ?? remark.text ?? "")
+    print(remark.url ?? "")  // a page with more about it, or nil
+    print(remark.validFrom, remark.validUntil)  // nil where the server does not say
+}
+```
+
+At least one of `title` and `text` is set. `text` is plain text without HTML, in the language of the server. The server sends a disruption with every departure and leg it concerns, so an application that shows each message once tells them apart by `id`. A hint has no `id`. It has the `code` that the server gives its kind, such as `A__KL` for air conditioning on German EFA servers, for an application that shows icons for the ones it knows. Operators define these codes, so they differ between networks.
+
 ## SwiftUI and storing values
 
 `Location` and `Network` are `Identifiable`. A `Departure` and a `Trip` have no identifier from the server; they are `Hashable`, so a list can use `id: \.self`.

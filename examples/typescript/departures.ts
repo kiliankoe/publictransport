@@ -35,4 +35,10 @@ for (const departure of await client.departures(network, stop, { limit: 10 })) {
       departure.cancelled ? " (cancelled)" : ""
     }`,
   );
+  // What the operator reports about the ride, such as a closed road.
+  for (const remark of departure.remarks ?? []) {
+    if (remark.kind === "disruption" && remark.title) {
+      console.log(`            ! ${remark.title}`);
+    }
+  }
 }

@@ -30,4 +30,8 @@ for departure in try await client.departures(in: network, at: stop, limit: 10) {
         "  \(localTime(at: departure.stop, departure.scheduledTime)) \(delay)"
             + " \(departure.line.name) \(departure.direction ?? "?")"
             + (departure.cancelled ? " (cancelled)" : ""))
+    // What the operator reports about the ride, such as a closed road.
+    for remark in departure.remarks where remark.kind == .disruption {
+        if let title = remark.title { print("      ! \(title)") }
+    }
 }

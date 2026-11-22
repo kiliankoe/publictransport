@@ -4,6 +4,7 @@
 import publictransport.BundledNetwork
 import publictransport.Client
 import publictransport.LocationKind
+import publictransport.RemarkKind
 import java.time.format.DateTimeFormatter
 
 private val clock = DateTimeFormatter.ofPattern("HH:mm")
@@ -27,5 +28,9 @@ suspend fun main() {
             "  $time ${(delay ?: "").padStart(3)} ${departure.line.name.padEnd(5)} ${departure.direction ?: "?"}" +
                 if (departure.cancelled) " (cancelled)" else "",
         )
+        // What the operator reports about the ride, such as a closed road.
+        for (remark in departure.remarks.filter { it.kind == RemarkKind.DISRUPTION }) {
+            remark.title?.let { println("            ! $it") }
+        }
     }
 }

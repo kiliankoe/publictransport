@@ -14,7 +14,8 @@ use serde::Deserialize;
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, GlobalId, Header, HttpRequest, HttpResponse,
     Leg, LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, Network,
-    Place, Protocol, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery, model::Target,
+    Place, Protocol, Remark, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
+    model::{Target, plain_text},
     time::WireTime,
 };
 
@@ -278,10 +279,11 @@ pub(crate) fn parse_departures(
 ) -> Result<Vec<Departure>, Error> {
     let (answers, failure) = answers(network, response)?;
     let answer = answer(answers.stop_events, &failure, response.status)?;
+    let situations = situations(response);
     let mut departures = answer
         .results(failure, response.status, &["NOEVENTFOUND"])?
         .into_iter()
-        .map(|result| result.stop_event.into_departure(network))
+        .map(|result| result.stop_event.into_departure(network, &situations))
         .collect::<Result<Vec<_>, _>>()?;
     departures.sort_by_key(Departure::expected_time);
     Ok(departures)
@@ -290,6 +292,7 @@ pub(crate) fn parse_departures(
 pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<Trips, Error> {
     let (answers, failure) = answers(network, response)?;
     let answer = answer(answers.trips, &failure, response.status)?;
+    let situations = situations(response);
     let results = answer.results(
         failure,
         response.status,
@@ -301,7 +304,7 @@ pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<
             .trip
             .legs
             .into_iter()
-            .filter_map(|leg| leg.into_leg(network).transpose())
+            .filter_map(|leg| leg.into_leg(network, &situations).transpose())
             .collect::<Result<Vec<_>, _>>()?;
         trips.extend(Trip::new(legs));
     }
@@ -415,6 +418,107 @@ struct Answer<T> {
     error_messages: Vec<ErrorMessage>,
     #[serde(rename = "ErrorCondition")]
     error_condition: Option<ErrorCondition>,
+}
+
+/// The situations of an answer, which its results refer to. Each is read
+/// on its own and apart from the results, so that one of a shape no
+/// recorded response showed costs only itself.
+fn situations(response: &HttpResponse) -> Vec<Situation> {
+    use quick_xml::events::Event;
+    let mut found = Vec::new();
+    let Ok(body) = std::str::from_utf8(&response.body) else {
+        return found;
+    };
+    if !body.contains("PtSituation>") {
+        return found;
+    }
+    let mut reader = quick_xml::Reader::from_str(body);
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(start)) if start.local_name().as_ref() == "PtSituation" => {
+                let Ok(span) = reader.read_to_end(start.name()) else {
+                    return found;
+                };
+                let inner = usize::try_from(span.start)
+                    .ok()
+                    .zip(usize::try_from(span.end).ok())
+                    .and_then(|(start, end)| body.get(start..end))
+                    .unwrap_or_default();
+                let situation = format!("<PtSituation>{inner}</PtSituation>");
+                found.extend(quick_xml::de::from_str::<Situation>(&situation));
+            }
+            Ok(Event::Eof) | Err(_) => return found,
+            Ok(_) => {}
+        }
+    }
+}
+
+/// A message of the incident system, in the form of SIRI.
+#[derive(Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct Situation {
+    #[serde(rename = "SituationNumber")]
+    number: Option<String>,
+    #[serde(default)]
+    validity_period: Vec<ValidityPeriod>,
+    #[serde(default)]
+    summary: Vec<Plain>,
+    /// Often a category such as "Linienaenderung", or the summary again.
+    #[serde(default)]
+    description: Vec<Plain>,
+    /// The message, often as HTML.
+    #[serde(default)]
+    detail: Vec<Plain>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct ValidityPeriod {
+    start_time: Option<WireTime>,
+    end_time: Option<WireTime>,
+}
+
+/// The text of an element that can have a language as an attribute.
+#[derive(Deserialize)]
+struct Plain {
+    #[serde(default, rename = "$text")]
+    text: String,
+}
+
+/// The first text that is not empty, without HTML.
+fn plain(texts: &[Plain]) -> Option<String> {
+    texts.iter().find_map(|plain| plain_text(&plain.text))
+}
+
+impl Situation {
+    fn remark(&self) -> Option<Remark> {
+        let period = self.validity_period.first();
+        Remark {
+            title: plain(&self.summary),
+            text: plain(&self.detail).or_else(|| plain(&self.description)),
+            id: trimmed(self.number.clone()),
+            valid_from: period.and_then(|period| Some(period.start_time.as_ref()?.0)),
+            valid_until: period.and_then(|period| Some(period.end_time.as_ref()?.0)),
+            ..Remark::disruption()
+        }
+        .if_any()
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct SituationRef {
+    #[serde(rename = "SituationNumber")]
+    number: Option<String>,
+}
+
+/// A property of a ride.
+#[derive(Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct Attribute {
+    #[serde(default)]
+    text: Vec<Text>,
+    code: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -759,6 +863,10 @@ struct Service {
     destination_text: Vec<Text>,
     #[serde(default)]
     cancelled: bool,
+    #[serde(default, rename = "SituationFullRef")]
+    situations: Vec<SituationRef>,
+    #[serde(default, rename = "Attribute")]
+    attributes: Vec<Attribute>,
 }
 
 #[derive(Deserialize)]
@@ -844,6 +952,25 @@ impl Call {
 }
 
 impl Service {
+    /// The situations of the answer that the service refers to, and its
+    /// attributes. Call this before `into_line`, which takes the rest.
+    fn remarks(&mut self, situations: &[Situation]) -> Vec<Remark> {
+        let disruptions = self.situations.iter().filter_map(|reference| {
+            let number = reference.number.as_deref()?.trim();
+            situations
+                .iter()
+                .find(|situation| situation.number.as_deref().map(str::trim) == Some(number))?
+                .remark()
+        });
+        let hints = std::mem::take(&mut self.attributes)
+            .into_iter()
+            .filter_map(|attribute| {
+                let text = plain_text(&text(attribute.text)?)?;
+                Some(Remark::hint(text, attribute.code))
+            });
+        disruptions.chain(hints).collect()
+    }
+
     fn into_line(self, extension: Option<Extension>) -> (Line, Option<String>, bool) {
         let section = self.sections.into_iter().next().unwrap_or(Section {
             mode: self.mode,
@@ -886,7 +1013,12 @@ impl Service {
 }
 
 impl StopEvent {
-    fn into_departure(self, network: &Network) -> Result<Departure, Error> {
+    fn into_departure(
+        mut self,
+        network: &Network,
+        situations: &[Situation],
+    ) -> Result<Departure, Error> {
+        let remarks = self.service.remarks(situations);
         let (line, direction, cancelled) = self.service.into_line(self.extension);
         let stopover = self.this_call.call_at_stop.into_stopover(network);
         Ok(Departure {
@@ -901,6 +1033,7 @@ impl StopEvent {
             realtime_platform: stopover.realtime_platform,
             // The vehicle may skip this stop only.
             cancelled: cancelled || stopover.cancelled,
+            remarks,
         })
     }
 }
@@ -962,11 +1095,12 @@ struct IndividualService {
 
 impl TripLeg {
     /// `None` for a leg of a kind this crate does not know.
-    fn into_leg(self, network: &Network) -> Result<Option<Leg>, Error> {
+    fn into_leg(self, network: &Network, situations: &[Situation]) -> Result<Option<Leg>, Error> {
         let no_time = || Error::Parse {
             message: "a leg has no scheduled time at one of its ends".to_owned(),
         };
-        if let Some(ride) = self.timed {
+        if let Some(mut ride) = self.timed {
+            let remarks = ride.service.remarks(situations);
             let (line, direction, cancelled) = ride.service.into_line(ride.extension);
             return Ok(Some(Leg {
                 kind: LegKind::Transit { line, direction },
@@ -986,6 +1120,7 @@ impl TripLeg {
                     .map(|call| call.into_stopover(network))
                     .collect(),
                 cancelled,
+                remarks,
             }));
         }
         let Some(leg) = self.interchange.or(self.continuous) else {
@@ -1018,6 +1153,7 @@ impl TripLeg {
             arrival: end_at(leg.leg_end, end),
             intermediate_stops: Vec::new(),
             cancelled: false,
+            remarks: Vec::new(),
         }))
     }
 }

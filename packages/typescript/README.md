@@ -101,6 +101,22 @@ departure.scheduledTime.toLocaleTimeString("en-GB", {
 });
 ```
 
+## Disruptions and hints
+
+A departure and a leg of a trip have `remarks`: the texts that the server sends with them. Every protocol but MOTIS fills them. A remark is one of two kinds. A disruption is a message from the incident system of the operator, such as a closed road or a broken elevator. A hint is a fixed property of the ride, such as air conditioning or a note for wheelchair users.
+
+```ts
+for (const remark of departure.remarks ?? []) {
+  if (remark.kind === "disruption") {
+    console.log(remark.title ?? remark.text);
+    console.log(remark.url); // a page with more about it, or undefined
+    console.log(remark.validFrom, remark.validUntil); // undefined where the server does not say
+  }
+}
+```
+
+At least one of `title` and `text` is set. `text` is plain text without HTML, in the language of the server. The server sends a disruption with every departure and leg it concerns, so an application that shows each message once tells them apart by `id`. A hint has no `id`. It has the `code` that the server gives its kind, such as `A__KL` for air conditioning on German EFA servers, for an application that shows icons for the ones it knows. Operators define these codes, so they differ between networks.
+
 ## Errors
 
 ```ts
@@ -148,7 +164,7 @@ The model types and the functions on them are generated from the Rust code by [w
 
 - The documentation of the model types comes from the Rust code, so it links and names things as Rust does: ``[`Location::local_time`]`` is `localTime`, `scheduled_time` is `scheduledTime`, `None` is a missing key, and `Error` is `PublicTransportError`.
 - A network crosses into the WebAssembly module with every call. For one with large coverage areas, such as Transitous, that takes one to two milliseconds.
-- The fields that have a default, such as the `headers` of a `Network` or the `globalIds` of a `Location`, are optional in their types, so that a value written by hand can leave them out. A value from the package always has them.
+- The fields that have a default, such as the `headers` of a `Network`, the `globalIds` of a `Location` or the `remarks` of a `Departure`, are optional in their types, so that a value written by hand can leave them out. A value from the package always has them.
 - A `Registry` lives in the WebAssembly module. Its memory is freed when the object is collected, or at once with `free()`. Its type names `Symbol.dispose`, so a project that checks the types of its dependencies (`skipLibCheck: false`) needs `ESNext.Disposable` in `lib`, or the types of Node.js.
 - A page with a Content Security Policy has to allow WebAssembly with `'wasm-unsafe-eval'`.
 - The types `Thrown` and `Failure` describe what the WebAssembly module throws. The package turns that into a `PublicTransportError`, so they are no part of the API.

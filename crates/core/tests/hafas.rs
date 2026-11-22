@@ -4,7 +4,7 @@ use proptest::prelude::*;
 use publictransport::{
     Coordinate, DeparturesQuery, Error, GlobalId, HafasOptions, HafasProduct, HttpRequest,
     HttpResponse, IdScheme, LegKind, LocationKind, LocationQuery, Method, Mode, Network, Place,
-    Protocol, Registry, Timestamp, TripsQuery,
+    Protocol, Registry, Remark, RemarkKind, Timestamp, TripsQuery,
 };
 use serde_json::{Value, json};
 
@@ -582,6 +582,72 @@ fn trips_have_rides_with_their_stops_and_references_for_more() {
     assert_eq!(first.realtime_departure, Some(berlin(17, 20, 22, 0)));
 }
 
+/// Kind and text of each remark about the ride, which has nothing else. The
+/// answers also attach "Halt entfällt" to the stops of the cancelled S5.
+fn about_the_ride(remarks: &[Remark]) -> Vec<(&RemarkKind, &str)> {
+    let mut about_the_ride = Vec::new();
+    for remark in remarks {
+        assert_eq!(
+            (&remark.title, &remark.url, &remark.id),
+            (&None, &None, &None),
+            "{remark:?}"
+        );
+        assert_eq!((remark.valid_from, remark.valid_until), (None, None));
+        let text = remark.text.as_deref().unwrap_or_default();
+        if text != "Halt entfällt" {
+            about_the_ride.push((&remark.kind, text));
+        }
+    }
+    about_the_ride
+}
+
+#[test]
+fn remarks_are_realtime_messages_and_attributes_but_not_the_operator_or_the_occupancy() {
+    let departures = vbb().parse_departures(&respond(DEPARTURES)).unwrap();
+    // The bus has the operator and the expected occupancy, nothing else.
+    let bus = departures
+        .iter()
+        .find(|d| d.scheduled_time == berlin(17, 20, 4, 0))
+        .expect("the bus at 20:04");
+    assert!(bus.remarks.is_empty(), "{:?}", bus.remarks);
+    let cancelled = departures.iter().find(|d| d.cancelled).expect("the S5");
+    assert_eq!(
+        about_the_ride(&cancelled.remarks),
+        [
+            (&RemarkKind::Hint, "Fahrradmitnahme möglich"),
+            (&RemarkKind::Disruption, "S5: Fällt aus")
+        ]
+    );
+    let codes: Vec<_> = cancelled
+        .remarks
+        .iter()
+        .map(|remark| remark.code.as_deref())
+        .collect();
+    assert!(
+        codes.contains(&Some("FK")) && codes.contains(&None),
+        "{codes:?}"
+    );
+
+    // The same train as a leg: an attribute for each end, a hint of the type
+    // `H` and the message.
+    let found = vbb().parse_trips(&respond(TRIP)).unwrap();
+    assert_eq!(
+        about_the_ride(&found.trips[0].legs[0].remarks),
+        [
+            (
+                &RemarkKind::Hint,
+                "Fahrradmitnahme möglich (S+U Alexanderplatz Bhf (Berlin))"
+            ),
+            (
+                &RemarkKind::Hint,
+                "Fahrradmitnahme möglich (S+U Zoologischer Garten Bhf (Berlin))"
+            ),
+            (&RemarkKind::Hint, "Weitere Infos siehe Fahrtdetails"),
+            (&RemarkKind::Disruption, "S5: Fällt aus")
+        ]
+    );
+}
+
 #[test]
 fn sections_that_are_no_rides_become_walks_and_other_legs() {
     let stop =
@@ -724,4 +790,26 @@ fn reference_to_a_missing_entry_of_a_shared_list_is_a_parse_error() {
         let result = vbb().parse_departures(&respond(answer.to_string()));
         assert!(matches!(result, Err(Error::Parse { .. })), "{result:?}");
     }
+}
+
+/// A remark comes next to a departure, so one of a shape that no recorded
+/// answer showed must not cost the departures.
+#[test]
+fn remark_of_an_unknown_shape_costs_only_itself() {
+    let complete = vbb()
+        .parse_departures(&respond(DEPARTURES))
+        .map(|found| found.len());
+    let mut answer: Value = serde_json::from_slice(DEPARTURES).unwrap_or_default();
+    let result = &mut answer["svcResL"][0]["res"];
+    result["common"]["remL"][0] = json!(5);
+    result["common"]["remL"][1]["txtN"] = json!(7);
+    result["jnyL"][0]["msgL"] = json!({"remX": 0});
+    result["jnyL"][1]["msgL"] = json!([null, {"type": 3}, {"type": "REM", "remX": "1"}]);
+
+    let odd = vbb()
+        .parse_departures(&respond(answer.to_string()))
+        .map(|found| found.len());
+
+    assert!(complete.is_ok(), "{complete:?}");
+    assert_eq!(odd, complete);
 }

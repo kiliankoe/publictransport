@@ -1271,6 +1271,11 @@ public struct Departure: Equatable, Hashable, Codable {
      * Whether the departure does not take place.
      */
     public var cancelled: Bool
+    /**
+     * What the server says about it: disruptions and hints. Empty if it
+     * says nothing.
+     */
+    public var remarks: [Remark]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -1303,7 +1308,11 @@ public struct Departure: Equatable, Hashable, Codable {
          */realtimePlatform: String?, 
         /**
          * Whether the departure does not take place.
-         */cancelled: Bool) {
+         */cancelled: Bool, 
+        /**
+         * What the server says about it: disruptions and hints. Empty if it
+         * says nothing.
+         */remarks: [Remark]) {
         self.stop = stop
         self.line = line
         self.direction = direction
@@ -1312,6 +1321,7 @@ public struct Departure: Equatable, Hashable, Codable {
         self.scheduledPlatform = scheduledPlatform
         self.realtimePlatform = realtimePlatform
         self.cancelled = cancelled
+        self.remarks = remarks
     }
 
     
@@ -1402,7 +1412,8 @@ struct FfiConverterTypeDeparture: FfiConverterRustBuffer {
                 realtimeTime: FfiConverterOptionTypeUtcTime.read(from: &buf), 
                 scheduledPlatform: FfiConverterOptionString.read(from: &buf), 
                 realtimePlatform: FfiConverterOptionString.read(from: &buf), 
-                cancelled: FfiConverterBool.read(from: &buf)
+                cancelled: FfiConverterBool.read(from: &buf), 
+                remarks: FfiConverterSequenceTypeRemark.read(from: &buf)
         )
     }
 
@@ -1415,6 +1426,7 @@ struct FfiConverterTypeDeparture: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.scheduledPlatform, into: &buf)
         FfiConverterOptionString.write(value.realtimePlatform, into: &buf)
         FfiConverterBool.write(value.cancelled, into: &buf)
+        FfiConverterSequenceTypeRemark.write(value.remarks, into: &buf)
     }
 }
 
@@ -2089,6 +2101,11 @@ public struct Leg: Equatable, Hashable, Codable {
      * where the leg starts or ends.
      */
     public var cancelled: Bool
+    /**
+     * What the server says about it: disruptions and hints. Empty if it
+     * says nothing.
+     */
+    public var remarks: [Remark]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -2108,12 +2125,17 @@ public struct Leg: Equatable, Hashable, Codable {
         /**
          * Whether the ride does not take place, or does not call at the stop
          * where the leg starts or ends.
-         */cancelled: Bool) {
+         */cancelled: Bool, 
+        /**
+         * What the server says about it: disruptions and hints. Empty if it
+         * says nothing.
+         */remarks: [Remark]) {
         self.kind = kind
         self.departure = departure
         self.arrival = arrival
         self.intermediateStops = intermediateStops
         self.cancelled = cancelled
+        self.remarks = remarks
     }
 
     
@@ -2135,7 +2157,8 @@ struct FfiConverterTypeLeg: FfiConverterRustBuffer {
                 departure: FfiConverterTypeLegEnd.read(from: &buf), 
                 arrival: FfiConverterTypeLegEnd.read(from: &buf), 
                 intermediateStops: FfiConverterSequenceTypeStopover.read(from: &buf), 
-                cancelled: FfiConverterBool.read(from: &buf)
+                cancelled: FfiConverterBool.read(from: &buf), 
+                remarks: FfiConverterSequenceTypeRemark.read(from: &buf)
         )
     }
 
@@ -2145,6 +2168,7 @@ struct FfiConverterTypeLeg: FfiConverterRustBuffer {
         FfiConverterTypeLegEnd.write(value.arrival, into: &buf)
         FfiConverterSequenceTypeStopover.write(value.intermediateStops, into: &buf)
         FfiConverterBool.write(value.cancelled, into: &buf)
+        FfiConverterSequenceTypeRemark.write(value.remarks, into: &buf)
     }
 }
 
@@ -3238,6 +3262,150 @@ func FfiConverterTypePolygon_lift(_ buf: RustBuffer) throws -> Polygon {
 #endif
 func FfiConverterTypePolygon_lower(_ value: Polygon) -> RustBuffer {
     return FfiConverterTypePolygon.lower(value)
+}
+
+
+/**
+ * A text that a server sends with a departure or with a leg of a trip.
+ */
+public struct Remark: Equatable, Hashable, Codable {
+    /**
+     * What the text is about.
+     */
+    public var kind: RemarkKind
+    /**
+     * A short headline.
+     */
+    public var title: String?
+    /**
+     * The message as plain text, in the language of the server. Paragraphs
+     * are separated by line breaks, and a link is followed by its target
+     * in brackets. At least one of `title` and `text` is set.
+     */
+    public var text: String?
+    /**
+     * A page with more about it.
+     */
+    public var url: String?
+    /**
+     * The identifier that the server gives the message. The same message
+     * comes with every departure and leg it is about, so this tells an
+     * application which ones to show once. `nil` for a hint.
+     */
+    public var id: String?
+    /**
+     * The code that the server has for a hint of this kind, such as
+     * `A__KL` or `FK`, for an application that shows an icon for the ones
+     * it knows. Operators define their own codes, so the same property has
+     * another code on another network. `nil` for a disruption.
+     */
+    public var code: String?
+    /**
+     * From when the message holds, if the server says so.
+     */
+    public var validFrom: UtcTime?
+    /**
+     * Until when the message holds, if the server says so. Servers write a
+     * date centuries ahead for a message without an end.
+     */
+    public var validUntil: UtcTime?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * What the text is about.
+         */kind: RemarkKind, 
+        /**
+         * A short headline.
+         */title: String?, 
+        /**
+         * The message as plain text, in the language of the server. Paragraphs
+         * are separated by line breaks, and a link is followed by its target
+         * in brackets. At least one of `title` and `text` is set.
+         */text: String?, 
+        /**
+         * A page with more about it.
+         */url: String?, 
+        /**
+         * The identifier that the server gives the message. The same message
+         * comes with every departure and leg it is about, so this tells an
+         * application which ones to show once. `nil` for a hint.
+         */id: String?, 
+        /**
+         * The code that the server has for a hint of this kind, such as
+         * `A__KL` or `FK`, for an application that shows an icon for the ones
+         * it knows. Operators define their own codes, so the same property has
+         * another code on another network. `nil` for a disruption.
+         */code: String?, 
+        /**
+         * From when the message holds, if the server says so.
+         */validFrom: UtcTime?, 
+        /**
+         * Until when the message holds, if the server says so. Servers write a
+         * date centuries ahead for a message without an end.
+         */validUntil: UtcTime?) {
+        self.kind = kind
+        self.title = title
+        self.text = text
+        self.url = url
+        self.id = id
+        self.code = code
+        self.validFrom = validFrom
+        self.validUntil = validUntil
+    }
+
+    
+
+}
+
+#if compiler(>=6)
+extension Remark: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+struct FfiConverterTypeRemark: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Remark {
+        return
+            try Remark(
+                kind: FfiConverterTypeRemarkKind.read(from: &buf), 
+                title: FfiConverterOptionString.read(from: &buf), 
+                text: FfiConverterOptionString.read(from: &buf), 
+                url: FfiConverterOptionString.read(from: &buf), 
+                id: FfiConverterOptionString.read(from: &buf), 
+                code: FfiConverterOptionString.read(from: &buf), 
+                validFrom: FfiConverterOptionTypeUtcTime.read(from: &buf), 
+                validUntil: FfiConverterOptionTypeUtcTime.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: Remark, into buf: inout [UInt8]) {
+        FfiConverterTypeRemarkKind.write(value.kind, into: &buf)
+        FfiConverterOptionString.write(value.title, into: &buf)
+        FfiConverterOptionString.write(value.text, into: &buf)
+        FfiConverterOptionString.write(value.url, into: &buf)
+        FfiConverterOptionString.write(value.id, into: &buf)
+        FfiConverterOptionString.write(value.code, into: &buf)
+        FfiConverterOptionTypeUtcTime.write(value.validFrom, into: &buf)
+        FfiConverterOptionTypeUtcTime.write(value.validUntil, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+func FfiConverterTypeRemark_lift(_ buf: RustBuffer) throws -> Remark {
+    return try FfiConverterTypeRemark.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+func FfiConverterTypeRemark_lower(_ value: Remark) -> RustBuffer {
+    return FfiConverterTypeRemark.lower(value)
 }
 
 
@@ -5375,6 +5543,82 @@ func FfiConverterTypePublicTransportError_lower(_ value: PublicTransportError) -
 
 
 /**
+ * What a ``Remark`` is about.
+ */
+
+public enum RemarkKind: Equatable, Hashable, CaseIterable {
+    
+    /**
+     * A message from the operator about something out of the ordinary,
+     * such as a closed road, a broken elevator or a cancelled stop.
+     */
+    case disruption
+    /**
+     * A fixed property of the ride, such as air conditioning or how to
+     * board with a wheelchair.
+     */
+    case hint
+
+
+
+
+}
+
+#if compiler(>=6)
+extension RemarkKind: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+struct FfiConverterTypeRemarkKind: FfiConverterRustBuffer {
+    typealias SwiftType = RemarkKind
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RemarkKind {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .disruption
+        
+        case 2: return .hint
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RemarkKind, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .disruption:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .hint:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+func FfiConverterTypeRemarkKind_lift(_ buf: RustBuffer) throws -> RemarkKind {
+    return try FfiConverterTypeRemarkKind.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+func FfiConverterTypeRemarkKind_lower(_ value: RemarkKind) -> RustBuffer {
+    return FfiConverterTypeRemarkKind.lower(value)
+}
+
+
+
+/**
  * The time a ``TripsQuery`` is bound to.
  */
 
@@ -6092,6 +6336,31 @@ fileprivate struct FfiConverterSequenceTypePolygon: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeRemark: FfiConverterRustBuffer {
+    typealias SwiftType = [Remark]
+
+    public static func write(_ value: [Remark], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeRemark.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [Remark] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [Remark]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeRemark.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeStopover: FfiConverterRustBuffer {
     typealias SwiftType = [Stopover]
 
@@ -6391,6 +6660,16 @@ extension LocationKind: Codable {
 }
 
 extension Mode: Codable {
+    public init(from decoder: any Decoder) throws {
+        self = try decodeCase(from: decoder, named: { String(describing: $0) })
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        try encodeCase(self, to: encoder, named: { String(describing: $0) })
+    }
+}
+
+extension RemarkKind: Codable {
     public init(from decoder: any Decoder) throws {
         self = try decodeCase(from: decoder, named: { String(describing: $0) })
     }

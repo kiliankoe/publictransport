@@ -7,7 +7,9 @@ use serde_json::{Value, json};
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, GlobalId, Header, HttpRequest, HttpResponse,
     Leg, LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, Network,
-    Place, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery, model::Target,
+    Place, Remark, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
+    http::lenient_list,
+    model::{Target, plain_text},
 };
 
 /// What a HAFAS mgate server needs to answer, as the operator's own app
@@ -436,6 +438,7 @@ pub(crate) fn parse_departures(
                 scheduled_platform: end.scheduled_platform,
                 realtime_platform: end.realtime_platform,
                 cancelled: end.cancelled || journey.is_cncl,
+                remarks: reader.remarks([&journey.msg_l, &stop.msg_l]),
             })
         })
         .collect::<Result<Vec<_>, Error>>()?;
@@ -635,6 +638,44 @@ impl<'a> Reader<'a> {
         })
     }
 
+    /// The remarks that the given lists of a journey and of its stops refer
+    /// to, each once. The operator and the occupancy come as texts too and
+    /// are no remarks.
+    fn remarks<'b>(&self, lists: impl IntoIterator<Item = &'b Vec<Message>>) -> Vec<Remark> {
+        let mut remarks = Vec::new();
+        for message in lists.into_iter().flatten() {
+            if message.kind.as_deref() != Some("REM") {
+                continue;
+            }
+            let Some(wire) = message
+                .rem_x
+                .and_then(|index| self.common.remarks.get(index))
+                .and_then(|remark| WireRemark::deserialize(remark).ok())
+            else {
+                continue;
+            };
+            let code = wire.code.as_deref().unwrap_or_default();
+            if code == "OPERATOR" || code.starts_with("text.occup") {
+                continue;
+            }
+            let Some(text) = wire.txt_n.as_deref().and_then(plain_text) else {
+                continue;
+            };
+            let remark = match wire.kind.as_deref() {
+                Some("R") => Remark {
+                    text: Some(text),
+                    ..Remark::disruption()
+                },
+                Some("A" | "H") => Remark::hint(text, wire.code),
+                _ => continue,
+            };
+            if !remarks.contains(&remark) {
+                remarks.push(remark);
+            }
+        }
+        remarks
+    }
+
     fn leg(&self, date: &str, section: &Section) -> Result<Leg, Error> {
         let journey = section.jny.as_ref();
         let kind = match (section.kind.as_str(), journey) {
@@ -657,6 +698,12 @@ impl<'a> Reader<'a> {
                 .map(|stop| self.stopover(date, stop))
                 .collect::<Result<_, _>>()?,
             cancelled: journey.is_some_and(|journey| journey.is_cncl),
+            remarks: self.remarks(
+                journey
+                    .map(|journey| &journey.msg_l)
+                    .into_iter()
+                    .chain([&section.dep.msg_l, &section.arr.msg_l]),
+            ),
         })
     }
 }
@@ -687,6 +734,31 @@ struct Common {
     lines: Vec<Product>,
     #[serde(default, rename = "opL")]
     operators: Vec<Operator>,
+    /// Kept as they come, so that an entry of an unknown shape keeps its
+    /// place in the list and costs only itself.
+    #[serde(default, rename = "remL", deserialize_with = "lenient_list")]
+    remarks: Vec<Value>,
+}
+
+/// A text that journeys and stops refer to.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WireRemark {
+    /// `A` for an attribute of the ride, `H` for a hint, `R` for a message
+    /// about its real-time state.
+    #[serde(rename = "type")]
+    kind: Option<String>,
+    code: Option<String>,
+    txt_n: Option<String>,
+}
+
+/// A reference from a journey or a stop to a text.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Message {
+    #[serde(rename = "type")]
+    kind: Option<String>,
+    rem_x: Option<usize>,
 }
 
 #[derive(Deserialize)]
@@ -820,6 +892,8 @@ struct Journey {
     stb_stop: Option<Stop>,
     #[serde(default)]
     stop_l: Vec<Stop>,
+    #[serde(default, deserialize_with = "lenient_list")]
+    msg_l: Vec<Message>,
 }
 
 /// A call at a stop, with the fields of an arrival, a departure or both.
@@ -851,6 +925,8 @@ struct Stop {
     a_cncl: bool,
     #[serde(default)]
     d_cncl: bool,
+    #[serde(default, deserialize_with = "lenient_list")]
+    msg_l: Vec<Message>,
 }
 
 #[derive(Deserialize)]
