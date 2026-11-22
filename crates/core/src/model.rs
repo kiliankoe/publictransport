@@ -995,11 +995,12 @@ pub struct LegEnd {
     /// The stop, platform or other place.
     pub stop: Location,
     /// The time according to the timetable. For a walk it is the time the
-    /// trip was planned with.
+    /// server planned the trip with. Most servers plan with real-time data,
+    /// so a walk after a late ride starts when that ride arrives and has no
+    /// predicted time of its own.
     pub scheduled_time: Timestamp,
-    /// The predicted time. `None` if the server has no prediction, which is
-    /// always the case for a walk. A walk after a late ride therefore keeps
-    /// its planned times and can start before the ride arrives.
+    /// The predicted time. `None` if the server has no prediction. Few
+    /// servers have one for a walk, see `scheduled_time`.
     #[cfg_attr(
         feature = "unstable-wasm",
         serde(skip_serializing_if = "Option::is_none")

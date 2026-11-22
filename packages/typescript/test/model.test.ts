@@ -98,12 +98,13 @@ test("times are dates and missing values are missing keys", () => {
   assert.ok(first.scheduledTime instanceof Date);
   assert.equal(first.scheduledTime.toISOString(), "2026-11-16T13:24:00.000Z");
   assert.equal(first.line.mode, "bus");
-  // A walk has no predicted times.
+  // A walk ends at no platform.
   const legs = parseTrips(vvo, ok(fixture("efa/vvo-trip.json"))).trips.flatMap((trip) => trip.legs);
-  const walk = legs.find((leg) => leg.kind.type === "walk")?.departure;
-  assert.ok(walk && !("realtimeTime" in walk));
+  const walk = legs.find((leg) => leg.kind.type === "walk")?.arrival;
+  assert.ok(walk && !("scheduledPlatform" in walk));
   // A time before 1970 with a fraction is rounded down, as in the other languages.
-  assert.equal(expectedTime({ ...walk, scheduledTime: new Date(-1500) }).getTime(), -2000);
+  const { realtimeTime: _, ...planned } = walk;
+  assert.equal(expectedTime({ ...planned, scheduledTime: new Date(-1500) }).getTime(), -2000);
 });
 
 test("local time has the offset that holds at the location", () => {

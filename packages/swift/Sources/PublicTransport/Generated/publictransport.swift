@@ -2175,13 +2175,14 @@ public struct LegEnd: Equatable, Hashable, Codable {
     public var stop: Location
     /**
      * The time according to the timetable. For a walk it is the time the
-     * trip was planned with.
+     * server planned the trip with. Most servers plan with real-time data,
+     * so a walk after a late ride starts when that ride arrives and has no
+     * predicted time of its own.
      */
     public var scheduledTime: UtcTime
     /**
-     * The predicted time. `nil` if the server has no prediction, which is
-     * always the case for a walk. A walk after a late ride therefore keeps
-     * its planned times and can start before the ride arrives.
+     * The predicted time. `nil` if the server has no prediction. Few
+     * servers have one for a walk, see `scheduled_time`.
      */
     public var realtimeTime: UtcTime?
     /**
@@ -2205,12 +2206,13 @@ public struct LegEnd: Equatable, Hashable, Codable {
          */stop: Location, 
         /**
          * The time according to the timetable. For a walk it is the time the
-         * trip was planned with.
+         * server planned the trip with. Most servers plan with real-time data,
+         * so a walk after a late ride starts when that ride arrives and has no
+         * predicted time of its own.
          */scheduledTime: UtcTime, 
         /**
-         * The predicted time. `nil` if the server has no prediction, which is
-         * always the case for a walk. A walk after a late ride therefore keeps
-         * its planned times and can start before the ride arrives.
+         * The predicted time. `nil` if the server has no prediction. Few
+         * servers have one for a walk, see `scheduled_time`.
          */realtimeTime: UtcTime?, 
         /**
          * The platform according to the timetable.

@@ -151,10 +151,14 @@ fn walk_between(previous: &Leg, next: &Leg, seconds: i64) -> Option<Leg> {
     {
         return None;
     }
-    let end = |stop: &Location, scheduled_time| LegEnd {
+    // The walk starts when the leg before it ends, late or not.
+    let delay = previous.arrival.delay_seconds();
+    let end = |stop: &Location, scheduled_time: Timestamp| LegEnd {
         stop: stop.clone(),
         scheduled_time,
-        realtime_time: None,
+        realtime_time: delay.map(|delay| Timestamp {
+            unix_seconds: scheduled_time.unix_seconds.saturating_add(delay),
+        }),
         scheduled_platform: None,
         realtime_platform: None,
         cancelled: false,
@@ -210,9 +214,13 @@ pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<
         let mut legs: Vec<Leg> = Vec::new();
         // The length of the walk that follows the leg before, in seconds.
         let mut transfer = None;
+        // The server estimates times for a walk too: it carries the delay
+        // of the ride before it on. Without a ride that has real-time data,
+        // these are the planned times again and no prediction.
+        let trip_is_live = journey.legs.iter().any(|leg| leg.is_realtime_controlled);
         for wire in journey.legs {
             let next_transfer = wire.transfer_after();
-            let leg = wire.into_leg(network)?;
+            let leg = wire.into_leg(network, trip_is_live)?;
             if let (Some(seconds), Some(previous)) = (transfer, legs.last())
                 && let Some(walk) = walk_between(previous, &leg, seconds)
             {
@@ -559,11 +567,15 @@ impl WireLeg {
             .find_map(|path| path.duration)
     }
 
-    fn into_leg(self, network: &Network) -> Result<Leg, Error> {
+    /// `trip_is_live` says whether a ride of the trip has real-time data, which the
+    /// estimated times of a walk then follow.
+    fn into_leg(self, network: &Network, trip_is_live: bool) -> Result<Leg, Error> {
         let no_time = || Error::Parse {
             message: "a leg has no scheduled time at one of its ends".to_owned(),
         };
-        let kind = self.transportation.street_kind().unwrap_or_else(|| {
+        let street_kind = self.transportation.street_kind();
+        let predicted = self.is_realtime_controlled || (trip_is_live && street_kind.is_some());
+        let kind = street_kind.unwrap_or_else(|| {
             let (line, direction) = self.transportation.into_line();
             LegKind::Transit { line, direction }
         });
@@ -577,7 +589,7 @@ impl WireLeg {
             .into_stopover(network)
             .into_leg_end()
             .ok_or_else(no_time)?;
-        if !self.is_realtime_controlled {
+        if !predicted {
             departure.realtime_time = None;
             arrival.realtime_time = None;
         }

@@ -406,16 +406,16 @@ fn efa_reads_a_ride_with_its_calls_and_a_walk() {
     assert!(!walk.cancelled);
     assert_eq!(walk.intermediate_stops, []);
     assert_eq!(walk.departure.stop.id, "de:14612:16:1:Gleis2");
-    // The server carries the train's delay on into the walk. That is not a
-    // prediction for the walk.
-    assert_eq!(end_times(&walk.departure), (utc(13, 30), None));
-    assert_eq!(walk.departure.expected_time(), utc(13, 30));
+    // The server carries the train's delay on into the walk.
+    assert_eq!(end_times(&walk.departure), (utc(13, 30), Some(utc(13, 32))));
+    assert_eq!(walk.departure.expected_time(), utc(13, 32));
     // The walk ends at the station, not at one of its platforms.
     assert_eq!(walk.arrival.stop.id, "de:14612:13");
     assert_eq!(walk.arrival.stop.name, "Albertplatz");
     assert_eq!(walk.arrival.stop.locality.as_deref(), Some("Dresden"));
-    assert_eq!(end_times(&walk.arrival), (utc(13, 40), None));
+    assert_eq!(end_times(&walk.arrival), (utc(13, 40), Some(utc(13, 42))));
     assert_eq!(platforms(&walk.arrival), (None, None));
+    assert_eq!(trips[1].arrival().expected_time(), utc(13, 42));
 }
 
 /// A change of platform comes as `footPathInfo` on the ride before it. The
@@ -432,13 +432,13 @@ fn efa_turns_the_footpath_after_a_ride_into_a_walk_to_the_next_leg() {
 
     assert_eq!(walk.departure.stop, train.arrival.stop);
     assert_eq!(walk.departure.stop.id, "de:14612:16:1:Gleis2");
-    assert_eq!(end_times(&walk.departure), (utc(13, 30), None));
+    assert_eq!(end_times(&walk.departure), (utc(13, 30), Some(utc(13, 32))));
     assert_eq!(platforms(&walk.departure), (None, None));
 
     assert_eq!(walk.arrival.stop, tram.departure.stop);
     assert_eq!(walk.arrival.stop.id, "de:14612:16:6:1");
     // 240 seconds after the walk starts.
-    assert_eq!(end_times(&walk.arrival), (utc(13, 34), None));
+    assert_eq!(end_times(&walk.arrival), (utc(13, 34), Some(utc(13, 36))));
     assert_eq!(platforms(&walk.arrival), (None, None));
 }
 
