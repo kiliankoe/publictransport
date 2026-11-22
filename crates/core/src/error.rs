@@ -7,7 +7,11 @@
 #[cfg_attr(
     feature = "unstable-wasm",
     derive(serde::Serialize, tsify::Tsify),
-    serde(tag = "type", rename_all = "camelCase"),
+    serde(
+        tag = "type",
+        rename_all = "camelCase",
+        rename_all_fields = "camelCase"
+    ),
     tsify(rename = "Failure")
 )]
 pub enum Error {
@@ -62,7 +66,15 @@ pub enum Error {
     /// The client sent too many requests (status 429). Trying again later
     /// can help.
     #[error("the server received too many requests")]
-    RateLimited,
+    RateLimited {
+        /// How long the server asks to wait, in seconds, from its
+        /// `Retry-After` header. `None` if it does not say.
+        #[cfg_attr(
+            feature = "unstable-wasm",
+            serde(skip_serializing_if = "Option::is_none")
+        )]
+        retry_after_seconds: Option<u32>,
+    },
     /// The server rejected the credentials (status 401, or the code `AUTH`
     /// in a HAFAS answer).
     #[error("the server rejected the credentials")]

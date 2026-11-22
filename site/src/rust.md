@@ -86,6 +86,7 @@ use publictransport_client::{ApiError, Error};
 match client.departures(&network, "no-such-stop").await {
     Ok(departures) => { /* ... */ }
     Err(Error::Api(ApiError::NotFound { .. })) => { /* the server does not know the stop */ }
+    Err(Error::Api(ApiError::RateLimited { retry_after_seconds })) => { /* how long the server asks to wait, if it says so */ }
     Err(Error::Api(error)) => { /* what the server or the query got wrong */ }
     Err(error) => { /* the HTTP exchange failed, or the answer was above 16 MB */ }
 }

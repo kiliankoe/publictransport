@@ -179,6 +179,7 @@ test("user agent of the network replaces the one of the client", async () => {
 });
 
 const moved = [{ name: "Location", value: "/new" }];
+const retryAfter = [{ name: "Retry-After", value: "120" }];
 
 for (const [name, status] of [
   ["redirect", 302],
@@ -231,7 +232,10 @@ test("each error of the core is thrown as its class, with its details", () => {
   });
   assert.throws(answer(401), UnauthorizedError);
   assert.throws(answer(403), BlockedError);
-  assert.throws(answer(429), RateLimitedError);
+  assert.throws(
+    () => parseDepartures(network, { status: 429, headers: retryAfter, body }),
+    (thrown) => thrown instanceof RateLimitedError && thrown.retryAfterSeconds === 120,
+  );
   assert.throws(answer(503), UnavailableError);
   assert.throws(() => parseDepartures(network, unknownStop), NotFoundError);
   assert.throws(() => parseDepartures(network, ok(new Uint8Array())), ParseError);

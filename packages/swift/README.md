@@ -92,7 +92,7 @@ do {
 }
 ```
 
-What the server or the query cause is a `PublicTransportError`, such as `.notFound` or `.rateLimited`. A failed HTTP exchange is a `URLError`, a cancelled task throws `CancellationError`, and an answer above 16 MB is `ClientError.responseTooLarge`.
+What the server or the query cause is a `PublicTransportError`, such as `.notFound` or `.rateLimited(retryAfterSeconds:)`, which holds how long the server asks to wait, if it says so. A failed HTTP exchange is a `URLError`, a cancelled task throws `CancellationError`, and an answer above 16 MB is `ClientError.responseTooLarge`.
 
 ## Known limitations
 

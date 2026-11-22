@@ -95,16 +95,17 @@ private func stop(_ ifopt: String, timezone: String? = nil) -> Location {
     // Naming every case is the test: it does not compile with another spelling.
     let all: Set<PublicTransportError> = [
         .invalidNetwork(message: ""), .invalidQuery(message: ""), .unsupported(message: ""),
-        .notFound(message: ""), .moved(location: ""), .blocked, .rateLimited, .unauthorized,
-        .unavailable, .server(status: 500, message: ""), .parse(message: ""),
+        .notFound(message: ""), .moved(location: ""), .blocked, .rateLimited(retryAfterSeconds: nil),
+        .unauthorized, .unavailable, .server(status: 500, message: ""), .parse(message: ""),
     ]
     #expect(all.count == 11)
 
+    let wait = [Header(name: "Retry-After", value: "120")]
     let thrown = #expect(throws: PublicTransportError.self) {
         try Network.bundled(.vvoEfa)
-            .parseDepartures(response: HttpResponse(status: 429, headers: [], body: Data()))
+            .parseDepartures(response: HttpResponse(status: 429, headers: wait, body: Data()))
     }
-    #expect(thrown == .rateLimited)
+    #expect(thrown == .rateLimited(retryAfterSeconds: 120))
     #expect(thrown?.localizedDescription == "the server received too many requests")
 }
 

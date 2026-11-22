@@ -5184,7 +5184,12 @@ enum PublicTransportError: Swift.Error, Equatable, Hashable, Foundation.Localize
      * The client sent too many requests (status 429). Trying again later
      * can help.
      */
-    case rateLimited
+    case rateLimited(
+        /**
+         * How long the server asks to wait, in seconds, from its
+         * `Retry-After` header. `nil` if it does not say.
+         */retryAfterSeconds: UInt32?
+    )
     /**
      * The server rejected the credentials (status 401, or the code `AUTH`
      * in a HAFAS answer).
@@ -5273,7 +5278,9 @@ struct FfiConverterTypePublicTransportError: FfiConverterRustBuffer {
             location: try FfiConverterOptionString.read(from: &buf)
             )
         case 6: return .blocked
-        case 7: return .rateLimited
+        case 7: return .rateLimited(
+            retryAfterSeconds: try FfiConverterOptionUInt32.read(from: &buf)
+            )
         case 8: return .unauthorized
         case 9: return .unavailable
         case 10: return .server(
@@ -5324,9 +5331,10 @@ struct FfiConverterTypePublicTransportError: FfiConverterRustBuffer {
             writeInt(&buf, Int32(6))
         
         
-        case .rateLimited:
+        case let .rateLimited(retryAfterSeconds):
             writeInt(&buf, Int32(7))
-        
+            FfiConverterOptionUInt32.write(retryAfterSeconds, into: &buf)
+            
         
         case .unauthorized:
             writeInt(&buf, Int32(8))

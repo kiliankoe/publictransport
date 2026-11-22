@@ -129,7 +129,9 @@ impl HttpResponse {
             }),
             401 => Err(Error::Unauthorized),
             403 => Err(Error::Blocked),
-            429 => Err(Error::RateLimited),
+            429 => Err(Error::RateLimited {
+                retry_after_seconds: self.retry_after_seconds(),
+            }),
             500..=599 => Err(Error::Unavailable),
             status => Err(Error::Server {
                 status,
@@ -146,6 +148,27 @@ impl HttpResponse {
         serde_json::from_slice(self.success_body()?).map_err(|error| Error::Parse {
             message: error.to_string(),
         })
+    }
+
+    /// The wait that the `Retry-After` header asks for. The header holds
+    /// seconds or a date. There is no clock here, so a date counts from the
+    /// `Date` header of the same response.
+    fn retry_after_seconds(&self) -> Option<u32> {
+        let value = self.header("retry-after")?.trim();
+        let seconds = if let Ok(seconds) = value.parse::<u64>() {
+            seconds
+        } else {
+            let date = |text: &str| {
+                Some(
+                    jiff::fmt::rfc2822::parse(text.trim())
+                        .ok()?
+                        .timestamp()
+                        .as_second(),
+                )
+            };
+            u64::try_from(date(value)? - date(self.header("date")?)?).unwrap_or(0)
+        };
+        Some(u32::try_from(seconds).unwrap_or(u32::MAX))
     }
 
     fn header(&self, name: &str) -> Option<&str> {

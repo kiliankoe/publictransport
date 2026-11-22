@@ -58,6 +58,14 @@ export class BlockedError extends PublicTransportError {
 /** The client sent too many requests (status 429). Trying again later can help. */
 export class RateLimitedError extends PublicTransportError {
   override name = "RateLimitedError";
+
+  /** How long the server asks to wait, in seconds, from its `Retry-After` header. */
+  readonly retryAfterSeconds: number | undefined;
+
+  constructor(message: string, retryAfterSeconds: number | undefined) {
+    super(message);
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
 }
 
 /** The server rejected the credentials (status 401, or the code `AUTH` in a HAFAS answer). */
@@ -107,7 +115,7 @@ function translated({ message, failure }: Thrown): PublicTransportError {
     case "blocked":
       return new BlockedError(message);
     case "rateLimited":
-      return new RateLimitedError(message);
+      return new RateLimitedError(message, failure.retryAfterSeconds);
     case "unauthorized":
       return new UnauthorizedError(message);
     case "unavailable":

@@ -117,7 +117,7 @@ try {
 }
 ```
 
-What the server or the query cause is a subclass of `PublicTransportError`: besides `NotFoundError`, a redirect is a `MovedError`, the status 401 an `UnauthorizedError`, 403 a `BlockedError`, 429 a `RateLimitedError`, a status from 500 an `UnavailableError`, and any other a `ServerError`. A failed HTTP exchange is thrown as `fetch` throws it, and an answer above 16 MB is a `ResponseTooLargeError`. A network or a query of the wrong shape is a `TypeError` before a request is sent.
+What the server or the query cause is a subclass of `PublicTransportError`: besides `NotFoundError`, a redirect is a `MovedError`, the status 401 an `UnauthorizedError`, 403 a `BlockedError`, 429 a `RateLimitedError` with `retryAfterSeconds`, how long the server asks to wait, a status from 500 an `UnavailableError`, and any other a `ServerError`. A failed HTTP exchange is thrown as `fetch` throws it, and an answer above 16 MB is a `ResponseTooLargeError`. A network or a query of the wrong shape is a `TypeError` before a request is sent.
 
 The client sets no time limit. Every call takes a `signal`, which cancels the request and rejects with the `DOMException` of the signal.
 

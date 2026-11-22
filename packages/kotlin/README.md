@@ -86,6 +86,8 @@ try {
     client.departures(network, "no-such-stop")
 } catch (error: PublicTransportException.NotFound) {
     // ...
+} catch (error: PublicTransportException.RateLimited) {
+    println(error.retryAfterSeconds) // how long the server asks to wait, or null
 } catch (error: PublicTransportException) {
     println(error.message) // a sentence in English
 }

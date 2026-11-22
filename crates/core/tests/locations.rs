@@ -386,7 +386,12 @@ fn failure_status_wins_over_a_valid_body() {
         let status = |status| parse(protocol, status, body).unwrap_err();
         assert_eq!(status(401), Error::Unauthorized);
         assert_eq!(status(403), Error::Blocked);
-        assert_eq!(status(429), Error::RateLimited);
+        assert_eq!(
+            status(429),
+            Error::RateLimited {
+                retry_after_seconds: None
+            }
+        );
         assert_eq!(status(500), Error::Unavailable);
         assert_eq!(status(503), Error::Unavailable);
         assert!(matches!(status(400), Error::Server { status: 400, .. }));
@@ -403,6 +408,57 @@ fn failure_status_wins_over_a_valid_body() {
         moved(Some("https://new.example")),
         "the endpoint has moved to https://new.example"
     );
+}
+
+/// The core has no clock, so a date to wait for counts from the `Date` of
+/// the same response.
+#[test]
+fn rate_limit_reports_how_long_the_server_asks_to_wait() {
+    const DATE: &str = "Wed, 21 Oct 2015 07:28:00 GMT";
+    type Headers<'a> = &'a [(&'a str, &'a str)];
+    let cases: [(Headers, Option<u32>); 7] = [
+        (&[("Retry-After", "120")], Some(120)),
+        (&[("rETRY-aFTER", "120")], Some(120)),
+        (
+            &[
+                ("dATE", DATE),
+                ("Retry-After", "Wed, 21 Oct 2015 07:30:00 GMT"),
+            ],
+            Some(120),
+        ),
+        (
+            &[
+                ("Date", DATE),
+                ("Retry-After", "Wed, 21 Oct 2015 07:27:00 GMT"),
+            ],
+            Some(0),
+        ),
+        (&[("Retry-After", DATE)], None),
+        (&[("Date", "today"), ("Retry-After", DATE)], None),
+        (&[("Date", DATE), ("Retry-After", "soon")], None),
+    ];
+    for (headers, retry_after_seconds) in cases {
+        let response = HttpResponse {
+            status: 429,
+            headers: headers
+                .iter()
+                .map(|&(name, value)| Header {
+                    name: name.into(),
+                    value: value.into(),
+                })
+                .collect(),
+            body: Vec::new(),
+        };
+        assert_eq!(
+            network(Protocol::Efa, "https://example.org/base")
+                .parse_locations(&response)
+                .unwrap_err(),
+            Error::RateLimited {
+                retry_after_seconds
+            },
+            "{headers:?}"
+        );
+    }
 }
 
 #[test]

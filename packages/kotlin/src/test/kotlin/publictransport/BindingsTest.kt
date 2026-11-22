@@ -4,6 +4,7 @@ import java.time.Instant
 import java.time.OffsetDateTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -21,7 +22,15 @@ class BindingsTest {
 
     @Test
     fun `message of an exception is the sentence of the core`() {
-        assertEquals("the server received too many requests", PublicTransportException.RateLimited().message)
+        val tooMany = HttpResponse(429u, listOf(Header("Retry-After", "120")), ByteArray(0))
+
+        val thrown =
+            assertFailsWith<PublicTransportException.RateLimited> {
+                BundledNetwork.VVO_EFA.network().parseDepartures(tooMany)
+            }
+
+        assertEquals("the server received too many requests", thrown.message)
+        assertEquals(120u, thrown.retryAfterSeconds)
     }
 
     // The values come from the core, so this checks that each one is a

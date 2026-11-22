@@ -156,7 +156,7 @@ def test_sends_the_library_request_and_returns_the_parsed_answer(
     ("status", "error", "fields"),
     [
         (301, Error.Moved, {"location": "https://new.example/std3"}),
-        (429, Error.RateLimited, {}),
+        (429, Error.RateLimited, {"retry_after_seconds": 120}),
         (418, Error.Server, {"status": 418, "message": "teapot"}),
     ],
 )
@@ -168,7 +168,9 @@ def test_status_headers_and_body_reach_the_library(
     def handler(request: httpx.Request) -> httpx.Response:
         sent.append(request)
         return httpx.Response(
-            status, headers={"Location": "https://new.example/std3"}, content=b"teapot"
+            status,
+            headers={"Location": "https://new.example/std3", "Retry-After": "120"},
+            content=b"teapot",
         )
 
     with pytest.raises(error) as raised:
