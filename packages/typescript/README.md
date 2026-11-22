@@ -1,17 +1,13 @@
 <!-- ANCHOR: site -->
 # publictransport for TypeScript
 
-A TypeScript and JavaScript client for public transport APIs. It uses a shared model for stops, departures and trips that covers several server types, so an application can query any supported network the same way. It supports servers that speak EFA (used by many German transport associations), MOTIS (the routing engine behind [Transitous](https://transitous.org)), TRIAS 1.2, OJP 1.0, HAFAS mgate (the interface behind many operators' apps) and OpenTripPlanner 2 with its Transmodel API.
-
-The package wraps the Rust library of the same name, compiled to WebAssembly. The Rust code builds the requests and parses the answers, and `fetch` sends them. It runs on Node.js from version 22, on Deno and on Bun. It has no dependencies and is an ES module only. The WebAssembly code is part of the JavaScript, so no runtime or bundler needs any setup to load it.
-
-In a browser the package loads and works, but a page can reach few servers directly: most transport servers do not allow requests from other origins (CORS), and a browser may not let a script set the `User-Agent` that some servers require. A page therefore needs a proxy that it controls, see `fetch` below.
-
-The package is on npm as `@kiliankoe/publictransport`:
+A TypeScript and JavaScript client for public transport APIs. One model for stops, departures and trips covers servers that speak EFA, MOTIS, TRIAS 1.2, OJP 1.0, HAFAS mgate or OpenTripPlanner 2, so an application queries every supported network the same way.
 
 ```sh
 pnpm add @kiliankoe/publictransport
 ```
+
+It runs on Node.js from version 22, on Deno and on Bun, has no dependencies and is an ES module only. The package wraps the Rust library of the same name as WebAssembly, which builds the requests and parses the answers, and `fetch` sends them. The WebAssembly code is part of the JavaScript, so nothing needs setup to load it.
 
 ```ts
 import { bundledNetwork, Client } from "@kiliankoe/publictransport";
@@ -23,38 +19,117 @@ const [from, to] = await client.locations(network, "Hauptbahnhof", { kinds: ["st
 if (!(from && to)) throw new Error("no stops found");
 
 for (const departure of await client.departures(network, from, { limit: 10 })) {
-  // The time on the clocks at the stop. Without a time zone it would be the one of this machine.
-  const time = departure.scheduledTime.toLocaleTimeString("en-GB", {
-    timeZone: departure.stop.timezone,
-    timeStyle: "short",
-  });
-  console.log(`${time} ${departure.line.name} ${departure.direction ?? ""}`);
+  console.log(departure.scheduledTime, departure.line.name, departure.direction ?? "");
 }
+```
+
+One client serves every network, so create one and keep it. The [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/typescript) have a program for each kind of request.
+
+## Trips
+
+```ts
+import { durationSeconds, transfers } from "@kiliankoe/publictransport";
 
 const found = await client.trips(network, from, to, { limit: 5 });
+for (const trip of found.trips) {
+  console.log(durationSeconds(trip), "seconds,", transfers(trip), "changes");
+}
+
 // The same arguments again, with the reference to the trips after these.
 const more = await client.trips(network, from, to, { limit: 5, page: found.later });
 ```
 
-The [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/typescript) have a short program for each kind of request.
+An end of a trip is a `Location`, the ID of a stop as a string or a coordinate. `departAt` and `arriveBy` ask for another time than now.
 
-`bundledNetwork("vvo-efa")` gives one of the networks that ship with the package; the type `BundledNetwork` lists their IDs. `Registry.bundled()` holds them all, for a list to choose from: `get("vvo-efa")` finds one by an ID that is only known at run time, and `covering({ latitude, longitude })` lists the networks for a position, each with the tier of its coverage there. A `Network` can also be written by hand, as `{ id: ..., name: ..., endpoint: ..., protocol: "efa", timezone: "Europe/Berlin" }`, and `networkFromJson(id, json)` reads further ones from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis).
+```ts
+const home = { latitude: 51.04, longitude: 13.73 };
+await client.trips(network, home, "de:14612:28", { arriveBy: tomorrowAtNine });
+```
 
-The model types are plain objects, described by interfaces, so a spread makes a changed one: `{ ...network, headers: [...(network.headers ?? []), { name: "X-Api-Key", value: key }] }`. A value that the server did not send is a missing key, not `null`, and a key that is `undefined` counts as missing where a value is passed in. Enumerations are strings, such as `"stop"` or `"highSpeedTrain"`, and the kind of a leg is told apart by `leg.kind.type`. What the other languages have as methods are functions here: `localTime(location, time)`, `expectedTime(departure)`, `localScheduledTime(departure)`, `localExpectedTime(departure)`, `delaySeconds(departure)`, `platform(departure)`, `departure(trip)`, `arrival(trip)`, `transfers(trip)`, `durationSeconds(trip)`, `stationIds(location)`, `sameStation(location, other)`, `stopId(network, location)`, `place(network, location)` and `tierAt(coverage, position)`.
+Each call also takes the whole query as one object, as in `client.departures(network, { stop, limit: 10 })`.
 
-A place is a `Location` from a search, a departure or a trip, the ID of a stop on the network that is asked as a string, or a coordinate as `{ latitude, longitude }`. `departures` takes a location or an ID, `trips` any two places. A location that another network returned works as well: for a trip always if it has a coordinate, for departures where the asked network can name the stop, which EFA, TRIAS and OJP can for stops with a global ID. The options after the places are the other fields of the query, and for a trip `departAt` or `arriveBy` as its time: `client.trips(network, from, to, { arriveBy: date, limit: 3 })`. Each call also takes the whole query as one object (`LocationQuery`, `DeparturesQuery`, `TripsQuery`), as in `client.departures(network, { stop, limit: 10 })`. A limit is a guide for the server and not a maximum.
+## Networks
 
-Times are `Date` values. A location has the name of its time zone as `timezone`, where the server tells it, so `Intl` and `toLocaleTimeString` show a time as the clocks there do, as above. `localTime(location, time)` gives that time as text in ISO 8601 format with the offset that holds there at that time, such as `2026-11-19T14:08:00+01:00`, or `undefined` where no time zone is known for it. `localScheduledTime` and `localExpectedTime` give the times of a departure or of an end of a leg in the same way, at its stop. `delaySeconds` is how late the vehicle is, in seconds, and `undefined` without real-time data. `platform` is the real-time platform if there is one, otherwise the scheduled one. `durationSeconds(trip)` is how long a trip takes, in seconds. `localTime` gives text because JavaScript has no type for a time with an offset; `Temporal.ZonedDateTime` can be made from it where that exists. An EFA network needs its `timezone` to send a query time. A TRIAS or OJP network needs a `requestorRef`, which public servers document, e.g. `OpenService`. A HAFAS network needs `hafas` and its `timezone`; the bundled ones have both.
+```ts
+import { Registry } from "@kiliankoe/publictransport";
 
-`trips` returns a `Trips` value: the list is in `trips`, and `earlier` and `later` are references for more. Pass one as `page` with the same other arguments to continue the search. An answer from an OpenTripPlanner server can be empty at night and still have a `later` reference to follow.
+const registry = Registry.bundled();
+const network = registry.get("vrr-efa"); // undefined if no network has this ID
 
-Failures that the server or the query cause are thrown as subclasses of `PublicTransportError`, such as `NotFoundError` or `RateLimitedError`; the `message` is a sentence in English, and `detail` has what the server said where there is more to tell. Failures of the HTTP exchange are thrown as `fetch` throws them, usually as a `TypeError`. An answer above 16 MB is a `ResponseTooLargeError`. The error of a status that is no success says what it means, whatever the body holds: a redirect is a `MovedError`, 401 an `UnauthorizedError`, 403 a `BlockedError`, 429 a `RateLimitedError`, a status from 500 an `UnavailableError`, and any other a `ServerError` with the `status`. A `NotFoundError` is a stop or a place that the server does not know, not the status 404. A network or a query of the wrong shape, such as a negative limit, is a `TypeError` before a request is sent. The client does not retry, limit its request rate or cache, and it sets no time limit. Every call takes a `signal` among its options, which cancels the request: `client.departures(network, stop, { signal: AbortSignal.timeout(30_000) })`. A cancelled or timed-out request rejects with the `DOMException` of the signal, an `AbortError` or a `TimeoutError`.
+// The networks for a position, the best coverage first.
+for (const { network, tier } of registry.covering({ latitude: 51.22, longitude: 6.79 })) {
+  console.log(tier, network.name);
+}
+```
 
-One client serves every network, so create one and keep it. It can be built on a `fetch` of your own, `new Client(userAgent, { fetch })`, for example to send the requests through a proxy. A page in a browser needs that for most servers: the function gets the URL of the transport server and the request to send, passes both to a proxy on the page's own origin, and returns its answer. It has to pass on `redirect: "manual"` and the `signal`, and the proxy must not follow redirects either.
+The [list of bundled networks](https://kiliankoe.github.io/publictransport/networks.html) also says what a network of your own needs. Write one as `{ id: ..., name: ..., endpoint: ..., protocol: "efa", timezone: "Europe/Berlin" }`, or read one from an entry of [transport-apis](https://github.com/public-transport/transport-apis) with `networkFromJson(id, json)`. The model types are plain objects, so a spread adds a header for a key or a client name:
 
-Some networks need more than their entry holds. Entur asks every client for its name in the header `ET-Client-Name` (`company-application`) and limits clients without it: add it to the headers of the bundled network with a spread, as above.
+```ts
+const entur = bundledNetwork("entur");
+const named = { ...entur, headers: [...(entur.headers ?? []), { name: "ET-Client-Name", value: "mycompany-myapp" }] };
+```
 
-An application with its own HTTP stack can skip the client: `locationsRequest(network, query)` returns the request to send, and `parseLocations(network, response)` reads the answer. Departures and trips have the same pair. The headers of both are lists of `{ name, value }`, since a name can repeat: `new Headers(request.headers.map(({ name, value }) => [name, value]))` makes those of a `fetch`.
+## The model
+
+The model types are interfaces for plain objects. A value that the server did not send is a missing key, not `null`. Enumerations are strings, such as `"stop"` or `"highSpeedTrain"`, and the kind of a leg is told apart by `leg.kind.type`. What the other languages have as methods are functions here:
+
+```ts
+import { delaySeconds, expectedTime, localScheduledTime, platform } from "@kiliankoe/publictransport";
+
+expectedTime(departure);       // the real-time one, if there is one
+delaySeconds(departure);       // undefined without real-time data
+platform(departure);           // the real-time platform, otherwise the scheduled one
+localScheduledTime(departure); // "2026-11-19T14:08:00+01:00", on the clocks at the stop
+```
+
+The others are `localExpectedTime`, `localTime(location, time)`, `departure(trip)`, `arrival(trip)`, `stationIds(location)`, `sameStation(location, other)`, `stopId(network, location)`, `place(network, location)` and `tierAt(coverage, position)`.
+
+Times are `Date` values. The local times are text in ISO 8601 format, because JavaScript has no type for a time with an offset. To print a time, `Intl` does it from the `Date` and the time zone of the stop:
+
+```ts
+departure.scheduledTime.toLocaleTimeString("en-GB", { timeZone: departure.stop.timezone, timeStyle: "short" });
+```
+
+## Errors
+
+```ts
+import { NotFoundError, PublicTransportError } from "@kiliankoe/publictransport";
+
+try {
+  await client.departures(network, "no-such-stop", { signal: AbortSignal.timeout(30_000) });
+} catch (error) {
+  if (error instanceof NotFoundError) {
+    // the server does not know the stop
+  } else if (error instanceof PublicTransportError) {
+    console.log(error.message, error.detail); // a sentence in English, and what the server said
+  }
+}
+```
+
+What the server or the query cause is a subclass of `PublicTransportError`: besides `NotFoundError`, a redirect is a `MovedError`, the status 401 an `UnauthorizedError`, 403 a `BlockedError`, 429 a `RateLimitedError`, a status from 500 an `UnavailableError`, and any other a `ServerError`. A failed HTTP exchange is thrown as `fetch` throws it, and an answer above 16 MB is a `ResponseTooLargeError`. A network or a query of the wrong shape is a `TypeError` before a request is sent.
+
+The client sets no time limit. Every call takes a `signal`, which cancels the request and rejects with the `DOMException` of the signal.
+
+## Browsers and your own `fetch`
+
+In a browser the package works, but a page can reach few servers directly: most transport servers do not allow requests from other origins (CORS), and a browser may not let a script set the `User-Agent`. A page therefore needs a proxy on its own origin, which a `fetch` of your own sends the requests through:
+
+```ts
+const client = new Client("my-app/1.0", {
+  fetch: (url, init) => fetch(`/proxy?url=${encodeURIComponent(String(url))}`, init),
+});
+```
+
+The function has to pass on `redirect: "manual"` and the `signal`, as `init` above does, and the proxy must not follow redirects either.
+
+An application with another HTTP stack skips the client. A pair of functions builds each request and reads its answer, and the same pair exists for departures and trips:
+
+```ts
+const request = locationsRequest(network, query); // a LocationQuery
+const locations = parseLocations(network, response);
+```
+
+The headers of both are lists of `{ name, value }`, since a name can repeat.
 
 ## Known limitations
 

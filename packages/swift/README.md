@@ -1,17 +1,13 @@
 <!-- ANCHOR: site -->
 # PublicTransport for Swift
 
-A Swift client for public transport APIs. It uses a shared model for stops, departures and trips that covers several server types, so an application can query any supported network the same way. It supports servers that speak EFA (used by many German transport associations), MOTIS (the routing engine behind [Transitous](https://transitous.org)), TRIAS 1.2, OJP 1.0, HAFAS mgate (the interface behind many operators' apps) and OpenTripPlanner 2 with its Transmodel API.
-
-The package wraps the Rust library of the same name. The Rust code builds the requests and parses the answers, and `URLSession` sends them. It runs on iOS, macOS, tvOS, watchOS and visionOS from version 26, and on Linux.
-
-Add it to a project by the URL of this repository, and depend on a version:
+A Swift client for public transport APIs. One model for stops, departures and trips covers servers that speak EFA, MOTIS, TRIAS 1.2, OJP 1.0, HAFAS mgate or OpenTripPlanner 2, so an application queries every supported network the same way.
 
 ```swift
 .package(url: "https://github.com/kiliankoe/publictransport", from: "0.1.2")
 ```
 
-On Apple platforms the package downloads the Rust library as a binary from the release. Between releases the code on a branch can be ahead of that binary, so a dependency on a branch does not work. On Linux the package links the library from a directory you name, see "Development". On watchOS the library covers only the watches with a 64-bit processor (Series 9 and later), so an app for all watches does not link yet.
+It runs on iOS, macOS, tvOS, watchOS and visionOS from version 26, and on Linux. The package wraps the Rust library of the same name, which builds the requests and parses the answers, and `URLSession` sends them.
 
 ```swift
 import PublicTransport
@@ -25,29 +21,84 @@ guard let from = stops.first, let to = stops.dropFirst().first else { return }
 for departure in try await client.departures(in: network, at: from, limit: 10) {
     print(departure.scheduledTime, departure.line.name, departure.direction ?? "")
 }
+```
 
+The [documentation](https://kiliankoe.github.io/publictransport/swift.html) has a program for each kind of request, which are also in [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/swift).
+
+## Trips
+
+```swift
 let found = try await client.trips(in: network, from: from, to: to, limit: 5)
+for trip in found.trips {
+    print(trip.durationSeconds ?? 0, "seconds,", trip.transfers, "changes")
+}
+
 // The same arguments again, with the reference to the trips after these.
 let more = try await client.trips(in: network, from: from, to: to, limit: 5, page: found.later)
 ```
 
-The [documentation](https://kiliankoe.github.io/publictransport/swift.html) has this guide with a short program for each kind of request, which are also in [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/swift).
+An end of a trip is a `Location`, the ID of a stop as a `String`, a `Coordinate` or a `CLLocationCoordinate2D`. `departingAt:` and `arrivingBy:` ask for another time than now.
 
-`Network.bundled(_:)` gives a network that ships with the package by name. `Registry.bundled()` holds them all, for a list to choose from: `network(id:)` finds one by its ID as text, and `covering(at:)` lists the networks for a position. A `Network` can also be described in code or read from an entry in the format of [transport-apis](https://github.com/public-transport/transport-apis) with `Network(id:json:)`.
+```swift
+let home = Coordinate(latitude: 51.04, longitude: 13.73)
+try await client.trips(in: network, from: home, to: "de:14612:28", arrivingBy: tomorrowAtNine)
+```
 
-A stop or a place is a `Location` from a search, a departure or a trip, or a `String` with an ID; a place in `trips` can be a `Coordinate` too, or a `CLLocationCoordinate2D` where Core Location exists. A location that another network returned works as well: for a trip always if it has a coordinate, for departures where the asked network can name the stop, which EFA, TRIAS and OJP can for stops with a global ID. Each call also takes a query of the Rust library (`LocationQuery`, `DeparturesQuery`, `TripsQuery`) with the label `query:`.
+## Networks
 
-Times are `Date` values. `Location.timeZone` is the time zone to show them in. On a departure and an end of a leg, `delaySeconds` is how late the vehicle is, or `nil` without real-time data, and `platform` is the real-time platform if there is one, otherwise the scheduled one. `Trip.durationSeconds` is how long a trip takes.
+```swift
+let registry = Registry.bundled()
+let network = registry.network(id: "vrr-efa")  // nil if no network has this ID
 
-`Location` and `Network` are `Identifiable`. A `Departure` and a `Trip` have no identifier from the server; they are `Hashable`, so a list can use `id: \.self`. 
+// The networks for a position, the best coverage first.
+for covering in registry.covering(at: Coordinate(latitude: 51.22, longitude: 6.79)) {
+    print(covering.tier, covering.network.name)
+}
+```
 
-What a query takes and what an answer holds is `Codable`: `Location`, `Departure`, `Trip`, the queries and the types inside them. An enum without values is stored as the name of its case, and a `BundledNetwork` as the ID of its network. An enum with values has the form that Swift writes for it, such as `{"id": {"_0": "de:14612:28"}}` for `Place.id`, and a `Date` the form that the encoder is set to. A `Network` is not `Codable`, because it can hold credentials and has a JSON form of its own; store its ID and find it again with `Registry.bundled().network(id:)`.
+The [list of bundled networks](https://kiliankoe.github.io/publictransport/networks.html) also says what a network of your own needs. Describe one in code, or read one from an entry of [transport-apis](https://github.com/public-transport/transport-apis) with `Network(id:json:)`. A header for a key or a client name is one more entry in its list:
 
-The stored form follows the model, so it can change where the model does: with any minor version before 1.0, and with a major version after. Read stored values with `try?` and fetch them again when that fails. For what has to outlive an update, such as a favorite stop, store `network.id` and `location.id`.
+```swift
+var network = Network.bundled(.entur)
+network.headers.append(Header(name: "ET-Client-Name", value: "mycompany-myapp"))
+```
 
-Failures that the server or the query cause are thrown as `PublicTransportError`, such as `.notFound` or `.rateLimited`; its `localizedDescription` is a sentence in English. Failures of the HTTP exchange are thrown as `URLError`, and a cancelled task throws `CancellationError`. An answer above 16 MB is `ClientError.responseTooLarge`. The client does not follow redirects: a moved server is `PublicTransportError.moved`. It does not retry, limit its request rate or cache.
+## Times, delays and platforms
 
-Some networks need more than their entry holds. Entur asks every client for its name in the header `ET-Client-Name` (`company-application`): add it to `network.headers`. An answer to `trips` from an OpenTripPlanner server can be empty at night and still have a `later` reference to follow.
+Times are `Date` values, and a location has the time zone to show them in.
+
+```swift
+departure.expectedTime    // the real-time one, if there is one
+departure.stop.timeZone   // nil where the server does not tell it
+departure.delaySeconds    // nil without real-time data
+departure.platform        // the real-time platform, otherwise the scheduled one
+```
+
+An end of a leg has the same properties.
+
+## SwiftUI and storing values
+
+`Location` and `Network` are `Identifiable`. A `Departure` and a `Trip` have no identifier from the server; they are `Hashable`, so a list can use `id: \.self`.
+
+What a query takes and what an answer holds is `Codable`. The stored form follows the model, so it can change with any minor version before 1.0: read stored values with `try?` and fetch them again when that fails. For what has to outlive an update, such as a favorite stop, store `network.id` and `location.id`. A `Network` is not `Codable`, because it can hold credentials; find it again with `Registry.bundled().network(id:)`.
+
+## Errors
+
+```swift
+do {
+    _ = try await client.departures(in: network, at: "no-such-stop")
+} catch let error as PublicTransportError {
+    print(error.localizedDescription)  // a sentence in English
+}
+```
+
+What the server or the query cause is a `PublicTransportError`, such as `.notFound` or `.rateLimited`. A failed HTTP exchange is a `URLError`, a cancelled task throws `CancellationError`, and an answer above 16 MB is `ClientError.responseTooLarge`.
+
+## Known limitations
+
+- On Apple platforms the package downloads the Rust library as a binary from the release. The code on a branch can be ahead of that binary, so a dependency on a branch does not work.
+- On Linux the package links the library from a directory you name, see "Development".
+- On watchOS the library covers only the watches with a 64-bit processor (Series 9 and later), so an app for all watches does not link yet.
 
 <!-- ANCHOR_END: site -->
 

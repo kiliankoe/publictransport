@@ -4,7 +4,7 @@
 
 A client library for public transport APIs, for Rust, Python, Swift, Kotlin and TypeScript. The libraries use a shared model for stops, departures and trips that covers several server types, so an application can query any supported network the same way.
 
-The project is at an early stage. It can search for locations by name, list the departures at a stop and plan trips between two places on servers that speak one of six protocols:
+The project is at an early stage. It can search for locations by name, list the departures at a stop and plan trips between two places, on servers that speak one of six protocols:
 
 - EFA, the JSON interface of MDV's journey planner, used by many German transport associations
 - MOTIS, the routing engine behind [Transitous](https://transitous.org)
@@ -13,15 +13,24 @@ The project is at an early stage. It can search for locations by name, list the 
 - HAFAS mgate, the JSON interface behind the apps of many operators
 - OpenTripPlanner 2 with its Transmodel API
 
-The library ships with networks that were checked against their live servers, named by `BundledNetwork` and listed by `Registry::bundled()`: VVO, VRR, Transitous, Entur and the HAFAS servers of about 35 operators in Europe and the USA. Further networks can be described in code or read from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis). Each network says where it has coverage, so an application can pick the networks for a position.
+It ships with [networks](https://kiliankoe.github.io/publictransport/networks.html) that were checked against their live servers: VVO, VRR, Transitous, Entur and the HAFAS servers of about 35 operators in Europe and the USA. Each says where it has coverage, so an application can pick the networks for a position. Further networks can be described in code or read from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis).
 
-## Design
+## Usage
 
-The core crate does no I/O. It builds HTTP requests and parses HTTP responses, and the caller sends them. This keeps the core usable from other languages and from WebAssembly, where each platform brings its own HTTP stack. The crate documentation of `publictransport` shows the request and parse steps and what the HTTP client has to do.
+Every language has the same three requests. This is Python, and the guides in the [documentation](https://kiliankoe.github.io/publictransport/) show the others.
 
-Rust applications that do not want to bring their own HTTP client use `publictransport-client`, which sends the requests with `reqwest`. Packages for Python, Swift, Kotlin and TypeScript wrap the same core, each with a client on its platform's HTTP stack: httpx, `URLSession`, OkHttp and `fetch`.
+```python
+from publictransport import BundledNetwork, Client, LocationKind
 
-The [documentation](https://kiliankoe.github.io/publictransport/) has a guide for each language, and [examples](https://github.com/kiliankoe/publictransport/tree/main/examples) has a short program for each kind of request.
+network = BundledNetwork.VVO_EFA.network()
+
+with Client(user_agent="my-app/1.0 (+https://example.org)") as client:
+    stops = client.locations(network, "Hauptbahnhof", kinds=[LocationKind.STOP])
+    departures = client.departures(network, stops[0], limit=10)
+    found = client.trips(network, stops[0], stops[1])
+```
+
+[examples](https://github.com/kiliankoe/publictransport/tree/main/examples) has a short program for each kind of request in each language.
 
 ## Install
 
@@ -33,12 +42,13 @@ The [documentation](https://kiliankoe.github.io/publictransport/) has a guide fo
 | Kotlin     | `implementation("io.github.kiliankoe:publictransport:0.1.2")`                                             | [packages/kotlin](https://github.com/kiliankoe/publictransport/tree/main/packages/kotlin)                                                                                |
 | TypeScript | `pnpm add @kiliankoe/publictransport` or `npm install @kiliankoe/publictransport`                         | [packages/typescript](https://github.com/kiliankoe/publictransport/tree/main/packages/typescript)                                                                        |
 
-## Shared Core
+## Design
 
 Every language runs the same Rust core, so a request is built and an answer is read the same way everywhere.
 
-- The model is defined once, in Rust. Each language gets the types that [UniFFI](https://mozilla.github.io/uniffi-rs/) generates from it. To make things more idiomatic, the generator's settings and a small script adapt details, such as `scripts/swift-idioms.py` and `scripts/kotlin-idioms.py`. TypeScript runs the core as WebAssembly and gets its types from [wasm-bindgen](https://wasm-bindgen.github.io/wasm-bindgen/) and [tsify](https://github.com/madonoharu/tsify), steered by attributes on the Rust types.
-- Written by hand in each language are the client on the platform's HTTP stack, and the bridges to the platform's own types, such as `TimeZone` in Swift or the error classes in TypeScript.
+- The core does no I/O. It builds HTTP requests and parses HTTP responses, and the caller sends them, so each platform brings its own HTTP stack: reqwest in `publictransport-client`, httpx, `URLSession`, OkHttp and `fetch`.
+- The model is defined once, in Rust. Python, Swift and Kotlin get the types that [UniFFI](https://mozilla.github.io/uniffi-rs/) generates from it, adapted by the generator's settings and a small script each. TypeScript runs the core as WebAssembly and gets its types from [wasm-bindgen](https://wasm-bindgen.github.io/wasm-bindgen/) and [tsify](https://github.com/madonoharu/tsify).
+- Written by hand in each language are the client and the bridges to the platform's own types, such as `TimeZone` in Swift or the error classes in TypeScript.
 - A convenience that every language can use goes into the Rust code, not into one package.
 
 <!-- ANCHOR_END: site -->

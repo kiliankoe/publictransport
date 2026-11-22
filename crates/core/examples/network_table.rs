@@ -38,4 +38,28 @@ fn main() {
             notes.join(", ")
         );
     }
+    println!("{NOTES}");
 }
+
+/// What holds for every language, so that the guides do not each repeat it.
+const NOTES: &str = "
+## A network of your own
+
+A network that is not bundled can be described in code or read from an entry in the format of [transport-apis](https://github.com/public-transport/transport-apis). What it needs besides its endpoint depends on the protocol. The names are those of the Rust fields, which each language spells in its own case.
+
+| Protocol | Needs |
+| --- | --- |
+| EFA | `timezone`, to send a query time |
+| TRIAS, OJP | `requestor_ref`, which public servers document, e.g. `OpenService` |
+| HAFAS mgate | `hafas` with the options of the server, and `timezone` |
+| OpenTripPlanner | `geocoder`, the server that searches for locations |
+
+A server that wants a key in an HTTP header gets it through `headers`.
+
+## Good to know
+
+- Entur asks every client for its name in the header `ET-Client-Name`, as `company-application`, and limits clients without it. Add it to the `headers` of the bundled network.
+- An answer to a trips query from an OpenTripPlanner server can be empty at night and still have a `later` reference to follow.
+- A location that another network returned works in a query too: for a trip always if it has a coordinate, for departures where the asked network can name the stop, which EFA, TRIAS and OJP can for stops with a global ID.
+- The limit of a query is a guide for the server and not a maximum.
+- The clients do not retry, limit their request rate or cache. They do not follow redirects either: a server that has moved is an error.";

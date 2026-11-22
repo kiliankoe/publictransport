@@ -9,35 +9,89 @@ cargo add publictransport-client
 The client needs a Tokio runtime. It re-exports the core, so an application depends on the one crate.
 
 ```rust,ignore
-use publictransport_client::{BundledNetwork, Client, LocationKind, LocationQuery, Network, TripsQuery};
+use publictransport_client::{BundledNetwork, Client, DeparturesQuery, LocationKind, LocationQuery, Network};
 
 let client = Client::new("my-app/1.0 (+https://example.org)")?;
-let vvo = Network::bundled(BundledNetwork::VvoEfa);
+let network = Network::bundled(BundledNetwork::VvoEfa);
 
 let query = LocationQuery::new("Hauptbahnhof").with_kinds([LocationKind::Stop]);
-let stops = client.locations(&vvo, query).await?;
-if let [from, to, ..] = stops.as_slice() {
-    for departure in client.departures(&vvo, from).await? {
-        // The time on the clocks at the stop, where its time zone is known.
-        if let Some(time) = departure.local_scheduled_time() {
-            println!("{time} {} to {:?}", departure.line.name, departure.direction);
-        }
+let stops = client.locations(&network, query).await?;
+let [from, to, ..] = stops.as_slice() else { return Ok(()) };
+
+for departure in client.departures(&network, DeparturesQuery::new(from).with_limit(10)).await? {
+    // The time on the clocks at the stop, where its time zone is known.
+    if let Some(time) = departure.local_scheduled_time() {
+        println!("{time} {} {:?}", departure.line.name, departure.direction);
     }
-    let found = client.trips(&vvo, TripsQuery::new(from, to)).await?;
 }
 ```
 
-`Network::bundled` gives a network that ships with the crate by name. `Registry::bundled()` holds them all: `get("vvo-efa")` finds one by its ID as text, and `covering(coordinate)` lists the networks for a position. A `Network` can also be described in code with `Network::new`, or read from an entry in the format of [transport-apis](https://github.com/public-transport/transport-apis) with `Network::from_json`.
+## Trips
 
-A stop or a place in a query is a `Location` from a search, a departure or a trip, or an ID as text; a place in a trips query can be a `Coordinate` too. A location that another network returned works as well.
+```rust,ignore
+let query = TripsQuery::new(from, to).with_limit(5);
+let found = client.trips(&network, &query).await?;
+for trip in &found.trips {
+    println!("{:?} seconds, {} changes", trip.duration_seconds(), trip.transfers());
+}
 
-Times are `Timestamp` values in UTC. `Location::local_time` gives one as the clocks at that location show it, or `None` where no time zone is known for it. A departure and an end of a leg give their own times that way with `local_scheduled_time` and `local_expected_time`. Their `delay_seconds` is how late the vehicle is, or `None` without real-time data, and `platform` is the real-time platform if there is one, otherwise the scheduled one. `Trip::duration_seconds` is how long a trip takes.
+// The same query again, with the reference to the trips after these.
+if let Some(later) = found.later {
+    let more = client.trips(&network, &query.with_page(later)).await?;
+}
+```
 
-An answer to a trips query has the list in `trips`, and `earlier` and `later` are references for more: pass one to `TripsQuery::with_page` on the same query. The `limit` of a query is not a maximum, servers treat it as a guide.
+An end of a trip is a `Location`, the ID of a stop as text or a `Coordinate`. `with_departure` and `with_arrival` ask for another time than now.
 
-The client does not retry, limit its request rate or cache, and it does not follow redirects. Its `Error` tells a failed HTTP exchange from what the server or the query got wrong.
+```rust,ignore
+let home = Coordinate { latitude: 51.04, longitude: 13.73 };
+let query = TripsQuery::new(home, "de:14612:28").with_arrival(tomorrow_at_nine);
+```
 
-The API documentation on docs.rs has the details: [`publictransport-client`](https://docs.rs/publictransport-client) for the client and its features, and [`publictransport`](https://docs.rs/publictransport) for the model and for the request and parse steps an own HTTP client needs.
+## Networks
+
+```rust,ignore
+let registry = Registry::bundled();
+let network = registry.get("vrr-efa"); // None if no network has this ID
+
+// The networks for a position, the best coverage first.
+for covering in registry.covering(Coordinate { latitude: 51.22, longitude: 6.79 }) {
+    println!("{:?} {}", covering.tier, covering.network.name);
+}
+```
+
+The [list of bundled networks](networks.md) also says what a network of your own needs. Describe one with `Network::new` and its `with_` methods, or read one from an entry of [transport-apis](https://github.com/public-transport/transport-apis) with `Network::from_json`. A header for a key or a client name goes on the same way:
+
+```rust,ignore
+let entur = Network::bundled(BundledNetwork::Entur).with_header("ET-Client-Name", "mycompany-myapp");
+```
+
+## Times, delays and platforms
+
+Times are `Timestamp` values in UTC. A departure and an end of a leg also give them as the clocks at their stop show them, which is what to print.
+
+```rust,ignore
+departure.local_scheduled_time(); // None where the time zone of the stop is unknown
+departure.local_expected_time();  // the real-time one, if there is one
+departure.delay_seconds();        // None without real-time data
+departure.platform();             // the real-time platform, otherwise the scheduled one
+stop.local_time(any_time);        // the same for any time at a location
+```
+
+## Errors
+
+```rust,ignore
+use publictransport_client::{ApiError, Error};
+
+match client.departures(&network, "no-such-stop").await {
+    Ok(departures) => { /* ... */ }
+    Err(Error::Api(ApiError::NotFound { .. })) => { /* the server does not know the stop */ }
+    Err(Error::Api(error)) => { /* what the server or the query got wrong */ }
+    Err(error) => { /* the HTTP exchange failed, or the answer was above 16 MB */ }
+}
+```
+
+The API documentation on docs.rs has the details: [`publictransport-client`](https://docs.rs/publictransport-client) for the client and its features, and [`publictransport`](https://docs.rs/publictransport) for the model and for the request and parse steps that an HTTP client of your own needs.
 
 ## Examples
 

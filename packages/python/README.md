@@ -1,43 +1,101 @@
 <!-- ANCHOR: site -->
 # publictransport
 
-A Python client for public transport APIs. It uses a shared model for stops, departures and trips that covers several server types, so an application can query any supported network the same way. It supports servers that speak EFA (used by many German transport associations), MOTIS (the routing engine behind [Transitous](https://transitous.org)), TRIAS 1.2, OJP 1.0, HAFAS mgate (the interface behind many operators' apps) and OpenTripPlanner 2 with its Transmodel API.
+A Python client for public transport APIs. One model for stops, departures and trips covers servers that speak EFA, MOTIS, TRIAS 1.2, OJP 1.0, HAFAS mgate or OpenTripPlanner 2, so an application queries every supported network the same way.
 
-The package wraps the Rust library of the same name. The Rust code builds the requests and parses the answers, and [httpx](https://www.python-httpx.org) sends them. Install it with `uv add publictransport` or `pip install publictransport`; there are wheels for Linux (glibc), macOS and Windows on x86-64, and for the first two on ARM.
+```sh
+uv add publictransport    # or: pip install publictransport
+```
+
+There are wheels for Linux (glibc), macOS and Windows on x86-64, and for the first two on ARM. The package wraps the Rust library of the same name, which builds the requests and parses the answers, and [httpx](https://www.python-httpx.org) sends them.
 
 ```python
 from publictransport import BundledNetwork, Client, LocationKind
 
-vvo = BundledNetwork.VVO_EFA.network()
+network = BundledNetwork.VVO_EFA.network()
 
 with Client(user_agent="my-app/1.0 (+https://example.org)") as client:
-    stops = client.locations(vvo, "Hauptbahnhof", kinds=[LocationKind.STOP])
-    for departure in client.departures(vvo, stops[0], limit=10):
-        # The time on the clocks at the stop, where its time zone is known.
-        time = departure.local_scheduled_time()
-        print(
-            f"{time:%H:%M}" if time else "?", departure.line.name, departure.direction
-        )
-
-    found = client.trips(vvo, stops[0], stops[1])
-    more = client.trips(vvo, stops[0], stops[1], page=found.later)
+    stops = client.locations(network, "Hauptbahnhof", kinds=[LocationKind.STOP])
+    for departure in client.departures(network, stops[0], limit=10):
+        print(departure.scheduled_time, departure.line.name, departure.direction)
 ```
 
-The [documentation](https://kiliankoe.github.io/publictransport/python.html) has this guide with a short program for each kind of request, which are also in [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/python).
+`AsyncClient` has the same methods as coroutines. The [documentation](https://kiliankoe.github.io/publictransport/python.html) has a program for each kind of request, which are also in [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/python).
 
-`AsyncClient` has the same methods as coroutines. A stop or a place is a `Location` from a search, a departure or a trip, or an ID as text; a place in `trips` can be a `Coordinate` too. A location that another network returned works as well: for a trip always if it has a coordinate, for departures where the asked network can name the stop, which EFA, TRIAS and OJP can for stops with a global ID. Each method also takes a query object (`LocationQuery`, `DeparturesQuery`, `TripsQuery`) in place of the plain values, which is what the Rust library works with.
+## Trips
 
-`BundledNetwork` names the networks that ship with the package. `Registry.bundled()` holds them all, for a list to choose from: `get("vvo-efa")` finds one by its ID as text, and `covering(Coordinate(...))` lists the networks for a position, each with the tier of its coverage there. A `Network` can also be written by hand, as `Network(id=..., name=..., endpoint=..., protocol=Protocol.EFA, timezone="Europe/Berlin")`, and `network_from_json(id, json)` reads further ones from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis).
+```python
+found = client.trips(network, stops[0], stops[1], limit=5)
+for trip in found.trips:
+    print(trip.duration_seconds(), "seconds,", trip.transfers(), "changes")
 
-Times are timezone-aware `datetime` objects in UTC. `Location.local_time(time)` gives one as the clocks at that location show it, with the UTC offset that holds there at that time, or `None` where no time zone is known for it. It is for showing a time; calculate with the UTC values. A departure and an end of a leg give their own times that way with `local_scheduled_time()` and `local_expected_time()`. Their `delay_seconds()` is how late the vehicle is, or `None` without real-time data, and `platform()` is the real-time platform if there is one, otherwise the scheduled one. `Trip.duration_seconds()` is how long a trip takes. A time in a query has to be timezone-aware too, in any zone. An EFA network needs its `timezone` to send a query time. A TRIAS or OJP network needs a `requestor_ref`, which public servers document, e.g. `OpenService`. A HAFAS network needs `hafas=HafasOptions(...)` and its `timezone`; the bundled ones have both. Entur asks every client for its name in the header `ET-Client-Name` (`company-application`) and limits clients without it, so add it to the bundled network: `entur.headers.append(Header(name="ET-Client-Name", value="mycompany-myapp"))`. A network of that protocol searches for locations on the geocoder named in `geocoder=`, and its answer to `trips` can be empty at night and still have a `later` reference to follow. A server that wants a key in an HTTP header gets it through `Network(headers=[Header(...)])`.
+# The same arguments again, with the reference to the trips after these.
+more = client.trips(network, stops[0], stops[1], limit=5, page=found.later)
+```
 
-`trips` returns a `Trips` record: the list is in `trips`, and `earlier` and `later` are references for more. Pass one as `page` with the same other arguments to continue the search.
+An end of a trip is a `Location`, the ID of a stop as text or a `Coordinate`. `depart_at=` and `arrive_by=` ask for another time than now, as a timezone-aware `datetime`.
 
-Failures that the server or the query cause are raised as subclasses of `publictransport.Error`, such as `Error.NotFound` or `Error.RateLimited`. Failures of the HTTP exchange are raised as httpx raises them. An answer above 16 MB raises `ResponseTooLarge`.
+```python
+home = Coordinate(latitude=51.04, longitude=13.73)
+client.trips(network, home, "de:14612:28", arrive_by=tomorrow_at_nine)
+```
 
-A client can be built on an httpx client of your own, `Client(http_client=...)`, for example to use a proxy. That client has to set the `User-Agent` itself and must not follow redirects.
+## Networks
 
-An application with its own HTTP stack can skip the clients: `Network.locations_request(query)` returns the request to send, and `Network.parse_locations(response)` reads the answer. Departures and trips have the same pair.
+```python
+from publictransport import Coordinate, Registry
+
+registry = Registry.bundled()
+network = registry.get("vrr-efa")  # None if no network has this ID
+
+# The networks for a position, the best coverage first.
+for covering in registry.covering(Coordinate(latitude=51.22, longitude=6.79)):
+    print(covering.tier, covering.network.name)
+```
+
+The [list of bundled networks](https://kiliankoe.github.io/publictransport/networks.html) also says what a network of your own needs. Write one as `Network(id=..., name=..., endpoint=..., protocol=Protocol.EFA, timezone="Europe/Berlin")`, or read one from an entry of [transport-apis](https://github.com/public-transport/transport-apis) with `network_from_json(id, json)`. A header for a key or a client name is one more entry in its list:
+
+```python
+network.headers.append(Header(name="ET-Client-Name", value="mycompany-myapp"))
+```
+
+## Times, delays and platforms
+
+Times are timezone-aware `datetime` objects in UTC. A departure and an end of a leg also give them as the clocks at their stop show them, which is what to print.
+
+```python
+departure.local_scheduled_time()  # None where the time zone of the stop is unknown
+departure.local_expected_time()   # the real-time one, if there is one
+departure.delay_seconds()         # None without real-time data
+departure.platform()              # the real-time platform, otherwise the scheduled one
+stop.local_time(any_time)         # the same for any time at a location
+```
+
+## Errors
+
+```python
+from publictransport import Error
+
+try:
+    client.departures(network, "no-such-stop")
+except Error.NotFound:
+    ...
+except Error.RateLimited:
+    ...
+```
+
+What the server or the query cause is a subclass of `publictransport.Error`. A failed HTTP exchange is raised as httpx raises it, and an answer above 16 MB raises `ResponseTooLarge`.
+
+## Your own HTTP client
+
+`Client(http_client=...)` builds on an httpx client of yours, for example to use a proxy. That client has to set the `User-Agent` itself and must not follow redirects.
+
+An application with another HTTP stack skips the clients. The network builds each request and reads its answer, and the same pair exists for departures and trips:
+
+```python
+request = network.locations_request(query)   # a LocationQuery
+locations = network.parse_locations(response)
+```
 
 ## Known limitations
 

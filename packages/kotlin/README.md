@@ -1,17 +1,15 @@
 <!-- ANCHOR: site -->
 # publictransport for Kotlin
 
-A Kotlin client for public transport APIs. It uses a shared model for stops, departures and trips that covers several server types, so an application can query any supported network the same way. It supports servers that speak EFA (used by many German transport associations), MOTIS (the routing engine behind [Transitous](https://transitous.org)), TRIAS 1.2, OJP 1.0, HAFAS mgate (the interface behind many operators' apps) and OpenTripPlanner 2 with its Transmodel API.
-
-The package wraps the Rust library of the same name. The Rust code builds the requests and parses the answers, and [OkHttp](https://square.github.io/okhttp/) sends them from suspend functions. It runs on the JVM from Java 11.
-
-The package is on Maven Central, for macOS and Linux (with glibc, so not Alpine) on x86-64 and ARM and for Windows on x86-64. An Android library is planned.
+A Kotlin client for public transport APIs. One model for stops, departures and trips covers servers that speak EFA, MOTIS, TRIAS 1.2, OJP 1.0, HAFAS mgate or OpenTripPlanner 2, so an application queries every supported network the same way.
 
 ```kotlin
 dependencies {
     implementation("io.github.kiliankoe:publictransport:0.1.2")
 }
 ```
+
+It runs on the JVM from Java 11, on macOS and Linux (with glibc, so not Alpine) on x86-64 and ARM and on Windows on x86-64. An Android library is planned. The package wraps the Rust library of the same name, which builds the requests and parses the answers, and [OkHttp](https://square.github.io/okhttp/) sends them from suspend functions.
 
 ```kotlin
 import publictransport.BundledNetwork
@@ -25,35 +23,86 @@ val stops = client.locations(network, "Hauptbahnhof", kinds = listOf(LocationKin
 val (from, to) = stops
 
 for (departure in client.departures(network, from, limit = 10)) {
-    // The time on the clocks at the stop, where its time zone is known.
-    val time = departure.localScheduledTime
-    println("${time?.toLocalTime() ?: "?"} ${departure.line.name} ${departure.direction ?: ""}")
+    println("${departure.scheduledTime} ${departure.line.name} ${departure.direction ?: ""}")
+}
+```
+
+One client serves every network, so create one and keep it. The [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/kotlin) have a program for each kind of request.
+
+## Trips
+
+```kotlin
+val found = client.trips(network, from, to, limit = 5)
+for (trip in found.trips) {
+    println("${trip.durationSeconds} seconds, ${trip.transfers} changes")
 }
 
-val found = client.trips(network, from, to, limit = 5)
 // The same arguments again, with the reference to the trips after these.
 val more = client.trips(network, from, to, limit = 5, page = found.later)
 ```
 
-The [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/kotlin) have a short program for each kind of request.
+`trips` takes two locations, or two `Place` values for other ends: `asPlace()` makes one from a location or a `Coordinate`, and `Place.Id` names a stop by its ID. `departAt` and `arriveBy` ask for another time than now.
 
-`BundledNetwork` names the networks that ship with the package, and `network()` gives one. `Registry.bundled()` holds them all, for a list to choose from: `get("vvo-efa")` finds one by its ID as text, and `covering(Coordinate(...))` lists the networks for a position, each with the tier of its coverage there. A `Network` can also be written by hand, as `Network(id = ..., name = ..., endpoint = ..., protocol = Protocol.EFA, timezone = "Europe/Berlin")`, and `networkFromJson(id, json)` reads further ones from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis).
+```kotlin
+val home = Coordinate(51.04, 13.73).asPlace()
+client.trips(network, home, Place.Id("de:14612:28"), arriveBy = tomorrowAtNine)
+```
 
-The model types are data classes with `val` properties, so `copy` makes a changed one: `network.copy(headers = network.headers + Header("X-Api-Key", key))`.
+## Networks
 
-`departures` takes a `Location` from a search, a departure or a trip, or the ID of a stop as a `String`. `trips` takes two locations, or two `Place` values for other ends: `asPlace()` makes one from a location or a `Coordinate`, as in `client.trips(network, stop.asPlace(), Coordinate(51.04, 13.73).asPlace())`, and `Place.Id` names a stop by its ID on the network that is asked. A location that another network returned works as well: for a trip always if it has a coordinate, for departures where the asked network can name the stop, which EFA, TRIAS and OJP can for stops with a global ID. Each call also takes a query of the Rust library (`LocationQuery`, `DeparturesQuery`, `TripsQuery`) in place of the plain values.
+```kotlin
+val registry = Registry.bundled()
+val network = registry.get("vrr-efa") // null if no network has this ID
 
-Times are `java.time.Instant` values. `Location.localTime(time)` gives one as the clocks at that location show it, an `OffsetDateTime` with the offset that holds there at that time, or `null` where no time zone is known for it. A departure and an end of a leg give their own times that way as `localScheduledTime` and `localExpectedTime`. Their `delaySeconds` is how late the vehicle is, or `null` without real-time data, and `platform` is the real-time platform if there is one, otherwise the scheduled one. `Trip.durationSeconds` is how long a trip takes. An EFA network needs its `timezone` to send a query time. A TRIAS or OJP network needs a `requestorRef`, which public servers document, e.g. `OpenService`. A HAFAS network needs `hafas = HafasOptions(...)` and its `timezone`; the bundled ones have both.
+// The networks for a position, the best coverage first.
+for (covering in registry.covering(Coordinate(51.22, 6.79))) {
+    println("${covering.tier} ${covering.network.name}")
+}
+```
 
-`trips` returns a `Trips` value: the list is in `trips`, and `earlier` and `later` are references for more. Pass one as `page` with the same other arguments to continue the search. An answer from an OpenTripPlanner server can be empty at night and still have a `later` reference to follow.
+The [list of bundled networks](https://kiliankoe.github.io/publictransport/networks.html) also says what a network of your own needs. Write one as `Network(id = ..., name = ..., endpoint = ..., protocol = Protocol.EFA, timezone = "Europe/Berlin")`, or read one from an entry of [transport-apis](https://github.com/public-transport/transport-apis) with `networkFromJson(id, json)`. The model types are data classes, so `copy` adds a header for a key or a client name:
 
-Failures that the server or the query cause are thrown as subclasses of `PublicTransportException`, such as `PublicTransportException.NotFound` or `PublicTransportException.RateLimited`; its `message` is a sentence in English. Failures of the HTTP exchange are thrown as OkHttp throws them, as an `IOException`. An answer above 16 MB is a `ResponseTooLargeException`, which is an `IOException` too. A cancelled coroutine cancels its request. The client does not follow redirects: a moved server is `PublicTransportException.Moved`. It does not retry, limit its request rate or cache.
+```kotlin
+val entur = BundledNetwork.ENTUR.network()
+val named = entur.copy(headers = entur.headers + Header("ET-Client-Name", "mycompany-myapp"))
+```
 
-One client serves every network, so create one and keep it. It can be built on an `OkHttpClient` of your own, `Client(userAgent, httpClient)`, for example to use a proxy or an interceptor. The client uses its connections and settings, except that it never follows a redirect and never sends a request again.
+## Times, delays and platforms
 
-Some networks need more than their entry holds. Entur asks every client for its name in the header `ET-Client-Name` (`company-application`) and limits clients without it: add it to the headers of the bundled network with `copy`, as above.
+Times are `java.time.Instant` values. A departure and an end of a leg also give them as the clocks at their stop show them, as an `OffsetDateTime`, which is what to print.
 
-An application with its own HTTP stack can skip the client: `Network.locationsRequest(query)` returns the request to send, and `Network.parseLocations(response)` reads the answer. Departures and trips have the same pair.
+```kotlin
+departure.localScheduledTime // null where the time zone of the stop is unknown
+departure.localExpectedTime  // the real-time one, if there is one
+departure.delaySeconds       // null without real-time data
+departure.platform           // the real-time platform, otherwise the scheduled one
+stop.localTime(anyTime)      // the same for any time at a location
+```
+
+## Errors
+
+```kotlin
+try {
+    client.departures(network, "no-such-stop")
+} catch (error: PublicTransportException.NotFound) {
+    // ...
+} catch (error: PublicTransportException) {
+    println(error.message) // a sentence in English
+}
+```
+
+What the server or the query cause is a subclass of `PublicTransportException`. A failed HTTP exchange is an `IOException` from OkHttp, and so is an answer above 16 MB, as a `ResponseTooLargeException`. A cancelled coroutine cancels its request.
+
+## Your own HTTP client
+
+`Client(userAgent, httpClient)` builds on an `OkHttpClient` of yours, for example to use a proxy or an interceptor. The client uses its connections and settings, except that it never follows a redirect and never sends a request again.
+
+An application with another HTTP stack skips the client. The network builds each request and reads its answer, and the same pair exists for departures and trips:
+
+```kotlin
+val request = network.locationsRequest(query) // a LocationQuery
+val locations = network.parseLocations(response)
+```
 
 ## Known limitations
 
