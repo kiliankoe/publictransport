@@ -2,6 +2,7 @@
 
 import json
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 from publictransport import (
@@ -103,6 +104,28 @@ def test_local_time_is_the_same_instant_on_the_clocks_of_the_location(
     assert result is not None
     assert result == time
     assert result.isoformat() == on_the_clock
+
+
+def test_conveniences_of_departures_and_trips_cross_the_boundary() -> None:
+    fixtures = Path(__file__).parents[3] / "crates/core/tests/fixtures/efa"
+    vvo = BundledNetwork.VVO_EFA.network()
+
+    def answer(name: str) -> HttpResponse:
+        body = (fixtures / name).read_bytes()
+        return HttpResponse(status=200, headers=[], body=body)
+
+    departure = vvo.parse_departures(answer("vvo-departures.json"))[0]
+    trip = vvo.parse_trips(answer("vvo-trip.json")).trips[0]
+    start = trip.legs[0].departure
+    scheduled = departure.local_scheduled_time()
+    expected = departure.local_expected_time()
+
+    assert scheduled is not None
+    assert expected is not None
+    assert scheduled.isoformat() == "2026-11-16T14:24:00+01:00"
+    assert expected.isoformat() == "2026-11-16T14:25:00+01:00"
+    assert (start.delay_seconds(), start.platform()) == (60, "14")
+    assert trip.duration_seconds() == 840
 
 
 def test_local_time_is_none_without_a_time_zone() -> None:

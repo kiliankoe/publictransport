@@ -438,6 +438,40 @@ impl Departure {
     pub fn expected_time(&self) -> Timestamp {
         self.realtime_time.unwrap_or(self.scheduled_time)
     }
+
+    /// The scheduled time on the clocks at the stop. `None` where
+    /// [`Location::local_time`] is, such as for a stop without a known time
+    /// zone.
+    #[must_use]
+    pub fn local_scheduled_time(&self) -> Option<LocalTime> {
+        self.stop.local_time(self.scheduled_time)
+    }
+
+    /// The expected time on the clocks at the stop, with the same rule for
+    /// `None`.
+    #[must_use]
+    pub fn local_expected_time(&self) -> Option<LocalTime> {
+        self.stop.local_time(self.expected_time())
+    }
+
+    /// How late the vehicle is, in seconds. Negative if it is early, zero
+    /// if it is on time, `None` without real-time data.
+    #[must_use]
+    pub fn delay_seconds(&self) -> Option<i64> {
+        let predicted = self.realtime_time?.unix_seconds;
+        Some(predicted.saturating_sub(self.scheduled_time.unix_seconds))
+    }
+}
+
+impl Departure {
+    /// The platform to show: the one the server knows now if there is one,
+    /// otherwise the one of the timetable.
+    #[must_use]
+    pub fn platform(&self) -> Option<&str> {
+        self.realtime_platform
+            .as_deref()
+            .or(self.scheduled_platform.as_deref())
+    }
 }
 
 /// A line of a public transport network.
@@ -864,6 +898,22 @@ impl Trip {
             .count()
             .saturating_sub(1)
     }
+
+    /// How long the trip takes, in seconds: from the expected time of
+    /// [`Trip::departure`] to the expected time of [`Trip::arrival`]. A walk
+    /// has no real-time data, so a trip that starts or ends with one counts
+    /// that end as planned, even if the ride next to it is late. `None`
+    /// only if `legs` is empty.
+    #[must_use]
+    pub fn duration_seconds(&self) -> Option<i64> {
+        let start = self.departure()?.expected_time().unix_seconds;
+        Some(
+            self.arrival()?
+                .expected_time()
+                .unix_seconds
+                .saturating_sub(start),
+        )
+    }
 }
 
 /// One part of a [`Trip`]: a ride in one vehicle, or a walk.
@@ -965,6 +1015,40 @@ impl LegEnd {
     #[must_use]
     pub fn expected_time(&self) -> Timestamp {
         self.realtime_time.unwrap_or(self.scheduled_time)
+    }
+
+    /// The scheduled time on the clocks at the stop. `None` where
+    /// [`Location::local_time`] is, such as for a stop without a known time
+    /// zone.
+    #[must_use]
+    pub fn local_scheduled_time(&self) -> Option<LocalTime> {
+        self.stop.local_time(self.scheduled_time)
+    }
+
+    /// The expected time on the clocks at the stop, with the same rule for
+    /// `None`.
+    #[must_use]
+    pub fn local_expected_time(&self) -> Option<LocalTime> {
+        self.stop.local_time(self.expected_time())
+    }
+
+    /// How late the vehicle is, in seconds. Negative if it is early, zero
+    /// if it is on time, `None` without real-time data.
+    #[must_use]
+    pub fn delay_seconds(&self) -> Option<i64> {
+        let predicted = self.realtime_time?.unix_seconds;
+        Some(predicted.saturating_sub(self.scheduled_time.unix_seconds))
+    }
+}
+
+impl LegEnd {
+    /// The platform to show: the one the server knows now if there is one,
+    /// otherwise the one of the timetable.
+    #[must_use]
+    pub fn platform(&self) -> Option<&str> {
+        self.realtime_platform
+            .as_deref()
+            .or(self.scheduled_platform.as_deref())
     }
 }
 

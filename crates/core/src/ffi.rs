@@ -4,7 +4,8 @@
 use std::time::{Duration, SystemTime};
 
 use crate::{
-    BundledNetwork, Error, GlobalId, LegEnd, LocalTime, Location, Network, Timestamp, Trip,
+    BundledNetwork, Departure, Error, GlobalId, LegEnd, LocalTime, Location, Network, Timestamp,
+    Trip,
 };
 
 /// The name of [`Timestamp`] in the bindings. The Python generator of `UniFFI` uses
@@ -123,6 +124,35 @@ impl Trip {
     #[uniffi::method(name = "transfers")]
     fn ffi_transfers(&self) -> u32 {
         u32::try_from(self.transfers()).unwrap_or(u32::MAX)
+    }
+
+    /// How long the trip takes, in seconds: from the expected time of its
+    /// departure to the expected time of its arrival. A walk has no
+    /// real-time data, so a trip that starts or ends with one counts that
+    /// end as planned, even if the ride next to it is late.
+    #[uniffi::method(name = "duration_seconds")]
+    fn ffi_duration_seconds(&self) -> Option<i64> {
+        self.duration_seconds()
+    }
+}
+
+#[uniffi::export]
+impl Departure {
+    /// The platform to show: the one the server knows now if there is one,
+    /// otherwise the one of the timetable.
+    #[uniffi::method(name = "platform")]
+    fn ffi_platform(&self) -> Option<String> {
+        self.platform().map(str::to_owned)
+    }
+}
+
+#[uniffi::export]
+impl LegEnd {
+    /// The platform to show: the one the server knows now if there is one,
+    /// otherwise the one of the timetable.
+    #[uniffi::method(name = "platform")]
+    fn ffi_platform(&self) -> Option<String> {
+        self.platform().map(str::to_owned)
     }
 }
 

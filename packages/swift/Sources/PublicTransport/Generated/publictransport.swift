@@ -498,6 +498,22 @@ fileprivate struct FfiConverterUInt32: FfiConverterPrimitive {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterInt64: FfiConverterPrimitive {
+    typealias FfiType = Int64
+    typealias SwiftType = Int64
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Int64 {
+        return try lift(readInt(&buf))
+    }
+
+    public static func write(_ value: Int64, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterDouble: FfiConverterPrimitive {
     typealias FfiType = Double
     typealias SwiftType = Double
@@ -1300,6 +1316,32 @@ public struct Departure: Equatable, Hashable, Codable {
 
     
     /**
+     * The platform to show: the one the server knows now if there is one,
+     * otherwise the one of the timetable.
+     */
+public var platform: String? {
+    return try!  FfiConverterOptionString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_departure_platform(
+            FfiConverterTypeDeparture_lower(self),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * How late the vehicle is, in seconds. Negative if it is early, zero
+     * if it is on time, `nil` without real-time data.
+     */
+public var delaySeconds: Int64? {
+    return try!  FfiConverterOptionInt64.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_departure_delay_seconds(
+            FfiConverterTypeDeparture_lower(self),uniffiCallStatus
+    )
+})
+}
+    
+    /**
      * The time the vehicle is expected to leave: the predicted time if
      * there is one, otherwise the scheduled time.
      */
@@ -1307,6 +1349,33 @@ public var expectedTime: UtcTime {
     return try!  FfiConverterTypeUtcTime_lift(try! rustCall() {
         uniffiCallStatus in
     uniffi_publictransport_fn_method_departure_expected_time(
+            FfiConverterTypeDeparture_lower(self),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * The expected time on the clocks at the stop, with the same rule for
+     * `nil`.
+     */
+func localExpectedTime() -> LocalTime?  {
+    return try!  FfiConverterOptionTypeLocalTime.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_departure_local_expected_time(
+            FfiConverterTypeDeparture_lower(self),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * The scheduled time on the clocks at the stop. `nil` where
+     * ``Location/timeZone`` is, such as for a stop without a known time
+     * zone.
+     */
+func localScheduledTime() -> LocalTime?  {
+    return try!  FfiConverterOptionTypeLocalTime.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_departure_local_scheduled_time(
             FfiConverterTypeDeparture_lower(self),uniffiCallStatus
     )
 })
@@ -2162,12 +2231,65 @@ public struct LegEnd: Equatable, Hashable, Codable {
 
     
     /**
+     * The platform to show: the one the server knows now if there is one,
+     * otherwise the one of the timetable.
+     */
+public var platform: String? {
+    return try!  FfiConverterOptionString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_legend_platform(
+            FfiConverterTypeLegEnd_lower(self),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * How late the vehicle is, in seconds. Negative if it is early, zero
+     * if it is on time, `nil` without real-time data.
+     */
+public var delaySeconds: Int64? {
+    return try!  FfiConverterOptionInt64.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_legend_delay_seconds(
+            FfiConverterTypeLegEnd_lower(self),uniffiCallStatus
+    )
+})
+}
+    
+    /**
      * The predicted time if there is one, otherwise the scheduled time.
      */
 public var expectedTime: UtcTime {
     return try!  FfiConverterTypeUtcTime_lift(try! rustCall() {
         uniffiCallStatus in
     uniffi_publictransport_fn_method_legend_expected_time(
+            FfiConverterTypeLegEnd_lower(self),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * The expected time on the clocks at the stop, with the same rule for
+     * `nil`.
+     */
+func localExpectedTime() -> LocalTime?  {
+    return try!  FfiConverterOptionTypeLocalTime.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_legend_local_expected_time(
+            FfiConverterTypeLegEnd_lower(self),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * The scheduled time on the clocks at the stop. `nil` where
+     * ``Location/timeZone`` is, such as for a stop without a known time
+     * zone.
+     */
+func localScheduledTime() -> LocalTime?  {
+    return try!  FfiConverterOptionTypeLocalTime.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_legend_local_scheduled_time(
             FfiConverterTypeLegEnd_lower(self),uniffiCallStatus
     )
 })
@@ -3284,6 +3406,21 @@ public var departure: LegEnd? {
     return try!  FfiConverterOptionTypeLegEnd.lift(try! rustCall() {
         uniffiCallStatus in
     uniffi_publictransport_fn_method_trip_departure(
+            FfiConverterTypeTrip_lower(self),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * How long the trip takes, in seconds: from the expected time of its
+     * departure to the expected time of its arrival. A walk has no
+     * real-time data, so a trip that starts or ends with one counts that
+     * end as planned, even if the ride next to it is late.
+     */
+public var durationSeconds: Int64? {
+    return try!  FfiConverterOptionInt64.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_trip_duration_seconds(
             FfiConverterTypeTrip_lower(self),uniffiCallStatus
     )
 })
@@ -5324,6 +5461,30 @@ fileprivate struct FfiConverterOptionUInt32: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterUInt32.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionInt64: FfiConverterRustBuffer {
+    typealias SwiftType = Int64?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterInt64.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterInt64.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }

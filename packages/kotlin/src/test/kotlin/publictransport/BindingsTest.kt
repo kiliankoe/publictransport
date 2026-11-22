@@ -38,6 +38,11 @@ class BindingsTest {
         assertEquals(start, trip.departure)
         assertEquals(trip.legs.last().arrival, trip.arrival)
         assertTrue(trip.transfers < trip.legs.size.toUInt())
+        assertEquals(OffsetDateTime.parse("2026-11-16T14:24:00+01:00"), departure.localScheduledTime)
+        assertEquals(OffsetDateTime.parse("2026-11-16T14:25:00+01:00"), departure.localExpectedTime)
+        assertEquals(60L, start.delaySeconds)
+        assertEquals("14", start.platform)
+        assertEquals(840L, trip.durationSeconds)
         assertEquals(listOf(GlobalId(IdScheme.IFOPT, "de:14612:28")), foreignStop.stationIds)
         assertEquals(network.id, BundledNetwork.VVO_EFA.id)
     }

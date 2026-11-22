@@ -33,6 +33,9 @@ private func stop(_ ifopt: String, timezone: String? = nil) -> Location {
     let trips = try vvo.parseTrips(response: answer("efa/vvo-trip.json")).trips
     try #require(!departures.isEmpty && !trips.isEmpty)
 
+    #expect(departures.first?.delaySeconds == 60)
+    #expect(trips.first?.legs.first?.departure.platform == "14")
+    #expect(trips.first?.durationSeconds == 840)
     for departure in departures {
         #expect(departure.expectedTime == departure.realtimeTime ?? departure.scheduledTime)
     }

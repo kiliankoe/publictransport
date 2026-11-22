@@ -199,6 +199,67 @@ pub fn expected_time(
     write(&read("departure or end of a leg", end)?.expected_time())
 }
 
+/// The scheduled time on the clocks at the stop of a departure or of an end
+/// of a leg, as `localTime` gives it. `undefined` where that is, such as
+/// for a stop without a known time zone.
+#[wasm_bindgen(js_name = localScheduledTime)]
+pub fn local_scheduled_time(
+    #[wasm_bindgen(unchecked_param_type = "Departure | LegEnd")] end: &Ts<LegEnd>,
+) -> Result<Option<Ts<LocalTime>>, JsValue> {
+    let local = read("departure or end of a leg", end)?.local_scheduled_time();
+    local.as_ref().map(write).transpose()
+}
+
+/// The expected time on the clocks at the stop of a departure or of an end
+/// of a leg, with the same rule for `undefined`.
+#[wasm_bindgen(js_name = localExpectedTime)]
+pub fn local_expected_time(
+    #[wasm_bindgen(unchecked_param_type = "Departure | LegEnd")] end: &Ts<LegEnd>,
+) -> Result<Option<Ts<LocalTime>>, JsValue> {
+    let local = read("departure or end of a leg", end)?.local_expected_time();
+    local.as_ref().map(write).transpose()
+}
+
+/// How late the vehicle is at a departure or at an end of a leg, in
+/// seconds. Negative if it is early, zero if it is on time, `undefined`
+/// without real-time data.
+#[wasm_bindgen(js_name = delaySeconds)]
+pub fn delay_seconds(
+    #[wasm_bindgen(unchecked_param_type = "Departure | LegEnd")] end: &Ts<LegEnd>,
+) -> Result<Option<f64>, JsValue> {
+    Ok(read("departure or end of a leg", end)?
+        .delay_seconds()
+        .map(number))
+}
+
+/// The platform to show for a departure or an end of a leg: the one the
+/// server knows now if there is one, otherwise the one of the timetable.
+#[wasm_bindgen]
+pub fn platform(
+    #[wasm_bindgen(unchecked_param_type = "Departure | LegEnd")] end: &Ts<LegEnd>,
+) -> Result<Option<String>, JsValue> {
+    Ok(read("departure or end of a leg", end)?
+        .platform()
+        .map(str::to_owned))
+}
+
+/// How long the trip takes, in seconds: from the expected time of its
+/// departure to the expected time of its arrival. A walk has no real-time
+/// data, so a trip that starts or ends with one counts that end as planned,
+/// even if the ride next to it is late. `undefined` only if the trip has no
+/// legs.
+#[wasm_bindgen(js_name = durationSeconds)]
+pub fn duration_seconds(trip: &Ts<Trip>) -> Result<Option<f64>, JsValue> {
+    Ok(read("trip", trip)?.duration_seconds().map(number))
+}
+
+/// Seconds as a JavaScript number. An `i64` would be a `BigInt` there, and
+/// the difference of two `Date` values fits a number exactly.
+#[expect(clippy::cast_precision_loss)]
+fn number(seconds: i64) -> f64 {
+    seconds as f64
+}
+
 /// Where and when the trip starts. `undefined` only if the trip has no
 /// legs, which a trip from the package always has.
 #[wasm_bindgen]

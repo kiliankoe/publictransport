@@ -20,6 +20,11 @@ ERROR = "PublicTransportException"
 # number of types that have one. They only read fields.
 PROPERTIES = {
     "expectedTime": 2,
+    "localScheduledTime": 2,
+    "localExpectedTime": 2,
+    "delaySeconds": 2,
+    "platform": 2,
+    "durationSeconds": 1,
     "departure": 1,
     "arrival": 1,
     "transfers": 1,

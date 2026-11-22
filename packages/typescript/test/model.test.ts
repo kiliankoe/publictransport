@@ -7,9 +7,13 @@ import { test } from "node:test";
 import {
   arrival,
   bundledNetwork,
+  delaySeconds,
   departure,
+  durationSeconds,
   expectedTime,
   type Location,
+  localExpectedTime,
+  localScheduledTime,
   localTime,
   locationsRequest,
   networkFromJson,
@@ -17,6 +21,7 @@ import {
   parseDepartures,
   parseTrips,
   place,
+  platform,
   RateLimitedError,
   Registry,
   sameStation,
@@ -130,6 +135,11 @@ test("derived values come from the core", () => {
   assert.deepEqual(departure(trip), start);
   assert.deepEqual(arrival(trip), trip.legs.at(-1)?.arrival);
   assert.equal(transfers(trip), 1);
+  assert.equal(localScheduledTime(first), "2026-11-16T14:24:00+01:00");
+  assert.equal(localExpectedTime(first), "2026-11-16T14:25:00+01:00");
+  assert.equal(delaySeconds(start), 60);
+  assert.equal(platform(start), "14");
+  assert.equal(durationSeconds(trip), 840);
   assert.deepEqual(stationIds(foreignStop), [{ scheme: "ifopt", value: "de:14612:28" }]);
   assert.ok(sameStation(foreignStop, start.stop));
 });

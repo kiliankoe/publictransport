@@ -26,15 +26,25 @@ RENAMED = {
 # number of types that have one. They only read fields.
 PROPERTIES = {
     "expectedTime": 2,
+    "delaySeconds": 2,
+    "platform": 2,
+    "durationSeconds": 1,
     "departure": 1,
     "arrival": 1,
     "transfers": 1,
     "stationIds": 1,
     "id": 1,
 }
-# Methods without arguments that stay methods: these two read the entries
-# of networks, which is work, and the last is UniFFI's own.
-METHODS = {"networks", "network", "uniffiEnsurePublictransportInitialized"}
+# Methods without arguments that stay methods: the first two read the
+# entries of networks, which is work, the next two are internal, see
+# `hide_helpers`, and the last is UniFFI's own.
+METHODS = {
+    "networks",
+    "network",
+    "localScheduledTime",
+    "localExpectedTime",
+    "uniffiEnsurePublictransportInitialized",
+}
 ERROR = "PublicTransportError"
 # Members that have another name in Swift than the comments from Rust say.
 MEMBERS = {
@@ -224,6 +234,8 @@ def hide_helpers(code: Code) -> None:
     # Swift shows a `Date` in the `TimeZone` of a location, see
     # `Location.timeZone`, and has no use for the local time as text.
     code.replace("local time", r"^public func localTime\(", "func localTime(", 1)
+    for name in ("localScheduledTime", "localExpectedTime"):
+        code.replace(name, rf"^public func {name}\(", f"func {name}(", 2)
     code.replace("local time type", r"^public typealias LocalTime\b", "typealias LocalTime", 1)
     declared = r"^(?:public|open) (?:final )?(?:struct|enum|class|protocol|func|typealias) (\w+)"
     for name in re.findall(declared, code.text, flags=re.MULTILINE):
