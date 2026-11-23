@@ -1,7 +1,7 @@
 use crate::{
     Arrival, Attribution, Coverage, Departure, DeparturesQuery, Error, HafasOptions, Header,
-    HttpRequest, HttpResponse, IdScheme, Location, LocationKind, LocationQuery, Operation, Place,
-    Trips, TripsQuery, efa, hafas, model::Board, motis, otp, trias,
+    HttpRequest, HttpResponse, IdScheme, Location, LocationKind, LocationQuery, NearbyQuery,
+    Operation, Place, Trips, TripsQuery, efa, hafas, model::Board, motis, otp, trias,
 };
 
 /// One server that answers public transport queries.
@@ -290,6 +290,7 @@ impl Network {
                 Operation::Locations => "location searches",
                 Operation::Departures => "departure or arrival requests",
                 Operation::Trips => "trip requests",
+                Operation::Nearby => "searches for nearby stops",
             };
             return Err(Error::Unsupported {
                 message: format!("{} does not answer {requests}", self.id),
@@ -383,6 +384,52 @@ impl Network {
             Protocol::HafasMgate => hafas::parse_locations(self, response),
             Protocol::OtpTransmodel => otp::parse_locations(self, response),
         }?;
+        for location in &mut locations {
+            self.mark(location);
+        }
+        Ok(locations)
+    }
+
+    /// Builds the request for the stops near a position.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidQuery`] if the position is not on the globe,
+    /// [`Error::Unsupported`] if the network is known not to answer this
+    /// search, and [`Error::InvalidNetwork`] if a TRIAS or OJP network has
+    /// no requestor reference or a HAFAS network no usable
+    /// [`Network::hafas`].
+    pub fn nearby_request(&self, query: &NearbyQuery) -> Result<HttpRequest, Error> {
+        self.check(Operation::Nearby)?;
+        let request = match self.protocol {
+            Protocol::Efa => efa::nearby_request(self, query),
+            Protocol::Motis => motis::nearby_request(self, query),
+            Protocol::Trias | Protocol::Ojp1 => trias::nearby_request(self, query),
+            Protocol::HafasMgate => hafas::nearby_request(self, query),
+            Protocol::OtpTransmodel => otp::nearby_request(self, query),
+        }?;
+        Ok(self.sent(request))
+    }
+
+    /// Parses the response to a [`Network::nearby_request`]: the stops in
+    /// the order of the server, which is the nearest first.
+    /// [`Coordinate::distance_meters`](crate::Coordinate::distance_meters)
+    /// gives how far one is. None in the circle gives an empty list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the status code reports a failure or if the body
+    /// is not what the protocol defines.
+    pub fn parse_nearby(&self, response: &HttpResponse) -> Result<Vec<Location>, Error> {
+        let mut locations = match self.protocol {
+            Protocol::Efa => efa::parse_nearby(self, response),
+            Protocol::Motis => motis::parse_locations(response),
+            Protocol::Trias | Protocol::Ojp1 => trias::parse_nearby(self, response),
+            Protocol::HafasMgate => hafas::parse_nearby(self, response),
+            Protocol::OtpTransmodel => otp::parse_nearby(self, response),
+        }?;
+        // The request asks for stops only. A server may not filter.
+        locations.retain(|location| location.kind == LocationKind::Stop);
         for location in &mut locations {
             self.mark(location);
         }

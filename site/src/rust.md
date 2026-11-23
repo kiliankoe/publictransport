@@ -9,7 +9,7 @@ cargo add publictransport-client
 The client needs a Tokio runtime. It re-exports the core, so an application depends on the one crate.
 
 ```rust,ignore
-use publictransport_client::{BundledNetwork, Client, DeparturesQuery, LocationKind, LocationQuery, Network};
+use publictransport_client::{BundledNetwork, Client, Coordinate, DeparturesQuery, LocationKind, LocationQuery, NearbyQuery, Network};
 
 let client = Client::new("my-app/1.0 (+https://example.org)")?;
 let network = Network::bundled(BundledNetwork::VvoEfa);
@@ -22,6 +22,17 @@ for departure in client.departures(&network, DeparturesQuery::new(from).with_lim
     // The time on the clocks at the stop, where its time zone is known.
     if let Some(time) = departure.local_scheduled_time() {
         println!("{time} {} {:?}", departure.line.name, departure.direction);
+    }
+}
+```
+
+`nearby` is the second way to find stops: it lists the stops around a position, the nearest first. `Coordinate::distance_meters` gives the straight-line distance between two positions in meters.
+
+```rust,ignore
+let position = Coordinate { latitude: 51.04, longitude: 13.7325 };
+for stop in client.nearby(&network, NearbyQuery::new(position).with_radius_meters(500)).await? {
+    if let Some(coordinate) = stop.coordinate {
+        println!("{} {:.0} m", stop.name, position.distance_meters(coordinate));
     }
 }
 ```
@@ -120,7 +131,7 @@ The API documentation on docs.rs has the details: [`publictransport-client`](htt
 
 The repository has these as programs to run, in [`examples`](https://github.com/kiliankoe/publictransport/tree/main/examples).
 
-### Search for places by name
+### Search for places by name and near a position
 
 ```rust,ignore
 {{#include ../../examples/rust/locations.rs}}

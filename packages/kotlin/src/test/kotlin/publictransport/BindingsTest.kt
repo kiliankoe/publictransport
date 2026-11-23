@@ -57,6 +57,11 @@ class BindingsTest {
     }
 
     @Test
+    fun `distance between positions crosses the boundary`() {
+        assertEquals(111_200.0, Coordinate(51.0, 13.7).distanceMeters(Coordinate(52.0, 13.7)), 100.0)
+    }
+
+    @Test
     fun `remarks cross the boundary`() {
         val departures = BundledNetwork.VRR_EFA.network().parseDepartures(ok(fixture("efa/vrr-departures.json")))
 

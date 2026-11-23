@@ -29,6 +29,7 @@ from publictransport import (
     Location,
     LocationKind,
     LocationQuery,
+    NearbyQuery,
     Network,
     Place,
     Protocol,
@@ -61,8 +62,8 @@ UNREACHABLE = Network(
 LOCATIONS = LocationQuery(text="Hauptbahnhof")
 
 Handler = Callable[[httpx.Request], httpx.Response]
-# Runs one operation ("locations", "departures", "arrivals" or "trips") of a
-# client whose requests the handler answers.
+# Runs one operation ("locations", "nearby", "departures", "arrivals" or
+# "trips") of a client whose requests the handler answers.
 Call = Callable[[Handler, str, Network, object], object]
 
 
@@ -108,6 +109,16 @@ class TooLarge(httpx.SyncByteStream, httpx.AsyncByteStream):
     ("network", "operation", "query", "fixture"),
     [
         (EFA, "locations", LOCATIONS, "efa/vvo-stopfinder.json"),
+        (
+            EFA,
+            "nearby",
+            NearbyQuery(
+                position=Coordinate(latitude=51.04, longitude=13.7325),
+                radius_meters=500,
+                limit=5,
+            ),
+            "efa/vvo-nearby.json",
+        ),
         (
             MOTIS,
             "departures",

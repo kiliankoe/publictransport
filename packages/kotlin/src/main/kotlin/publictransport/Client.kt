@@ -118,6 +118,35 @@ class Client(
     ): List<Location> = network.parseLocations(send(network.locationsRequest(query)))
 
     /**
+     * Finds the stops near a position. The nearest comes first, and
+     * [Coordinate.distanceMeters] gives how far one is.
+     *
+     * @param position Where to look. A position off the globe throws
+     *   [PublicTransportException.InvalidQuery].
+     * @param radiusMeters How far from the position to look. 1000 m if left
+     *   out. MOTIS has no radius and returns the nearest stops however far
+     *   they are.
+     * @param limit The largest number wanted. Servers treat it as a guide.
+     * @throws IllegalArgumentException if the radius or the limit is
+     *   negative.
+     */
+    suspend fun nearby(
+        network: Network,
+        position: Coordinate,
+        radiusMeters: Int? = null,
+        limit: Int? = null,
+    ): List<Location> {
+        require(radiusMeters == null || radiusMeters >= 0) { "the radius $radiusMeters is no distance" }
+        return nearby(network, NearbyQuery(position, radiusMeters?.toUInt(), count(limit)))
+    }
+
+    /** Finds the stops near a position with a query of the core library. */
+    suspend fun nearby(
+        network: Network,
+        query: NearbyQuery,
+    ): List<Location> = network.parseNearby(send(network.nearbyRequest(query)))
+
+    /**
      * Lists the next departures at a stop, ordered by expected time.
      *
      * @param stop A location from a search, a departure or a trip. A stop

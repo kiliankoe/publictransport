@@ -1238,6 +1238,20 @@ public struct Coordinate: Equatable, Hashable, Codable {
     }
 
     
+    /**
+     * The distance to another position in meters, along the surface of
+     * the earth as a sphere. NaN if either position is not on the globe.
+     */
+public func distanceMeters(to other: Coordinate) -> Double  {
+    return try!  FfiConverterDouble.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_coordinate_distance_meters(
+            FfiConverterTypeCoordinate_lower(self),
+        FfiConverterTypeCoordinate_lower(other),uniffiCallStatus
+    )
+})
+}
+    
 
 }
 
@@ -2964,6 +2978,92 @@ func FfiConverterTypeLocationQuery_lower(_ value: LocationQuery) -> RustBuffer {
 
 
 /**
+ * A search for the stops near a position.
+ */
+public struct NearbyQuery: Equatable, Hashable, Codable {
+    /**
+     * Where to look.
+     */
+    public var position: Coordinate
+    /**
+     * How far from the position to look, in meters. 1000 m without it.
+     * MOTIS has no radius and returns the nearest stops however far they
+     * are; ``Coordinate/distanceMeters(to:)`` tells how far one is.
+     */
+    public var radiusMeters: UInt32?
+    /**
+     * The largest number of stops wanted. Without it the server decides:
+     * MOTIS returns 5 and `OpenTripPlanner` 20, EFA every stop in the
+     * circle. MOTIS refuses a number above the maximum of the server.
+     */
+    public var limit: UInt32?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Where to look.
+         */position: Coordinate, 
+        /**
+         * How far from the position to look, in meters. 1000 m without it.
+         * MOTIS has no radius and returns the nearest stops however far they
+         * are; ``Coordinate/distanceMeters(to:)`` tells how far one is.
+         */radiusMeters: UInt32? = nil, 
+        /**
+         * The largest number of stops wanted. Without it the server decides:
+         * MOTIS returns 5 and `OpenTripPlanner` 20, EFA every stop in the
+         * circle. MOTIS refuses a number above the maximum of the server.
+         */limit: UInt32? = nil) {
+        self.position = position
+        self.radiusMeters = radiusMeters
+        self.limit = limit
+    }
+
+    
+
+}
+
+#if compiler(>=6)
+extension NearbyQuery: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+struct FfiConverterTypeNearbyQuery: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> NearbyQuery {
+        return
+            try NearbyQuery(
+                position: FfiConverterTypeCoordinate.read(from: &buf), 
+                radiusMeters: FfiConverterOptionUInt32.read(from: &buf), 
+                limit: FfiConverterOptionUInt32.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: NearbyQuery, into buf: inout [UInt8]) {
+        FfiConverterTypeCoordinate.write(value.position, into: &buf)
+        FfiConverterOptionUInt32.write(value.radiusMeters, into: &buf)
+        FfiConverterOptionUInt32.write(value.limit, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+func FfiConverterTypeNearbyQuery_lift(_ buf: RustBuffer) throws -> NearbyQuery {
+    return try FfiConverterTypeNearbyQuery.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+func FfiConverterTypeNearbyQuery_lower(_ value: NearbyQuery) -> RustBuffer {
+    return FfiConverterTypeNearbyQuery.lower(value)
+}
+
+
+/**
  * One server that answers public transport queries.
  */
 public struct Network: Equatable, Hashable {
@@ -3223,6 +3323,27 @@ public func locationsRequest(query: LocationQuery)throws  -> HttpRequest  {
 }
     
     /**
+     * Builds the request for the stops near a position.
+     *
+     * # Errors
+     *
+     * Returns ``PublicTransportError/invalidQuery`` if the position is not on the globe,
+     * ``PublicTransportError/unsupported`` if the network is known not to answer this
+     * search, and ``PublicTransportError/invalidNetwork`` if a TRIAS or OJP network has
+     * no requestor reference or a HAFAS network no usable
+     * ``Network/hafas``.
+     */
+public func nearbyRequest(query: NearbyQuery)throws  -> HttpRequest  {
+    return try  FfiConverterTypeHttpRequest_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_nearby_request(
+            FfiConverterTypeNetwork_lower(self),
+        FfiConverterTypeNearbyQuery_lower(query),uniffiCallStatus
+    )
+})
+}
+    
+    /**
      * Parses the response to a ``Network/arrivalsRequest``. The arrivals
      * are ordered by ``Arrival/expectedTime``.
      *
@@ -3276,6 +3397,27 @@ public func parseLocations(response: HttpResponse)throws  -> [Location]  {
     return try  FfiConverterSequenceTypeLocation.lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
         uniffiCallStatus in
     uniffi_publictransport_fn_method_network_parse_locations(
+            FfiConverterTypeNetwork_lower(self),
+        FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Parses the response to a ``Network/nearbyRequest``: the stops in
+     * the order of the server, which is the nearest first.
+     * ``Coordinate/distanceMeters(to:)``
+     * gives how far one is. None in the circle gives an empty list.
+     *
+     * # Errors
+     *
+     * Returns an error if the status code reports a failure or if the body
+     * is not what the protocol defines.
+     */
+public func parseNearby(response: HttpResponse)throws  -> [Location]  {
+    return try  FfiConverterSequenceTypeLocation.lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_parse_nearby(
             FfiConverterTypeNetwork_lower(self),
         FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
     )
@@ -5248,6 +5390,10 @@ public enum NetworkOperation: Equatable, Hashable, CaseIterable {
      * Trips between two places.
      */
     case trips
+    /**
+     * The stops near a position.
+     */
+    case nearby
 
 
 
@@ -5274,6 +5420,8 @@ struct FfiConverterTypeNetworkOperation: FfiConverterRustBuffer {
         
         case 3: return .trips
         
+        case 4: return .nearby
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -5292,6 +5440,10 @@ struct FfiConverterTypeNetworkOperation: FfiConverterRustBuffer {
         
         case .trips:
             writeInt(&buf, Int32(3))
+        
+        
+        case .nearby:
+            writeInt(&buf, Int32(4))
         
         }
     }

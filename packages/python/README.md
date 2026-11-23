@@ -10,7 +10,7 @@ uv add publictransport    # or: pip install publictransport
 There are wheels for Linux (glibc), macOS and Windows on x86-64, and for the first two on ARM. The package wraps the Rust library of the same name, which builds the requests and parses the answers, and [httpx](https://www.python-httpx.org) sends them.
 
 ```python
-from publictransport import BundledNetwork, Client, LocationKind
+from publictransport import BundledNetwork, Client, Coordinate, LocationKind
 
 network = BundledNetwork.VVO_EFA.network()
 
@@ -18,6 +18,15 @@ with Client(user_agent="my-app/1.0 (+https://example.org)") as client:
     stops = client.locations(network, "Hauptbahnhof", kinds=[LocationKind.STOP])
     for departure in client.departures(network, stops[0], limit=10):
         print(departure.scheduled_time, departure.line.name, departure.direction)
+```
+
+`nearby` is the second way to find stops: it lists the stops around a position, the nearest first. `Coordinate.distance_meters` gives the straight-line distance between two positions in meters.
+
+```python
+position = Coordinate(latitude=51.04, longitude=13.7325)
+for stop in client.nearby(network, position, radius_meters=500):
+    if stop.coordinate:
+        print(stop.name, round(position.distance_meters(stop.coordinate)), "m")
 ```
 
 `arrivals` takes the same arguments and lists what arrives at the stop. An arrival has an `origin`, where the vehicle comes from, in place of the `direction`.
@@ -110,7 +119,7 @@ What the server or the query cause is a subclass of `publictransport.Error`. A f
 
 `Client(http_client=...)` builds on an httpx client of yours, for example to use a proxy. That client has to set the `User-Agent` itself and must not follow redirects.
 
-An application with another HTTP stack skips the clients. The network builds each request and reads its answer, and the same pair exists for departures, arrivals and trips:
+An application with another HTTP stack skips the clients. The network builds each request and reads its answer, and the same pair exists for nearby stops, departures, arrivals and trips:
 
 ```python
 request = network.locations_request(query)  # a LocationQuery

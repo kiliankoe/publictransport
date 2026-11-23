@@ -16,6 +16,7 @@ from publictransport._uniffi import (
     HttpResponse,
     Location,
     LocationQuery,
+    NearbyQuery,
     Network,
     Place,
     Trips,
@@ -85,6 +86,15 @@ def _location_query(
         _no_options("LocationQuery", tuple(kinds) or None, limit)
         return query
     return LocationQuery(text=query, kinds=list(kinds), limit=limit)
+
+
+def _nearby_query(
+    position: NearbyQuery | Coordinate, radius_meters: int | None, limit: int | None
+) -> NearbyQuery:
+    if isinstance(position, NearbyQuery):
+        _no_options("NearbyQuery", radius_meters, limit)
+        return position
+    return NearbyQuery(position=position, radius_meters=radius_meters, limit=limit)
 
 
 def _departures_query(
@@ -211,6 +221,28 @@ class Client:
         """
         request = network.locations_request(_location_query(query, kinds, limit))
         return network.parse_locations(self._send(request))
+
+    def nearby(
+        self,
+        network: Network,
+        position: NearbyQuery | Coordinate,
+        *,
+        radius_meters: int | None = None,
+        limit: int | None = None,
+    ) -> list[Location]:
+        """Find the stops near a position. The nearest comes first.
+
+        `radius_meters` is how far from the position to look, 1000 m if
+        left out. MOTIS has no radius and returns the nearest stops however
+        far they are. `limit` is the largest number wanted, which servers
+        treat as a guide. A `NearbyQuery` carries the same and takes the
+        place of all three.
+
+        `Coordinate.distance_meters` gives how far a stop is. A position
+        off the globe raises `Error.InvalidQuery`.
+        """
+        request = network.nearby_request(_nearby_query(position, radius_meters, limit))
+        return network.parse_nearby(self._send(request))
 
     def departures(
         self,
@@ -356,6 +388,28 @@ class AsyncClient:
         """
         request = network.locations_request(_location_query(query, kinds, limit))
         return network.parse_locations(await self._send(request))
+
+    async def nearby(
+        self,
+        network: Network,
+        position: NearbyQuery | Coordinate,
+        *,
+        radius_meters: int | None = None,
+        limit: int | None = None,
+    ) -> list[Location]:
+        """Find the stops near a position. The nearest comes first.
+
+        `radius_meters` is how far from the position to look, 1000 m if
+        left out. MOTIS has no radius and returns the nearest stops however
+        far they are. `limit` is the largest number wanted, which servers
+        treat as a guide. A `NearbyQuery` carries the same and takes the
+        place of all three.
+
+        `Coordinate.distance_meters` gives how far a stop is. A position
+        off the globe raises `Error.InvalidQuery`.
+        """
+        request = network.nearby_request(_nearby_query(position, radius_meters, limit))
+        return network.parse_nearby(await self._send(request))
 
     async def departures(
         self,

@@ -91,6 +91,98 @@ impl LocationQuery {
     }
 }
 
+/// A search for the stops near a position.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
+pub struct NearbyQuery {
+    /// Where to look.
+    pub position: Coordinate,
+    /// How far from the position to look, in meters. 1000 m without it.
+    /// MOTIS has no radius and returns the nearest stops however far they
+    /// are; [`Coordinate::distance_meters`] tells how far one is.
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub radius_meters: Option<u32>,
+    /// The largest number of stops wanted. Without it the server decides:
+    /// MOTIS returns 5 and `OpenTripPlanner` 20, EFA every stop in the
+    /// circle. MOTIS refuses a number above the maximum of the server.
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub limit: Option<u32>,
+}
+
+impl From<Coordinate> for NearbyQuery {
+    fn from(position: Coordinate) -> Self {
+        Self::new(position)
+    }
+}
+
+impl From<&Self> for NearbyQuery {
+    fn from(query: &Self) -> Self {
+        query.clone()
+    }
+}
+
+impl NearbyQuery {
+    /// A search around `position` within 1000 m, for as many stops as the
+    /// server returns on its own.
+    #[must_use]
+    pub fn new(position: Coordinate) -> Self {
+        Self {
+            position,
+            radius_meters: None,
+            limit: None,
+        }
+    }
+
+    /// Sets [`NearbyQuery::radius_meters`].
+    #[must_use]
+    pub fn with_radius_meters(mut self, radius_meters: u32) -> Self {
+        self.radius_meters = Some(radius_meters);
+        self
+    }
+
+    /// Sets [`NearbyQuery::limit`].
+    #[must_use]
+    pub fn with_limit(mut self, limit: u32) -> Self {
+        self.limit = Some(limit);
+        self
+    }
+
+    /// The radius to ask with.
+    pub(crate) fn radius(&self) -> u32 {
+        self.radius_meters.unwrap_or(1000)
+    }
+
+    /// The radius for a server built on EFA, which measures it on a
+    /// Mercator map: its meters shrink with the cosine of the latitude, so
+    /// 1000 of them are 630 m in Dresden.
+    pub(crate) fn mercator_radius(&self) -> u32 {
+        let stretched = f64::from(self.radius()) / self.position.latitude.to_radians().cos();
+        // Near a pole the circle covers the map.
+        #[expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            reason = "clamped"
+        )]
+        let radius = stretched.ceil().clamp(0.0, f64::from(u32::MAX)) as u32;
+        radius
+    }
+}
+
 /// A place a trip can start or end at.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
@@ -278,6 +370,36 @@ pub struct Coordinate {
     pub latitude: f64,
     /// Longitude, positive to the east.
     pub longitude: f64,
+}
+
+#[cfg_attr(feature = "uniffi", uniffi::export)]
+impl Coordinate {
+    /// The distance to another position in meters, along the surface of
+    /// the earth as a sphere. NaN if either position is not on the globe.
+    #[must_use]
+    pub fn distance_meters(&self, other: Coordinate) -> f64 {
+        const EARTH_RADIUS: f64 = 6_371_008.8;
+        let (from, to) = (self.latitude.to_radians(), other.latitude.to_radians());
+        let longitudes = (other.longitude - self.longitude).to_radians();
+        // The haversine formula, which stays exact for short distances.
+        let half_chord = ((to - from) / 2.0).sin().powi(2)
+            + from.cos() * to.cos() * (longitudes / 2.0).sin().powi(2);
+        // `clamp` keeps a NaN, so a position that is none gives no distance.
+        2.0 * EARTH_RADIUS * half_chord.sqrt().clamp(0.0, 1.0).asin()
+    }
+}
+
+impl Coordinate {
+    /// The position if it is on the globe.
+    pub(crate) fn checked(self) -> Result<Self, crate::Error> {
+        if (-90.0..=90.0).contains(&self.latitude) && (-180.0..=180.0).contains(&self.longitude) {
+            Ok(self)
+        } else {
+            Err(crate::Error::InvalidQuery {
+                message: "the coordinate is not on the globe".to_owned(),
+            })
+        }
+    }
 }
 
 /// An instant in UTC. [`Location::local_time`] gives it as the clocks at a
@@ -940,13 +1062,7 @@ impl Place {
         };
         match self {
             Self::Id(id) => Ok(Target::Id(id.clone())),
-            Self::Coordinate(coordinate)
-                if (-90.0..=90.0).contains(&coordinate.latitude)
-                    && (-180.0..=180.0).contains(&coordinate.longitude) =>
-            {
-                Ok(Target::Coordinate(*coordinate))
-            }
-            Self::Coordinate(_) => Err(invalid("the coordinate is not on the globe")),
+            Self::Coordinate(coordinate) => Ok(Target::Coordinate(coordinate.checked()?)),
             Self::Location(location) => network
                 .place(location)
                 .ok_or_else(|| {

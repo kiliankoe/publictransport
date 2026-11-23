@@ -134,6 +134,12 @@ private fun locations(
     call: suspend Client.(Network) -> List<Location>,
 ) = Case(name, fixture, network, { locationsRequest(query) }, { parseLocations(it) }, call)
 
+private fun nearby(
+    name: String,
+    query: NearbyQuery,
+    call: suspend Client.(Network) -> List<Location>,
+) = Case(name, "efa/vvo-nearby.json", ::efa, { nearbyRequest(query) }, { parseNearby(it) }, call)
+
 private fun departures(
     name: String,
     query: DeparturesQuery,
@@ -161,6 +167,9 @@ private val calls =
             fixture = "trias/vvo-locations.xml",
             network = ::trias,
         ) { locations(it, "Hauptbahnhof", listOf(LocationKind.STOP), 3) },
+        nearby("stops near a position, with radius and limit", NearbyQuery(Coordinate(51.04, 13.7325), 500u, 5u)) {
+            nearby(it, Coordinate(51.04, 13.7325), radiusMeters = 500, limit = 5)
+        },
         departures("departures by query", DeparturesQuery(hbf)) { departures(it, DeparturesQuery(hbf)) },
         departures("departures at an ID, with time and limit", DeparturesQuery(hbf, time, 7u)) {
             departures(it, "de:14612:28", time, 7)

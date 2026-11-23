@@ -24,6 +24,8 @@ pub enum Operation {
     Departures,
     /// Trips between two places.
     Trips,
+    /// The stops near a position.
+    Nearby,
 }
 
 /// Where a [`Network`] has data, in three tiers of quality.
@@ -310,6 +312,8 @@ impl Network {
                 .map_or_else(Vec::new, |provided| {
                     [
                         ("LocationInformationRequest", Operation::Locations),
+                        // The search by position is the same service.
+                        ("LocationInformationRequest", Operation::Nearby),
                         ("StopEventRequest", Operation::Departures),
                         ("TripRequest", Operation::Trips),
                     ]

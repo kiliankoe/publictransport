@@ -4,7 +4,7 @@
 
 The repository has these as programs to run, in [`examples`](https://github.com/kiliankoe/publictransport/tree/main/examples).
 
-### Search for places by name
+### Search for places by name and near a position
 
 ```kotlin
 {{#include ../../examples/kotlin/src/main/kotlin/Locations.kt}}

@@ -1,5 +1,5 @@
-// Searches for places by name on the EFA server of VVO, the transport
-// association of Dresden.
+// Searches for places by name and near a position on the EFA server of
+// VVO, the transport association of Dresden.
 
 import Foundation
 import PublicTransport
@@ -18,4 +18,13 @@ for location in locations.prefix(5) {
         position = String(format: " at %.4f, %.4f", coordinate.latitude, coordinate.longitude)
     }
     print("\(location.kind): \(location.name) (\(location.id))\(position)")
+}
+
+// The stops within 300 m of the best match, the nearest first. The distance
+// is the straight line.
+if let center = locations.first?.coordinate {
+    for stop in try await client.nearby(in: network, at: center, radiusMeters: 300) {
+        guard let coordinate = stop.coordinate else { continue }
+        print(String(format: "%.0f m: %@", center.distanceMeters(to: coordinate), stop.name))
+    }
 }

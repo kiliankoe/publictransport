@@ -51,6 +51,19 @@ extension String: PlaceConvertible {
         }
     }
 
+    extension Client {
+        /// The stops near a position of Core Location, as for a
+        /// ``Coordinate``.
+        public func nearby(
+            in network: Network,
+            at position: CLLocationCoordinate2D,
+            radiusMeters: Int? = nil,
+            limit: Int? = nil
+        ) async throws -> [Location] {
+            try await nearby(in: network, at: Coordinate(position), radiusMeters: radiusMeters, limit: limit)
+        }
+    }
+
     extension CLLocationCoordinate2D {
         /// The position of this library as one of Core Location.
         public init(_ coordinate: Coordinate) {
@@ -187,6 +200,40 @@ public struct Client: Sendable {
     public func locations(in network: Network, query: LocationQuery) async throws -> [Location] {
         let response = try await send(network.locationsRequest(query: query))
         return try network.parseLocations(response: response)
+    }
+
+    /// Finds the stops near a position. The nearest comes first, and
+    /// ``Coordinate/distanceMeters(to:)`` gives how far one is.
+    ///
+    /// - Parameters:
+    ///   - position: Where to look.
+    ///   - radiusMeters: How far from the position to look. 1000 m if left
+    ///     out. MOTIS has no radius and returns the nearest stops however
+    ///     far they are.
+    ///   - limit: The largest number wanted. Servers treat it as a guide.
+    /// - Throws: ``PublicTransportError``, such as `invalidQuery` for a
+    ///   position off the globe, and `URLError` if the request got no
+    ///   answer.
+    public func nearby(
+        in network: Network,
+        at position: Coordinate,
+        radiusMeters: Int? = nil,
+        limit: Int? = nil
+    ) async throws -> [Location] {
+        let radius = try radiusMeters.map { meters in
+            guard let radius = UInt32(exactly: meters) else {
+                throw PublicTransportError.invalidQuery(message: "the radius \(meters) is no distance")
+            }
+            return radius
+        }
+        let query = NearbyQuery(position: position, radiusMeters: radius, limit: try count(limit))
+        return try await nearby(in: network, query: query)
+    }
+
+    /// Finds the stops near a position with a query of the core library.
+    public func nearby(in network: Network, query: NearbyQuery) async throws -> [Location] {
+        let response = try await send(network.nearbyRequest(query: query))
+        return try network.parseNearby(response: response)
     }
 
     /// Lists the next departures at a stop, ordered by expected time.

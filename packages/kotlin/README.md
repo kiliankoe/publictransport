@@ -14,6 +14,7 @@ It runs on the JVM from Java 11, on macOS and Linux (with glibc, so not Alpine) 
 ```kotlin
 import publictransport.BundledNetwork
 import publictransport.Client
+import publictransport.Coordinate
 import publictransport.LocationKind
 
 val client = Client("my-app/1.0 (+https://example.org)")
@@ -24,6 +25,16 @@ val (from, to) = stops
 
 for (departure in client.departures(network, from, limit = 10)) {
     println("${departure.scheduledTime} ${departure.line.name} ${departure.direction ?: ""}")
+}
+```
+
+`nearby` is the second way to find stops: it lists the stops around a position, the nearest first. `Coordinate.distanceMeters` gives the straight-line distance between two positions in meters.
+
+```kotlin
+val position = Coordinate(51.04, 13.7325)
+for (stop in client.nearby(network, position, radiusMeters = 500)) {
+    val distance = stop.coordinate?.let(position::distanceMeters) ?: continue
+    println("${stop.name} ${distance.toInt()} m")
 }
 ```
 
@@ -119,7 +130,7 @@ What the server or the query cause is a subclass of `PublicTransportException`. 
 
 `Client(userAgent, httpClient)` builds on an `OkHttpClient` of yours, for example to use a proxy or an interceptor. The client uses its connections and settings, except that it never follows a redirect and never sends a request again.
 
-An application with another HTTP stack skips the client. The network builds each request and reads its answer, and the same pair exists for departures, arrivals and trips:
+An application with another HTTP stack skips the client. The network builds each request and reads its answer, and the same pair exists for nearby stops, departures, arrivals and trips:
 
 ```kotlin
 val request = network.locationsRequest(query) // a LocationQuery

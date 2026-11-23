@@ -7,8 +7,8 @@ use serde_json::{Value, json};
 
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, Header, HttpRequest, HttpResponse, Leg, LegEnd,
-    LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, Network, Place, Remark,
-    Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
+    LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, NearbyQuery, Network,
+    Place, Remark, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
     http::lenient_list,
     model::{Board, Target, plain_text},
     time::WireTime,
@@ -31,6 +31,10 @@ const SITUATION: &str = "fragment situation on PtSituationElement{situationNumbe
     summary{value} description{value} infoLinks{uri} validityPeriods{startTime endTime}}";
 const CALLS: &str = "estimatedCalls(numberOfDepartures:$limit,startTime:$start,\
     includeCancelledTrips:true){...call situations{...situation} notices{text}}";
+const NEAREST: &str = "query($latitude:Float!,$longitude:Float!,$radius:Float!,$limit:Int){\
+    nearest(latitude:$latitude,longitude:$longitude,maximumDistance:$radius,\
+    maximumResults:$limit,filterByPlaceTypes:[stopPlace]){\
+    edges{node{place{... on StopPlace{id name latitude longitude}}}}}}";
 const TRIPS: &str = "query($from:Location!,$to:Location!,$time:DateTime,$arriveBy:Boolean,\
     $limit:Int,$page:String){trip(from:$from,to:$to,dateTime:$time,arriveBy:$arriveBy,\
     numTripPatterns:$limit,pageCursor:$page){previousPageCursor nextPageCursor routingErrors{code} \
@@ -52,7 +56,13 @@ fn request<const N: usize>(
         .into_iter()
         .filter_map(|(name, value)| Some((name.to_owned(), value?)))
         .collect();
-    let body = json!({"query": format!("{query} {CALL} {QUAY} {LINE} {SITUATION}"), "variables": variables});
+    post(
+        network,
+        &json!({"query": format!("{query} {CALL} {QUAY} {LINE} {SITUATION}"), "variables": variables}),
+    )
+}
+
+fn post(network: &Network, body: &Value) -> HttpRequest {
     HttpRequest {
         method: Method::Post,
         url: network.endpoint.trim_end_matches('/').to_owned(),
@@ -136,6 +146,58 @@ pub(crate) fn departures_request(
             ("start", query.time.map(time).transpose()?),
         ],
     ))
+}
+
+/// The stop places within a circle, which the server orders by the walk
+/// to them. It answers on the endpoint for routing, so this needs no
+/// geocoder.
+pub(crate) fn nearby_request(network: &Network, query: &NearbyQuery) -> Result<HttpRequest, Error> {
+    let position = query.position.checked()?;
+    let mut variables = serde_json::Map::new();
+    variables.insert("latitude".to_owned(), json!(position.latitude));
+    variables.insert("longitude".to_owned(), json!(position.longitude));
+    variables.insert("radius".to_owned(), json!(f64::from(query.radius())));
+    if let Some(limit) = query.limit {
+        variables.insert("limit".to_owned(), json!(limit));
+    }
+    Ok(post(
+        network,
+        &json!({"query": NEAREST, "variables": variables}),
+    ))
+}
+
+pub(crate) fn parse_nearby(
+    network: &Network,
+    response: &HttpResponse,
+) -> Result<Vec<Location>, Error> {
+    let (data, error) = data(response)?;
+    let Some(nearest) = data.nearest else {
+        return Err(error.unwrap_or_else(|| Error::Parse {
+            message: "the response has no nearest places".to_owned(),
+        }));
+    };
+    Ok(explained(nearest.edges, error)?
+        .into_iter()
+        .filter_map(|edge| edge.node?.place)
+        .filter_map(|place| {
+            Some(Location {
+                id: place.id?,
+                global_ids: Vec::new(),
+                kind: LocationKind::Stop,
+                name: place.name.unwrap_or_default(),
+                locality: None,
+                coordinate: place
+                    .latitude
+                    .zip(place.longitude)
+                    .map(|(latitude, longitude)| Coordinate {
+                        latitude,
+                        longitude,
+                    }),
+                timezone: network.timezone.clone(),
+                network: None,
+            })
+        })
+        .collect())
 }
 
 pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<HttpRequest, Error> {
@@ -367,6 +429,32 @@ struct Data {
     stop_place: Option<CallBoard>,
     quay: Option<CallBoard>,
     trip: Option<WireTrip>,
+    nearest: Option<Nearest>,
+}
+
+#[derive(Deserialize)]
+struct Nearest {
+    #[serde(default, deserialize_with = "lenient_list")]
+    edges: Vec<Edge>,
+}
+
+#[derive(Deserialize)]
+struct Edge {
+    node: Option<Node>,
+}
+
+#[derive(Deserialize)]
+struct Node {
+    /// Empty for a place of another type than the query selects.
+    place: Option<NearPlace>,
+}
+
+#[derive(Deserialize)]
+struct NearPlace {
+    id: Option<String>,
+    name: Option<String>,
+    latitude: Option<f64>,
+    longitude: Option<f64>,
 }
 
 #[derive(Deserialize)]

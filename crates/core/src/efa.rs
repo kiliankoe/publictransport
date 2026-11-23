@@ -4,8 +4,8 @@ use serde::Deserialize;
 
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, Leg,
-    LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Mode, Network, Remark, Stopover,
-    Timestamp, Trip, TripTime, Trips, TripsQuery,
+    LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Mode, NearbyQuery, Network,
+    Remark, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
     http::lenient_list,
     model::{Board, Target, plain_text},
     time::WireTime,
@@ -43,6 +43,44 @@ pub(crate) fn locations_request(network: &Network, query: &LocationQuery) -> Htt
         parameters.push(("anyObjFilter_sf", &filter));
     }
     HttpRequest::get(&network.endpoint, "XML_STOPFINDER_REQUEST", parameters)
+}
+
+/// The stops within a circle, which the server orders by distance.
+pub(crate) fn nearby_request(network: &Network, query: &NearbyQuery) -> Result<HttpRequest, Error> {
+    let position = query.position.checked()?;
+    let center = format!(
+        "{}:{}:WGS84[dd.ddddd]",
+        position.longitude, position.latitude
+    );
+    let radius = query.mercator_radius().to_string();
+    let limit = query.limit.map(|limit| limit.to_string());
+    let mut parameters = common();
+    parameters.extend([
+        ("coord", center.as_str()),
+        ("inclFilter", "1"),
+        ("type_1", "STOP"),
+        ("radius_1", radius.as_str()),
+    ]);
+    if let Some(limit) = &limit {
+        parameters.push(("max", limit));
+    }
+    Ok(HttpRequest::get(
+        &network.endpoint,
+        "XML_COORD_REQUEST",
+        parameters,
+    ))
+}
+
+pub(crate) fn parse_nearby(
+    network: &Network,
+    response: &HttpResponse,
+) -> Result<Vec<Location>, Error> {
+    let response: StopFinderResponse = response.json()?;
+    Ok(response
+        .locations
+        .into_iter()
+        .map(|location| location.into_location(network))
+        .collect())
 }
 
 pub(crate) fn parse_locations(

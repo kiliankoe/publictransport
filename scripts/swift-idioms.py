@@ -51,6 +51,7 @@ MEMBERS = {
     "Registry/get": "Registry/network(id:)",
     "Registry/covering": "Registry/covering(at:)",
     "Coverage/tierAt": "Coverage/tier(at:)",
+    "Coordinate/distanceMeters": "Coordinate/distanceMeters(to:)",
     "Location/sameStation": "Location/isSameStation(with:)",
     "Location/timezone": "Location/timeZoneIdentifier",
     # Internal in Swift, see `hide_helpers`.
@@ -308,6 +309,12 @@ def main() -> None:
         "label of isSameStation(with:)",
         r"public func sameStation\(other: Location\)",
         "public func isSameStation(with other: Location)",
+        1,
+    )
+    code.replace(
+        "label of distanceMeters(to:)",
+        r"public func distanceMeters\(other: Coordinate\)",
+        "public func distanceMeters(to other: Coordinate)",
         1,
     )
     # `Network(id:json:)` in Client.swift takes its place.

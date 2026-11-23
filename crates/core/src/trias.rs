@@ -13,8 +13,8 @@ use serde::Deserialize;
 
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, GlobalId, Header, HttpRequest, HttpResponse,
-    Leg, LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, Network,
-    Place, Protocol, Remark, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
+    Leg, LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, NearbyQuery,
+    Network, Place, Protocol, Remark, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
     model::{Board, Target, plain_text},
     time::WireTime,
 };
@@ -197,6 +197,48 @@ pub(crate) fn locations_request(
     };
     let request = dialect.request("LocationInformationRequest", &(input + &restrictions));
     dialect.post(network, &request)
+}
+
+/// The stops within a circle, as a location search with a restriction on
+/// the area in place of a name.
+pub(crate) fn nearby_request(network: &Network, query: &NearbyQuery) -> Result<HttpRequest, Error> {
+    let dialect = Dialect::of(network);
+    let position = query.position.checked()?;
+    // The two are SIRI's elements, which neither dialect prefixes: SIRI
+    // is the default namespace of an OJP request, and TRIAS has its own.
+    let center = format!(
+        "<Longitude>{}</Longitude><Latitude>{}</Latitude>",
+        position.longitude, position.latitude,
+    );
+    let circle = dialect.element("Center", &center)
+        // The servers known to speak the two protocols are built on EFA.
+        + &dialect.element("Radius", &query.mercator_radius().to_string());
+    let input = dialect.element(
+        "InitialInput",
+        &dialect.element("GeoRestriction", &dialect.element("Circle", &circle)),
+    );
+    let restrictions = dialect.element(
+        "Restrictions",
+        &(dialect.element("Type", "stop") + &dialect.number_of_results(query.limit)),
+    );
+    let request = dialect.request("LocationInformationRequest", &(input + &restrictions));
+    dialect.post(network, &request)
+}
+
+/// The stops of a search by position, which the server orders by distance.
+pub(crate) fn parse_nearby(
+    network: &Network,
+    response: &HttpResponse,
+) -> Result<Vec<Location>, Error> {
+    let (answers, failure) = answers(network, response)?;
+    let answer = answer(answers.locations, &failure, response.status)?;
+    // -20100 is what an EFA server answers for a circle without stops.
+    let results = answer.results(failure, response.status, &["NORESULTS", "-20100"])?;
+    // Both dialects name the locality alone here.
+    Ok(results
+        .into_iter()
+        .filter_map(|result| result.location.into_location(network, false))
+        .collect())
 }
 
 pub(crate) fn departures_request(
@@ -624,8 +666,10 @@ impl Failure {
                 code == "LOCATIONUNSERVED" || (code.len() > 7 && code.ends_with("UNKNOWN"))
             })
         };
-        let harmless =
-            |text: &&String| code(text).is_some_and(|code| no_results.contains(&code.as_str()));
+        let harmless = |text: &&String| {
+            no_results.contains(&text.as_str())
+                || code(text).is_some_and(|code| no_results.contains(&code.as_str()))
+        };
         if let Some(text) = self.texts.iter().find(not_found) {
             return Err(Error::NotFound {
                 message: text.clone(),
@@ -735,7 +779,10 @@ struct GeoPosition {
 
 impl WireLocation {
     /// `None` for a place of a kind this crate does not know.
-    fn into_location(self, network: &Network, ojp: bool) -> Option<Location> {
+    /// `full_name` says that the name of the location is the whole name
+    /// with the locality in parentheses, as in a search by name on OJP,
+    /// and not the locality alone.
+    fn into_location(self, network: &Network, full_name: bool) -> Option<Location> {
         let (kind, id, name, global_ids) = if let Some(stop) = self.stop_point {
             let id = stop.stop_point_ref.trim().to_owned();
             (
@@ -777,9 +824,8 @@ impl WireLocation {
             global_ids,
             kind,
             name: name.or_else(|| location_name.clone()).unwrap_or_default(),
-            locality: if ojp {
-                // OJP has the full name here, with the locality in
-                // parentheses: "Hauptbahnhof (Essen)".
+            locality: if full_name {
+                // "Hauptbahnhof (Essen)"
                 location_name.as_deref().and_then(trailing_parentheses)
             } else {
                 location_name

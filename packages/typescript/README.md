@@ -10,7 +10,7 @@ pnpm add @kiliankoe/publictransport
 It runs on Node.js from version 22, on Deno and on Bun, has no dependencies and is an ES module only. The package wraps the Rust library of the same name as WebAssembly, which builds the requests and parses the answers, and `fetch` sends them. The WebAssembly code is part of the JavaScript, so nothing needs setup to load it.
 
 ```ts
-import { bundledNetwork, Client } from "@kiliankoe/publictransport";
+import { bundledNetwork, Client, distanceMeters } from "@kiliankoe/publictransport";
 
 const client = new Client("my-app/1.0 (+https://example.org)");
 const network = bundledNetwork("vvo-efa");
@@ -20,6 +20,17 @@ if (!(from && to)) throw new Error("no stops found");
 
 for (const departure of await client.departures(network, from, { limit: 10 })) {
   console.log(departure.scheduledTime, departure.line.name, departure.direction ?? "");
+}
+```
+
+`nearby` is the second way to find stops: it lists the stops around a position, the nearest first. The function `distanceMeters` gives the straight-line distance between two positions in meters.
+
+```ts
+const position = { latitude: 51.04, longitude: 13.7325 };
+for (const stop of await client.nearby(network, position, { radiusMeters: 500 })) {
+  if (stop.coordinate) {
+    console.log(stop.name, Math.round(distanceMeters(position, stop.coordinate)), "m");
+  }
 }
 ```
 
@@ -96,7 +107,7 @@ platform(departure); // the real-time platform, otherwise the scheduled one
 localScheduledTime(departure); // "2026-11-19T14:08:00+01:00", on the clocks at the stop
 ```
 
-The others are `localExpectedTime`, `localTime(location, time)`, `departure(trip)`, `arrival(trip)`, `stationIds(location)`, `sameStation(location, other)`, `stopId(network, location)`, `place(network, location)` and `tierAt(coverage, position)`.
+The others are `localExpectedTime`, `localTime(location, time)`, `departure(trip)`, `arrival(trip)`, `stationIds(location)`, `sameStation(location, other)`, `stopId(network, location)`, `place(network, location)`, `tierAt(coverage, position)` and `distanceMeters(from, to)`.
 
 Times are `Date` values. The local times are text in ISO 8601 format, because JavaScript has no type for a time with an offset. To print a time, `Intl` does it from the `Date` and the time zone of the stop:
 
@@ -155,7 +166,7 @@ const client = new Client("my-app/1.0", {
 
 The function has to pass on `redirect: "manual"` and the `signal`, as `init` above does, and the proxy must not follow redirects either.
 
-An application with another HTTP stack skips the client. A pair of functions builds each request and reads its answer, and the same pair exists for departures, arrivals and trips:
+An application with another HTTP stack skips the client. A pair of functions builds each request and reads its answer, and the same pair exists for nearby stops, departures, arrivals and trips:
 
 ```ts
 const request = locationsRequest(network, query); // a LocationQuery

@@ -1,5 +1,5 @@
-// Searches for places by name on the EFA server of VVO, the transport
-// association of Dresden.
+// Searches for places by name and near a position on the EFA server of
+// VVO, the transport association of Dresden.
 
 import publictransport.BundledNetwork
 import publictransport.Client
@@ -18,5 +18,13 @@ suspend fun main() {
         val position =
             location.coordinate?.let { " at %.4f, %.4f".format(Locale.ROOT, it.latitude, it.longitude) } ?: ""
         println("${location.kind}: ${location.name} (${location.id})$position")
+    }
+
+    // The stops within 300 m of the best match, the nearest first. The
+    // distance is the straight line.
+    val center = locations.firstOrNull()?.coordinate ?: return
+    for (stop in client.nearby(network, center, radiusMeters = 300)) {
+        val distance = stop.coordinate?.let(center::distanceMeters) ?: continue
+        println("%.0f m: %s".format(Locale.ROOT, distance, stop.name))
     }
 }

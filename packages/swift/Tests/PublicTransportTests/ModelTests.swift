@@ -91,6 +91,12 @@ private func stop(_ ifopt: String, timezone: String? = nil) -> Location {
     #expect(registry.covering(at: dresden).contains(CoveringNetwork(network: vvo, tier: .realtime)))
 }
 
+@Test func distanceBetweenPositionsCrossesTheBoundary() {
+    let dresden = Coordinate(latitude: 51, longitude: 13.7)
+
+    #expect(abs(dresden.distanceMeters(to: Coordinate(latitude: 52, longitude: 13.7)) - 111_200) < 100)
+}
+
 @Test func enumsWithoutValuesListTheirCases() {
     #expect(LocationKind.allCases == [.stop, .address, .poi, .other])
     #expect(CoverageTier.allCases == [.realtime, .regular, .any])

@@ -9,6 +9,7 @@ import {
   bundledNetwork,
   delaySeconds,
   departure,
+  distanceMeters,
   durationSeconds,
   expectedTime,
   type Location,
@@ -169,6 +170,15 @@ test("registry finds networks by ID and by position", () => {
   assert.deepEqual(covering[0], { network: bundledNetwork("vrr-efa"), tier: "realtime" });
   assert.equal(tierAt(covering[0]?.network.coverage ?? {}, duesseldorf), "realtime");
   assert.deepEqual(new Registry([vvo]).networks(), [vvo]);
+});
+
+test("distance between positions crosses the boundary", () => {
+  const distance = distanceMeters(
+    { latitude: 51, longitude: 13.7 },
+    { latitude: 52, longitude: 13.7 },
+  );
+
+  assert.ok(Math.abs(distance - 111_200) < 100);
 });
 
 test("network is read from an entry of transport-apis", () => {

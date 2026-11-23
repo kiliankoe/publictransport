@@ -4,7 +4,7 @@ A few usage examples of how this SDK works.
 
 | Example      | What it shows                                                       | Server                           |
 | ------------ | ------------------------------------------------------------------- | -------------------------------- |
-| `locations`  | Search for places by name                                           | VVO in Dresden, EFA              |
+| `locations`  | Search for places by name, and for the stops near the first one     | VVO in Dresden, EFA              |
 | `departures` | List the next departures at a stop                                  | VBB in Berlin, HAFAS             |
 | `trips`      | Plan trips between two stops, and ask for the trips after the first | Entur in Norway, OpenTripPlanner |
 | `networks`   | List the bundled networks that cover a position, without a request  | none                             |

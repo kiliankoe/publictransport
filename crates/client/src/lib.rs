@@ -145,6 +145,24 @@ impl Client {
         Ok(network.parse_locations(&response)?)
     }
 
+    /// Finds the stops near a position. The query is the position as a
+    /// [`Coordinate`], or a [`NearbyQuery`] for a search with options. See
+    /// [`Network::parse_nearby`] for the result.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Transport`] if the request got no answer and
+    /// [`Error::Api`] for everything the server or the query got wrong.
+    pub async fn nearby(
+        &self,
+        network: &Network,
+        query: impl Into<NearbyQuery>,
+    ) -> Result<Vec<Location>, Error> {
+        let request = network.nearby_request(&query.into())?;
+        let response = self.send(request).await?;
+        Ok(network.parse_nearby(&response)?)
+    }
+
     /// Lists the next departures at a stop. The query is the stop, as a
     /// [`Location`] or as an ID of this network, or a [`DeparturesQuery`]
     /// for a request with options. A stop that another network returned

@@ -1,7 +1,7 @@
-//! Searches for places by name on the EFA server of VVO, the transport
-//! association of Dresden.
+//! Searches for places by name and near a position on the EFA server of
+//! VVO, the transport association of Dresden.
 
-use publictransport_client::{BundledNetwork, Client, LocationQuery, Network};
+use publictransport_client::{BundledNetwork, Client, LocationQuery, NearbyQuery, Network};
 
 // Servers want to know who asks: name your application and a way to reach you.
 const USER_AGENT: &str = "publictransport-example (+https://github.com/kiliankoe/publictransport)";
@@ -27,6 +27,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "{:?}: {} ({}){position}",
             location.kind, location.name, location.id
         );
+    }
+
+    // The stops within 300 m of the best match, the nearest first. The
+    // distance is the straight line.
+    let Some(center) = locations.first().and_then(|location| location.coordinate) else {
+        return Ok(());
+    };
+    let query = NearbyQuery::new(center).with_radius_meters(300);
+    for stop in client.nearby(&network, &query).await? {
+        if let Some(coordinate) = stop.coordinate {
+            println!("{:.0} m: {}", center.distance_meters(coordinate), stop.name);
+        }
     }
     Ok(())
 }

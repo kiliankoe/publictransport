@@ -79,6 +79,17 @@ struct Call: Sendable, CustomTestStringConvertible {
         )
     }
 
+    static func nearby(
+        _ name: String, query: NearbyQuery,
+        call: @escaping @Sendable (Client, Network) async throws -> [Location]
+    ) -> Call {
+        Call(
+            testDescription: name, fixture: "efa/vvo-nearby.json",
+            request: { try $0.nearbyRequest(query: query) },
+            check: { try #expect(await call($0, $1) == $1.parseNearby(response: $2)) }
+        )
+    }
+
     static func departures(
         _ name: String, network: @escaping @Sendable (String) -> Network = efa,
         fixture: String = "efa/vvo-departures.json", query: DeparturesQuery,
@@ -146,6 +157,14 @@ struct Call: Sendable, CustomTestStringConvertible {
             query: LocationQuery(text: "Hauptbahnhof", limit: 3, kinds: [.stop])
         ) {
             try await $0.locations(in: $1, matching: "Hauptbahnhof", kinds: [.stop], limit: 3)
+        },
+        .nearby(
+            "stops near a position, with radius and limit",
+            query: NearbyQuery(
+                position: Coordinate(latitude: 51.04, longitude: 13.7325), radiusMeters: 500, limit: 5)
+        ) {
+            try await $0.nearby(
+                in: $1, at: Coordinate(latitude: 51.04, longitude: 13.7325), radiusMeters: 500, limit: 5)
         },
         .departures(
             "departures at an ID, with time and limit",

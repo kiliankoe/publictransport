@@ -6,8 +6,8 @@ use serde_json::{Value, json};
 
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, GlobalId, Header, HttpRequest, HttpResponse,
-    Leg, LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, Network,
-    Place, Remark, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
+    Leg, LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, NearbyQuery,
+    Network, Place, Remark, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
     http::lenient_list,
     model::{Board, Target, plain_text},
 };
@@ -306,6 +306,44 @@ pub(crate) fn locations_request(
         ("field", Some(json!("S"))),
     ]);
     request(network, "LocMatch", &json!({"input": input}))
+}
+
+/// The stops within a circle, which the server orders by distance.
+pub(crate) fn nearby_request(network: &Network, query: &NearbyQuery) -> Result<HttpRequest, Error> {
+    let position = query.position.checked()?;
+    // The server counts in millionths of a degree.
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "a position on the globe fits"
+    )]
+    let millionths = |degrees: f64| (degrees * 1_000_000.0).round() as i64;
+    let arguments = object([
+        (
+            "ring",
+            Some(json!({
+                "cCrd": {"x": millionths(position.longitude), "y": millionths(position.latitude)},
+                "maxDist": query.radius(),
+            })),
+        ),
+        ("getStops", Some(json!(true))),
+        ("getPOIs", Some(json!(false))),
+        ("maxLoc", query.limit.map(|limit| json!(limit))),
+    ]);
+    request(network, "LocGeoPos", &arguments)
+}
+
+pub(crate) fn parse_nearby(
+    network: &Network,
+    response: &HttpResponse,
+) -> Result<Vec<Location>, Error> {
+    let Some(found) = result::<Matches>(response, &[])? else {
+        return Ok(Vec::new());
+    };
+    Ok(found
+        .loc_l
+        .into_iter()
+        .map(|location| location.into_location(network))
+        .collect())
 }
 
 pub(crate) fn departures_request(

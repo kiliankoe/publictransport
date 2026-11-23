@@ -6,10 +6,12 @@ import {
   arrivalsRequest as arrivalsRequestOrThrown,
   departuresRequest as departuresRequestOrThrown,
   locationsRequest as locationsRequestOrThrown,
+  nearbyRequest as nearbyRequestOrThrown,
   networkFromJson as networkFromJsonOrThrown,
   parseArrivals as parseArrivalsOrThrown,
   parseDepartures as parseDeparturesOrThrown,
   parseLocations as parseLocationsOrThrown,
+  parseNearby as parseNearbyOrThrown,
   parseTrips as parseTripsOrThrown,
   tripsRequest as tripsRequestOrThrown,
 } from "./generated/publictransport_wasm.js";
@@ -24,6 +26,12 @@ export const locationsRequest = throwing(locationsRequestOrThrown);
 
 /** Reads the answer to a {@link locationsRequest}. The best match comes first. */
 export const parseLocations = throwing(parseLocationsOrThrown);
+
+/** Builds the request for the stops near a position. */
+export const nearbyRequest = throwing(nearbyRequestOrThrown);
+
+/** Reads the answer to a {@link nearbyRequest}. The nearest stop comes first. */
+export const parseNearby = throwing(parseNearbyOrThrown);
 
 /** Builds the request for the next departures at a stop. */
 export const departuresRequest = throwing(departuresRequestOrThrown);

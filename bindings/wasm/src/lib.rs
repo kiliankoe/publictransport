@@ -14,7 +14,7 @@
 use publictransport::{
     Arrival, BundledNetwork, Coordinate, Coverage, CoverageTier, CoveringNetwork, Departure,
     DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, LegEnd, LocalTime, Location,
-    LocationQuery, Network, Place, Timestamp, Trip, Trips, TripsQuery,
+    LocationQuery, NearbyQuery, Network, Place, Timestamp, Trip, Trips, TripsQuery,
 };
 use serde::{Serialize, de::DeserializeOwned};
 use tsify::{Ts, Tsify};
@@ -84,6 +84,34 @@ pub fn parse_locations(
 ) -> Result<Vec<Ts<Location>>, JsValue> {
     let locations = read("network", network)?.parse_locations(&read("response", response)?);
     write_all(&locations.map_err(thrown)?)
+}
+
+/// Builds the request for the stops near a position.
+#[wasm_bindgen(js_name = nearbyRequest)]
+pub fn nearby_request(
+    network: &Ts<Network>,
+    query: &Ts<NearbyQuery>,
+) -> Result<Ts<HttpRequest>, JsValue> {
+    let request = read("network", network)?.nearby_request(&read("query", query)?);
+    write(&request.map_err(thrown)?)
+}
+
+/// Reads the answer to a `nearbyRequest`: the stops in the order of the
+/// server, which is the nearest first.
+#[wasm_bindgen(js_name = parseNearby)]
+pub fn parse_nearby(
+    network: &Ts<Network>,
+    response: &Ts<HttpResponse>,
+) -> Result<Vec<Ts<Location>>, JsValue> {
+    let locations = read("network", network)?.parse_nearby(&read("response", response)?);
+    write_all(&locations.map_err(thrown)?)
+}
+
+/// The distance between two positions in meters, along the surface of the
+/// earth as a sphere.
+#[wasm_bindgen(js_name = distanceMeters)]
+pub fn distance_meters(from: &Ts<Coordinate>, to: &Ts<Coordinate>) -> Result<f64, JsValue> {
+    Ok(read("position", from)?.distance_meters(read("other position", to)?))
 }
 
 /// Builds the request for the next departures at a stop.

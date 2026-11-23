@@ -192,6 +192,13 @@ def test_station_ids_are_shared_by_a_station_and_its_platforms() -> None:
     ]
 
 
+def test_distance_between_positions_crosses_the_boundary() -> None:
+    dresden = Coordinate(latitude=51.0, longitude=13.7)
+    north = Coordinate(latitude=52.0, longitude=13.7)
+
+    assert dresden.distance_meters(north) == pytest.approx(111_200, rel=0.001)
+
+
 def test_registry_finds_the_bundled_networks_that_cover_a_position() -> None:
     dresden = Coordinate(latitude=51.05, longitude=13.74)
 

@@ -23,6 +23,16 @@ for departure in try await client.departures(in: network, at: from, limit: 10) {
 }
 ```
 
+`nearby` is the second way to find stops: it lists the stops around a position, the nearest first. `distanceMeters(to:)` gives the straight-line distance between two positions in meters. The position is a `Coordinate` or a `CLLocationCoordinate2D`.
+
+```swift
+let position = Coordinate(latitude: 51.04, longitude: 13.7325)
+for stop in try await client.nearby(in: network, at: position, radiusMeters: 500) {
+    guard let coordinate = stop.coordinate else { continue }
+    print(stop.name, Int(position.distanceMeters(to: coordinate)), "m")
+}
+```
+
 `arrivals` takes the same arguments and lists what arrives at the stop. An arrival has an `origin`, where the vehicle comes from, in place of the `direction`.
 
 ```swift

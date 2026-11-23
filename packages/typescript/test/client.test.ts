@@ -17,13 +17,16 @@ import {
   type LocationQuery,
   locationsRequest,
   MovedError,
+  type NearbyQuery,
   type Network,
   NotFoundError,
+  nearbyRequest,
   ParseError,
   PublicTransportError,
   parseArrivals,
   parseDepartures,
   parseLocations,
+  parseNearby,
   parseTrips,
   RateLimitedError,
   ResponseTooLargeError,
@@ -92,6 +95,11 @@ function locations(
   };
 }
 
+function nearby(name: string, query: NearbyQuery, call: Case["call"]): Case {
+  const request = (network: Network) => nearbyRequest(network, query);
+  return { name, fixture: "efa/vvo-nearby.json", request, parse: parseNearby, call };
+}
+
 function departures(name: string, query: DeparturesQuery, call: Case["call"]): Case {
   const request = (network: Network) => departuresRequest(network, query);
   return { name, fixture: "efa/vvo-departures.json", request, parse: parseDepartures, call };
@@ -118,6 +126,11 @@ const calls: Case[] = [
       // A key that is `undefined` is a missing one, also for the type check.
       client.locations(network, "Hauptbahnhof", { limit: 3, kinds: ["stop"], signal: undefined }),
     { fixture: "trias/vvo-locations.xml", network: trias },
+  ),
+  nearby(
+    "stops near a position, with radius and limit",
+    { position: coordinate, radiusMeters: 500, limit: 5 },
+    (client, network) => client.nearby(network, coordinate, { radiusMeters: 500, limit: 5 }),
   ),
   departures(
     "departures by query, at a location of another network",

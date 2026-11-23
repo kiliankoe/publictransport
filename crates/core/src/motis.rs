@@ -4,8 +4,8 @@ use serde::Deserialize;
 
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, Leg,
-    LegKind, Line, Location, LocationKind, LocationQuery, Mode, Network, Stopover, Trip, TripTime,
-    Trips, TripsQuery,
+    LegKind, Line, Location, LocationKind, LocationQuery, Mode, NearbyQuery, Network, Stopover,
+    Trip, TripTime, Trips, TripsQuery,
     model::{Board, Target},
     time::WireTime,
 };
@@ -41,6 +41,22 @@ pub(crate) fn locations_request(
     Ok(HttpRequest::get(
         &network.endpoint,
         "v1/geocode",
+        parameters,
+    ))
+}
+
+/// The stops nearest to a position. The server takes no radius.
+pub(crate) fn nearby_request(network: &Network, query: &NearbyQuery) -> Result<HttpRequest, Error> {
+    let position = query.position.checked()?;
+    let place = format!("{},{}", position.latitude, position.longitude);
+    let limit = query.limit.map(|limit| limit.to_string());
+    let mut parameters = vec![("place", place.as_str()), ("type", "STOP")];
+    if let Some(limit) = &limit {
+        parameters.push(("numResults", limit));
+    }
+    Ok(HttpRequest::get(
+        &network.endpoint,
+        "v1/reverse-geocode",
         parameters,
     ))
 }

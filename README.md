@@ -4,7 +4,7 @@
 
 A client library for public transport APIs, for Rust, Python, Swift, Kotlin and TypeScript. The libraries use a shared model for stops, departures and trips that covers several server types, so an application can query any supported network the same way.
 
-The project is at an early stage. It can search for locations by name, list the departures and arrivals at a stop and plan trips between two places, on servers that speak one of six protocols:
+The project is at an early stage. It can search for locations by name, find the stops near a position, list the departures and arrivals at a stop and plan trips between two places, on servers that speak one of six protocols:
 
 - EFA, the JSON interface of MDV's journey planner, used by many German transport associations
 - MOTIS, the routing engine behind [Transitous](https://transitous.org)
@@ -20,7 +20,7 @@ It ships with [networks](https://kiliankoe.github.io/publictransport/networks.ht
 Every language has the same requests. This is Python, and the guides in the [documentation](https://kiliankoe.github.io/publictransport/) show the others.
 
 ```python
-from publictransport import BundledNetwork, Client, LocationKind
+from publictransport import BundledNetwork, Client, Coordinate, LocationKind
 
 network = BundledNetwork.VVO_EFA.network()
 
@@ -28,6 +28,15 @@ with Client(user_agent="my-app/1.0 (+https://example.org)") as client:
     stops = client.locations(network, "Hauptbahnhof", kinds=[LocationKind.STOP])
     departures = client.departures(network, stops[0], limit=10)
     found = client.trips(network, stops[0], stops[1])
+```
+
+`nearby` lists the stops around a position, the nearest first, and `distance_meters` gives the straight-line distance between two positions.
+
+```python
+position = Coordinate(latitude=51.04, longitude=13.7325)
+for stop in client.nearby(network, position, radius_meters=500):
+    if stop.coordinate:
+        print(stop.name, round(position.distance_meters(stop.coordinate)), "m")
 ```
 
 [examples](https://github.com/kiliankoe/publictransport/tree/main/examples) has a short program for each kind of request in each language.

@@ -1,11 +1,13 @@
 import type {
   Arrival,
+  Coordinate,
   Departure,
   DeparturesQuery,
   HttpRequest,
   HttpResponse,
   Location,
   LocationQuery,
+  NearbyQuery,
   Network,
   Place,
   Trips,
@@ -15,9 +17,11 @@ import {
   arrivalsRequest,
   departuresRequest,
   locationsRequest,
+  nearbyRequest,
   parseArrivals,
   parseDepartures,
   parseLocations,
+  parseNearby,
   parseTrips,
   tripsRequest,
 } from "./requests.js";
@@ -119,6 +123,36 @@ export class Client {
       typeof query === "string" ? { ...rest, text: query } : query,
     );
     return parseLocations(network, await this.#send(request, signal));
+  }
+
+  /** Finds the stops near a position with a query. */
+  nearby(network: Network, query: NearbyQuery, options?: RequestOptions): Promise<Location[]>;
+  /**
+   * Finds the stops near a position. The nearest comes first, and
+   * {@link distanceMeters} gives how far one is.
+   *
+   * @param position Where to look. A position off the globe rejects with an
+   *   {@link InvalidQueryError}.
+   * @param options The other fields of a {@link NearbyQuery}: how far to
+   *   look as `radiusMeters`, 1000 m if left out, and the largest number
+   *   wanted as `limit`, which servers treat as a guide. MOTIS has no
+   *   radius and returns the nearest stops however far they are.
+   */
+  nearby(
+    network: Network,
+    position: Coordinate,
+    options?: Omit<NearbyQuery, "position"> & RequestOptions,
+  ): Promise<Location[]>;
+  async nearby(
+    network: Network,
+    query: Coordinate | NearbyQuery,
+    { signal, ...rest }: Omit<NearbyQuery, "position"> & RequestOptions = {},
+  ): Promise<Location[]> {
+    const request = nearbyRequest(
+      network,
+      "position" in query ? query : { ...rest, position: query },
+    );
+    return parseNearby(network, await this.#send(request, signal));
   }
 
   /** Lists departures with a query. */
