@@ -19,11 +19,11 @@ ERROR = "PublicTransportException"
 # Methods without arguments that Kotlin writes as properties, with the
 # number of types that have one. They only read fields.
 PROPERTIES = {
-    "expectedTime": 2,
-    "localScheduledTime": 2,
-    "localExpectedTime": 2,
-    "delaySeconds": 2,
-    "platform": 2,
+    "expectedTime": 3,
+    "localScheduledTime": 3,
+    "localExpectedTime": 3,
+    "delaySeconds": 3,
+    "platform": 3,
     "durationSeconds": 1,
     "departure": 1,
     "arrival": 1,

@@ -218,6 +218,37 @@ public struct Client: Sendable {
         return try network.parseDepartures(response: response)
     }
 
+    /// Lists the next arrivals at a stop, ordered by expected time. An
+    /// arrival has an ``Arrival/origin``, where the vehicle comes from, in
+    /// place of the direction.
+    ///
+    /// - Parameters:
+    ///   - stop: A location, or the ID of a stop on this network, as for
+    ///     ``departures(in:at:after:limit:)``.
+    ///   - time: The time from which on arrivals are wanted. Now if left
+    ///     out.
+    ///   - limit: How many arrivals are wanted. This is not a maximum:
+    ///     servers treat it as a guide and may return more or fewer.
+    /// - Throws: ``PublicTransportError``, such as `notFound` for a stop
+    ///   the network does not know, and `URLError` if the request got no
+    ///   answer.
+    public func arrivals(
+        in network: Network,
+        at stop: some PlaceConvertible,
+        after time: Date? = nil,
+        limit: Int? = nil
+    ) async throws -> [Arrival] {
+        let query = DeparturesQuery(stop: stop.place, time: time, limit: try count(limit))
+        return try await arrivals(in: network, query: query)
+    }
+
+    /// Lists arrivals with a query of the core library, the one of
+    /// departures.
+    public func arrivals(in network: Network, query: DeparturesQuery) async throws -> [Arrival] {
+        let response = try await send(network.arrivalsRequest(query: query))
+        return try network.parseArrivals(response: response)
+    }
+
     /// Plans trips between two places, in the order the server ranks them.
     ///
     /// Each end is a location, also one that another network returned, a

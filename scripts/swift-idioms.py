@@ -25,9 +25,9 @@ RENAMED = {
 # Methods without arguments that Swift writes as properties, with the
 # number of types that have one. They only read fields.
 PROPERTIES = {
-    "expectedTime": 2,
-    "delaySeconds": 2,
-    "platform": 2,
+    "expectedTime": 3,
+    "delaySeconds": 3,
+    "platform": 3,
     "durationSeconds": 1,
     "departure": 1,
     "arrival": 1,
@@ -235,7 +235,7 @@ def hide_helpers(code: Code) -> None:
     # `Location.timeZone`, and has no use for the local time as text.
     code.replace("local time", r"^public func localTime\(", "func localTime(", 1)
     for name in ("localScheduledTime", "localExpectedTime"):
-        code.replace(name, rf"^public func {name}\(", f"func {name}(", 2)
+        code.replace(name, rf"^public func {name}\(", f"func {name}(", 3)
     code.replace("local time type", r"^public typealias LocalTime\b", "typealias LocalTime", 1)
     declared = r"^(?:public|open) (?:final )?(?:struct|enum|class|protocol|func|typealias) (\w+)"
     for name in re.findall(declared, code.text, flags=re.MULTILINE):

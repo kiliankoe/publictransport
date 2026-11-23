@@ -7,7 +7,7 @@ use serde::Deserialize;
 
 use crate::{Coordinate, Error, HafasOptions, HafasProduct, Network, Protocol};
 
-/// One of the three things a [`Network`] can be asked.
+/// One of the kinds of request that a [`Network`] can be asked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
@@ -20,7 +20,7 @@ use crate::{Coordinate, Error, HafasOptions, HafasProduct, Network, Protocol};
 pub enum Operation {
     /// A search for locations.
     Locations,
-    /// The departures at a stop.
+    /// The departures at a stop, and with them the arrivals.
     Departures,
     /// Trips between two places.
     Trips,

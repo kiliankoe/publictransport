@@ -15,7 +15,7 @@ use crate::{
     Coordinate, Departure, DeparturesQuery, Error, GlobalId, Header, HttpRequest, HttpResponse,
     Leg, LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, Network,
     Place, Protocol, Remark, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
-    model::{Target, plain_text},
+    model::{Board, Target, plain_text},
     time::WireTime,
 };
 
@@ -202,6 +202,7 @@ pub(crate) fn locations_request(
 pub(crate) fn departures_request(
     network: &Network,
     query: &DeparturesQuery,
+    board: Board,
 ) -> Result<HttpRequest, Error> {
     let dialect = Dialect::of(network);
     let time = query.time.map(utc).transpose()?;
@@ -213,7 +214,13 @@ pub(crate) fn departures_request(
     let parameters = dialect.element(
         "Params",
         &(dialect.number_of_results(query.limit)
-            + &dialect.element("StopEventType", "departure")
+            + &dialect.element(
+                "StopEventType",
+                match board {
+                    Board::Departures => "departure",
+                    Board::Arrivals => "arrival",
+                },
+            )
             + &dialect.element("IncludeRealtimeData", "true")),
     );
     let request = dialect.request("StopEventRequest", &(location + &parameters));
@@ -276,6 +283,7 @@ pub(crate) fn parse_locations(
 pub(crate) fn parse_departures(
     network: &Network,
     response: &HttpResponse,
+    board: Board,
 ) -> Result<Vec<Departure>, Error> {
     let (answers, failure) = answers(network, response)?;
     let answer = answer(answers.stop_events, &failure, response.status)?;
@@ -283,7 +291,11 @@ pub(crate) fn parse_departures(
     let mut departures = answer
         .results(failure, response.status, &["NOEVENTFOUND"])?
         .into_iter()
-        .map(|result| result.stop_event.into_departure(network, &situations))
+        .map(|result| {
+            result
+                .stop_event
+                .into_departure(network, &situations, board)
+        })
         .collect::<Result<Vec<_>, _>>()?;
     departures.sort_by_key(Departure::expected_time);
     Ok(departures)
@@ -860,6 +872,8 @@ struct Service {
     #[serde(default)]
     published_line_name: Vec<Text>,
     #[serde(default)]
+    origin_text: Vec<Text>,
+    #[serde(default)]
     destination_text: Vec<Text>,
     #[serde(default)]
     cancelled: bool,
@@ -1017,22 +1031,28 @@ impl StopEvent {
         mut self,
         network: &Network,
         situations: &[Situation],
+        board: Board,
     ) -> Result<Departure, Error> {
         let remarks = self.service.remarks(situations);
+        let origin = text(std::mem::take(&mut self.service.origin_text));
         let (line, direction, cancelled) = self.service.into_line(self.extension);
         let stopover = self.this_call.call_at_stop.into_stopover(network);
+        let end = stopover.on(board).ok_or_else(|| Error::Parse {
+            message: "a stop event has no scheduled time".to_owned(),
+        })?;
         Ok(Departure {
-            stop: stopover.stop,
+            stop: end.stop,
             line,
-            direction,
-            scheduled_time: stopover.scheduled_departure.ok_or_else(|| Error::Parse {
-                message: "a stop event has no scheduled departure".to_owned(),
-            })?,
-            realtime_time: stopover.realtime_departure,
-            scheduled_platform: stopover.scheduled_platform,
-            realtime_platform: stopover.realtime_platform,
+            direction: match board {
+                Board::Departures => direction,
+                Board::Arrivals => origin,
+            },
+            scheduled_time: end.scheduled_time,
+            realtime_time: end.realtime_time,
+            scheduled_platform: end.scheduled_platform,
+            realtime_platform: end.realtime_platform,
             // The vehicle may skip this stop only.
-            cancelled: cancelled || stopover.cancelled,
+            cancelled: cancelled || end.cancelled,
             remarks,
         })
     }

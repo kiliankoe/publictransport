@@ -23,6 +23,12 @@ for (const departure of await client.departures(network, from, { limit: 10 })) {
 }
 ```
 
+`arrivals` takes the same arguments and lists what arrives at the stop. An arrival has an `origin`, where the vehicle comes from, in place of the `direction`.
+
+```ts
+const arrivals = await client.arrivals(network, from, { limit: 10 });
+```
+
 One client serves every network, so create one and keep it. The [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/typescript) have a program for each kind of request.
 
 ## Trips
@@ -149,7 +155,7 @@ const client = new Client("my-app/1.0", {
 
 The function has to pass on `redirect: "manual"` and the `signal`, as `init` above does, and the proxy must not follow redirects either.
 
-An application with another HTTP stack skips the client. A pair of functions builds each request and reads its answer, and the same pair exists for departures and trips:
+An application with another HTTP stack skips the client. A pair of functions builds each request and reads its answer, and the same pair exists for departures, arrivals and trips:
 
 ```ts
 const request = locationsRequest(network, query); // a LocationQuery

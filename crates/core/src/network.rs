@@ -1,7 +1,7 @@
 use crate::{
-    Attribution, Coverage, Departure, DeparturesQuery, Error, HafasOptions, Header, HttpRequest,
-    HttpResponse, IdScheme, Location, LocationKind, LocationQuery, Operation, Place, Trips,
-    TripsQuery, efa, hafas, motis, otp, trias,
+    Arrival, Attribution, Coverage, Departure, DeparturesQuery, Error, HafasOptions, Header,
+    HttpRequest, HttpResponse, IdScheme, Location, LocationKind, LocationQuery, Operation, Place,
+    Trips, TripsQuery, efa, hafas, model::Board, motis, otp, trias,
 };
 
 /// One server that answers public transport queries.
@@ -159,6 +159,34 @@ pub enum Protocol {
 }
 
 impl Network {
+    /// The request for the vehicles on one side of a stop.
+    fn board_request(&self, query: &DeparturesQuery, board: Board) -> Result<HttpRequest, Error> {
+        self.check(Operation::Departures)?;
+        let request = match self.protocol {
+            Protocol::Efa => efa::departures_request(self, query, board),
+            Protocol::Motis => motis::departures_request(self, query, board),
+            Protocol::Trias | Protocol::Ojp1 => trias::departures_request(self, query, board),
+            Protocol::HafasMgate => hafas::departures_request(self, query, board),
+            Protocol::OtpTransmodel => otp::departures_request(self, query, board),
+        }?;
+        Ok(self.sent(request))
+    }
+
+    /// The vehicles on one side of a stop, each read as a departure.
+    fn parse_board(&self, response: &HttpResponse, board: Board) -> Result<Vec<Departure>, Error> {
+        let mut departures = match self.protocol {
+            Protocol::Efa => efa::parse_departures(self, response, board),
+            Protocol::Motis => motis::parse_departures(response, board),
+            Protocol::Trias | Protocol::Ojp1 => trias::parse_departures(self, response, board),
+            Protocol::HafasMgate => hafas::parse_departures(self, response, board),
+            Protocol::OtpTransmodel => otp::parse_departures(self, response, board),
+        }?;
+        for departure in &mut departures {
+            self.mark(&mut departure.stop);
+        }
+        Ok(departures)
+    }
+
     /// Describes a server. See the fields for the meaning of the arguments.
     pub fn new(
         id: impl Into<String>,
@@ -260,7 +288,7 @@ impl Network {
         if self.unsupported.contains(&operation) {
             let requests = match operation {
                 Operation::Locations => "location searches",
-                Operation::Departures => "departure requests",
+                Operation::Departures => "departure or arrival requests",
                 Operation::Trips => "trip requests",
             };
             return Err(Error::Unsupported {
@@ -377,15 +405,7 @@ impl Network {
     /// supported range, if the stop is a position, or if it is a location
     /// that the network cannot name as a stop, see [`Network::stop_id`].
     pub fn departures_request(&self, query: &DeparturesQuery) -> Result<HttpRequest, Error> {
-        self.check(Operation::Departures)?;
-        let request = match self.protocol {
-            Protocol::Efa => efa::departures_request(self, query),
-            Protocol::Motis => motis::departures_request(self, query),
-            Protocol::Trias | Protocol::Ojp1 => trias::departures_request(self, query),
-            Protocol::HafasMgate => hafas::departures_request(self, query),
-            Protocol::OtpTransmodel => otp::departures_request(self, query),
-        }?;
-        Ok(self.sent(request))
+        self.board_request(query, Board::Departures)
     }
 
     /// Parses the response to a [`Network::departures_request`]. The
@@ -400,17 +420,33 @@ impl Network {
     /// an [`Error::Server`]. A HAFAS answer needs the network's time zone
     /// and is an [`Error::InvalidNetwork`] without it.
     pub fn parse_departures(&self, response: &HttpResponse) -> Result<Vec<Departure>, Error> {
-        let mut departures = match self.protocol {
-            Protocol::Efa => efa::parse_departures(self, response),
-            Protocol::Motis => motis::parse_departures(response),
-            Protocol::Trias | Protocol::Ojp1 => trias::parse_departures(self, response),
-            Protocol::HafasMgate => hafas::parse_departures(self, response),
-            Protocol::OtpTransmodel => otp::parse_departures(self, response),
-        }?;
-        for departure in &mut departures {
-            self.mark(&mut departure.stop);
-        }
-        Ok(departures)
+        self.parse_board(response, Board::Departures)
+    }
+
+    /// Builds the request for the arrivals at a stop, from the query that
+    /// [`Network::departures_request`] takes: its time is the one from
+    /// which arrivals are wanted.
+    ///
+    /// # Errors
+    ///
+    /// The same as [`Network::departures_request`]. A network that lists
+    /// departures as unsupported has no arrivals either.
+    pub fn arrivals_request(&self, query: &DeparturesQuery) -> Result<HttpRequest, Error> {
+        self.board_request(query, Board::Arrivals)
+    }
+
+    /// Parses the response to a [`Network::arrivals_request`]. The arrivals
+    /// are ordered by [`Arrival::expected_time`].
+    ///
+    /// # Errors
+    ///
+    /// The same as [`Network::parse_departures`].
+    pub fn parse_arrivals(&self, response: &HttpResponse) -> Result<Vec<Arrival>, Error> {
+        let arrivals = self.parse_board(response, Board::Arrivals)?;
+        Ok(arrivals
+            .into_iter()
+            .map(Arrival::read_as_departure)
+            .collect())
     }
 
     /// Builds the request for trips between two places.

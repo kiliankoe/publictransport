@@ -24,6 +24,8 @@ efa() {
 
 # Dresden Hauptbahnhof to Albertplatz
 efa vvo https://efa.vvo-online.de/std3 Hauptbahnhof de:14612:28 de:14612:13
+# The arrivals there
+fetch efa/vvo-arrivals.json 'https://efa.vvo-online.de/std3/XML_DM_REQUEST?type_dm=any&name_dm=de:14612:28&mode=direct&useRealtime=1&limit=10&itdDateTimeDepArr=arr&outputFormat=rapidJSON&coordOutputFormat=WGS84%5Bdd.ddddd%5D'
 # A stop that does not exist
 fetch efa/vvo-departures-unknown-stop.json 'https://efa.vvo-online.de/std3/XML_DM_REQUEST?type_dm=any&name_dm=de:14612:99999&mode=direct&useRealtime=1&limit=10&outputFormat=rapidJSON&coordOutputFormat=WGS84%5Bdd.ddddd%5D'
 # Düsseldorf Hbf to Essen Hbf
@@ -34,6 +36,7 @@ efa vrr https://efa.vrr.de/standard 'D%C3%BCsseldorf%20Hbf' de:05111:18235 de:05
 motis=https://api.transitous.org/api
 fetch motis/transitous-geocode.json "$motis/v1/geocode?text=Dresden+Hauptbahnhof"
 fetch motis/transitous-stoptimes.json "$motis/v6/stoptimes?stopId=de-DELFI_de:14612:28&n=10"
+fetch motis/transitous-arrivals.json "$motis/v6/stoptimes?stopId=de-DELFI_de:14612:28&n=10&arriveBy=true"
 fetch motis/transitous-plan.json "$motis/v6/plan?fromPlace=de-DELFI_de:14612:28&toPlace=de-DELFI_de:14612:13:1:1&detailedTransfers=false"
 
 # post <output file> <url> <xml body>
@@ -55,11 +58,11 @@ ojp() {
 }
 
 trias_departures() {
-  trias "<StopEventRequest><Location><LocationRef><StopPointRef>$1</StopPointRef><LocationName><Text>$1</Text></LocationName></LocationRef></Location><Params><NumberOfResults>10</NumberOfResults><StopEventType>departure</StopEventType><IncludeRealtimeData>true</IncludeRealtimeData></Params></StopEventRequest>"
+  trias "<StopEventRequest><Location><LocationRef><StopPointRef>$1</StopPointRef><LocationName><Text>$1</Text></LocationName></LocationRef></Location><Params><NumberOfResults>10</NumberOfResults><StopEventType>${2:-departure}</StopEventType><IncludeRealtimeData>true</IncludeRealtimeData></Params></StopEventRequest>"
 }
 
 ojp_departures() {
-  ojp "<ojp:OJPStopEventRequest><ojp:Location><ojp:PlaceRef><ojp:StopPlaceRef>$1</ojp:StopPlaceRef><ojp:LocationName><ojp:Text>$1</ojp:Text></ojp:LocationName></ojp:PlaceRef></ojp:Location><ojp:Params><ojp:NumberOfResults>10</ojp:NumberOfResults><ojp:StopEventType>departure</ojp:StopEventType><ojp:IncludeRealtimeData>true</ojp:IncludeRealtimeData></ojp:Params></ojp:OJPStopEventRequest>"
+  ojp "<ojp:OJPStopEventRequest><ojp:Location><ojp:PlaceRef><ojp:StopPlaceRef>$1</ojp:StopPlaceRef><ojp:LocationName><ojp:Text>$1</ojp:Text></ojp:LocationName></ojp:PlaceRef></ojp:Location><ojp:Params><ojp:NumberOfResults>10</ojp:NumberOfResults><ojp:StopEventType>${2:-departure}</ojp:StopEventType><ojp:IncludeRealtimeData>true</ojp:IncludeRealtimeData></ojp:Params></ojp:OJPStopEventRequest>"
 }
 
 # The Dresden queries again, on VVO's TRIAS server.
@@ -67,6 +70,7 @@ vvo_trias=https://efa.vvo-online.de/std3/trias
 post trias/vvo-locations.xml $vvo_trias "$(trias '<LocationInformationRequest><InitialInput><LocationName>Hauptbahnhof</LocationName></InitialInput><Restrictions><NumberOfResults>5</NumberOfResults></Restrictions></LocationInformationRequest>')"
 post trias/vvo-locations-no-match.xml $vvo_trias "$(trias '<LocationInformationRequest><InitialInput><LocationName>qqqqxzy</LocationName></InitialInput><Restrictions><NumberOfResults>5</NumberOfResults></Restrictions></LocationInformationRequest>')"
 post trias/vvo-departures.xml $vvo_trias "$(trias_departures de:14612:28)"
+post trias/vvo-arrivals.xml $vvo_trias "$(trias_departures de:14612:28 arrival)"
 post trias/vvo-departures-unknown-stop.xml $vvo_trias "$(trias_departures de:14612:99999)"
 post trias/vvo-trip.xml $vvo_trias "$(trias '<TripRequest><Origin><LocationRef><StopPointRef>de:14612:28</StopPointRef><LocationName><Text>de:14612:28</Text></LocationName></LocationRef></Origin><Destination><LocationRef><StopPointRef>de:14612:13</StopPointRef><LocationName><Text>de:14612:13</Text></LocationName></LocationRef></Destination><Params><NumberOfResults>3</NumberOfResults><IncludeIntermediateStops>true</IncludeIntermediateStops></Params></TripRequest>')"
 
@@ -76,6 +80,7 @@ post trias/vrr-departures.xml https://efa.vrr.de/std3/trias "$(trias_departures 
 vrr_ojp=https://efa.vrr.de/std3/ojp
 post ojp/vrr-locations.xml $vrr_ojp "$(ojp '<ojp:OJPLocationInformationRequest><ojp:InitialInput><ojp:LocationName>Düsseldorf Hbf</ojp:LocationName></ojp:InitialInput><ojp:Restrictions><ojp:NumberOfResults>5</ojp:NumberOfResults></ojp:Restrictions></ojp:OJPLocationInformationRequest>')"
 post ojp/vrr-departures.xml $vrr_ojp "$(ojp_departures de:05111:18235)"
+post ojp/vrr-arrivals.xml $vrr_ojp "$(ojp_departures de:05111:18235 arrival)"
 post ojp/vrr-trip.xml $vrr_ojp "$(ojp '<ojp:OJPTripRequest><ojp:Origin><ojp:PlaceRef><ojp:StopPlaceRef>de:05111:18235</ojp:StopPlaceRef><ojp:LocationName><ojp:Text>de:05111:18235</ojp:Text></ojp:LocationName></ojp:PlaceRef></ojp:Origin><ojp:Destination><ojp:PlaceRef><ojp:StopPlaceRef>de:05113:9289</ojp:StopPlaceRef><ojp:LocationName><ojp:Text>de:05113:9289</ojp:Text></ojp:LocationName></ojp:PlaceRef></ojp:Destination><ojp:Params><ojp:NumberOfResults>3</ojp:NumberOfResults><ojp:IncludeIntermediateStops>true</ojp:IncludeIntermediateStops></ojp:Params></ojp:OJPTripRequest>')"
 post ojp/vvo-departures.xml https://efa.vvo-online.de/std3/ojp "$(ojp_departures de:14612:28)"
 
@@ -92,6 +97,7 @@ vbb=(https://fahrinfo.vbb.de/bin/mgate.exe '"lang":"de","client":{"type":"WEB","
 mkdir -p hafas
 hafas hafas/vbb-locations.json $vbb LocMatch '{"input":{"loc":{"type":"ALL","name":"Alexanderplatz?"},"maxLoc":5,"field":"S"}}'
 hafas hafas/vbb-departures.json $vbb StationBoard '{"type":"DEP","stbLoc":{"lid":"A=1@L=900100003@"},"maxJny":10}'
+hafas hafas/vbb-arrivals.json $vbb StationBoard '{"type":"ARR","stbLoc":{"lid":"A=1@L=900100003@"},"maxJny":10}'
 hafas hafas/vbb-departures-unknown-stop.json $vbb StationBoard '{"type":"DEP","stbLoc":{"lid":"A=1@L=999999999@"},"maxJny":10}'
 hafas hafas/vbb-trip.json $vbb TripSearch '{"depLocL":[{"lid":"A=1@L=900100003@"}],"arrLocL":[{"lid":"A=1@L=900023201@"}],"outFrwd":true,"numF":3,"getPasslist":true}'
 
@@ -117,5 +123,6 @@ otp() {
     --data "{\"query\":\"$2\",\"variables\":$3}"
 }
 otp otp/entur-departures.json $departures '{"id":"NSR:StopPlace:59872","limit":10}'
+otp otp/entur-arrivals.json ${departures/includeCancelledTrips:true/includeCancelledTrips:true,arrivalDeparture:arrivals} '{"id":"NSR:StopPlace:59872","limit":10}'
 otp otp/entur-departures-unknown-stop.json $departures '{"id":"NSR:StopPlace:0"}'
 otp otp/entur-trip.json $trips '{"from":{"place":"NSR:StopPlace:59872"},"to":{"place":"NSR:StopPlace:58211"},"limit":3}'

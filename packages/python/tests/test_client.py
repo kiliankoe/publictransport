@@ -61,8 +61,8 @@ UNREACHABLE = Network(
 LOCATIONS = LocationQuery(text="Hauptbahnhof")
 
 Handler = Callable[[httpx.Request], httpx.Response]
-# Runs one operation ("locations", "departures" or "trips") of a client whose
-# requests the handler answers.
+# Runs one operation ("locations", "departures", "arrivals" or "trips") of a
+# client whose requests the handler answers.
 Call = Callable[[Handler, str, Network, object], object]
 
 
@@ -115,6 +115,14 @@ class TooLarge(httpx.SyncByteStream, httpx.AsyncByteStream):
                 stop=Place.ID("de-DELFI_de:14612:28"),  # pyright: ignore[reportArgumentType]
             ),
             "motis/transitous-stoptimes.json",
+        ),
+        (
+            EFA,
+            "arrivals",
+            DeparturesQuery(
+                stop=Place.ID("de:14612:28"),  # pyright: ignore[reportArgumentType]
+            ),
+            "efa/vvo-arrivals.json",
         ),
         (
             EFA,

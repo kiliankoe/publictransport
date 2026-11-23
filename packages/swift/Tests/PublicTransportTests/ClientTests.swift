@@ -91,6 +91,17 @@ struct Call: Sendable, CustomTestStringConvertible {
         )
     }
 
+    static func arrivals(
+        _ name: String, query: DeparturesQuery,
+        call: @escaping @Sendable (Client, Network) async throws -> [Arrival]
+    ) -> Call {
+        Call(
+            testDescription: name, fixture: "efa/vvo-arrivals.json",
+            request: { try $0.arrivalsRequest(query: query) },
+            check: { try #expect(await call($0, $1) == $1.parseArrivals(response: $2)) }
+        )
+    }
+
     /// The query gets the reference to the trips after those of the fixture.
     static func trips(
         _ name: String, query: @escaping @Sendable (_ later: String?) -> TripsQuery,
@@ -150,6 +161,12 @@ struct Call: Sendable, CustomTestStringConvertible {
         },
         .departures("departures at a place", query: DeparturesQuery(stop: .id("de:14612:28"))) {
             try await $0.departures(in: $1, at: Place.id("de:14612:28"))
+        },
+        .arrivals(
+            "arrivals at an ID, with time and limit",
+            query: DeparturesQuery(stop: .id("de:14612:28"), time: time, limit: 7)
+        ) {
+            try await $0.arrivals(in: $1, at: "de:14612:28", after: time, limit: 7)
         },
         .trips("trips from a location to an ID, departing at a time, with limit") { _ in
             TripsQuery(

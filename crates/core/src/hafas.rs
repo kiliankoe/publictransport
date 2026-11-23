@@ -9,7 +9,7 @@ use crate::{
     Leg, LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, Network,
     Place, Remark, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
     http::lenient_list,
-    model::{Target, plain_text},
+    model::{Board, Target, plain_text},
 };
 
 /// What a HAFAS mgate server needs to answer, as the operator's own app
@@ -311,6 +311,7 @@ pub(crate) fn locations_request(
 pub(crate) fn departures_request(
     network: &Network,
     query: &DeparturesQuery,
+    board: Board,
 ) -> Result<HttpRequest, Error> {
     // The answer holds local times, so it could not be read without one.
     network.zone()?;
@@ -320,7 +321,13 @@ pub(crate) fn departures_request(
         .transpose()?;
     let (date, time) = time.unzip();
     let arguments = object([
-        ("type", Some(json!("DEP"))),
+        (
+            "type",
+            Some(json!(match board {
+                Board::Departures => "DEP",
+                Board::Arrivals => "ARR",
+            })),
+        ),
         ("stbLoc", Some(place_by_id(&query.stop.stop_id(network)?))),
         ("maxJny", query.limit.map(|limit| json!(limit))),
         ("date", date.map(Value::String)),
@@ -416,22 +423,24 @@ pub(crate) fn parse_locations(
 pub(crate) fn parse_departures(
     network: &Network,
     response: &HttpResponse,
+    board: Board,
 ) -> Result<Vec<Departure>, Error> {
-    let Some(board) = result::<Board>(response, &[])? else {
+    let Some(found) = result::<StationBoard>(response, &[])? else {
         return Ok(Vec::new());
     };
-    let reader = Reader::new(network, &board.common);
-    let mut departures = board
+    let reader = Reader::new(network, &found.common);
+    let mut departures = found
         .jny_l
         .into_iter()
         .map(|journey| {
             let stop = journey.stb_stop.as_ref().ok_or_else(|| Error::Parse {
-                message: "a departure has no stop".to_owned(),
+                message: "an entry of the board has no stop".to_owned(),
             })?;
-            let end = reader.leg_end(&journey.date, stop, Side::Departure)?;
+            let end = reader.leg_end(&journey.date, stop, board)?;
             Ok(Departure {
                 stop: end.stop,
                 line: reader.line(journey.prod_x)?,
+                // The origin, on a board of arrivals.
                 direction: journey.dir_txt,
                 scheduled_time: end.scheduled_time,
                 realtime_time: end.realtime_time,
@@ -477,10 +486,11 @@ pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<
     })
 }
 
-#[derive(Clone, Copy)]
-enum Side {
-    Departure,
-    Arrival,
+/// The name of a platform. Older versions of the interface send the name,
+/// newer ones an object with it, and a server may send both.
+fn platform(name: Option<&String>, object: Option<&Platform>) -> Option<String> {
+    let named = object.and_then(|platform| platform.txt.as_ref());
+    name.or(named).filter(|name| !name.is_empty()).cloned()
 }
 
 /// Reads the parts of an answer that point into its shared lists.
@@ -597,24 +607,34 @@ impl<'a> Reader<'a> {
         time.map(|time| self.time(date, time, offset)).transpose()
     }
 
-    fn leg_end(&self, date: &str, stop: &Stop, side: Side) -> Result<LegEnd, Error> {
-        let stopover = self.stopover(date, stop)?;
-        match side {
-            Side::Departure => stopover.into_leg_start(),
-            Side::Arrival => stopover.into_leg_end(),
+    fn leg_end(&self, date: &str, stop: &Stop, side: Board) -> Result<LegEnd, Error> {
+        let mut stopover = self.stopover(date, stop)?;
+        // A stop can have a platform and a cancellation for each side.
+        if side == Board::Arrivals {
+            let arriving = |platform: Option<String>, known: &mut Option<String>| {
+                if platform.is_some() {
+                    *known = platform;
+                }
+            };
+            arriving(
+                platform(stop.a_platf_s.as_ref(), stop.a_pltf_s.as_ref()),
+                &mut stopover.scheduled_platform,
+            );
+            arriving(
+                platform(stop.a_platf_r.as_ref(), stop.a_pltf_r.as_ref()),
+                &mut stopover.realtime_platform,
+            );
         }
-        .ok_or_else(|| Error::Parse {
+        stopover.cancelled = match side {
+            Board::Departures => stop.d_cncl,
+            Board::Arrivals => stop.a_cncl,
+        };
+        stopover.on(side).ok_or_else(|| Error::Parse {
             message: "a stop has no scheduled time".to_owned(),
         })
     }
 
     fn stopover(&self, date: &str, stop: &Stop) -> Result<Stopover, Error> {
-        // Older versions of the interface send the name, newer ones an
-        // object with it, and a server may send both.
-        let platform = |name: &Option<String>, object: &Option<Platform>| {
-            let named = object.as_ref().and_then(|platform| platform.txt.clone());
-            name.clone().or(named).filter(|name| !name.is_empty())
-        };
         let (arrival, departure) = (stop.a_tz_offset, stop.d_tz_offset);
         Ok(Stopover {
             stop: self.location(stop.loc_x)?,
@@ -630,10 +650,10 @@ impl<'a> Reader<'a> {
                 stop.d_time_r.as_ref(),
                 stop.d_tz_offset_r.or(departure),
             )?,
-            scheduled_platform: platform(&stop.d_platf_s, &stop.d_pltf_s)
-                .or_else(|| platform(&stop.a_platf_s, &stop.a_pltf_s)),
-            realtime_platform: platform(&stop.d_platf_r, &stop.d_pltf_r)
-                .or_else(|| platform(&stop.a_platf_r, &stop.a_pltf_r)),
+            scheduled_platform: platform(stop.d_platf_s.as_ref(), stop.d_pltf_s.as_ref())
+                .or_else(|| platform(stop.a_platf_s.as_ref(), stop.a_pltf_s.as_ref())),
+            realtime_platform: platform(stop.d_platf_r.as_ref(), stop.d_pltf_r.as_ref())
+                .or_else(|| platform(stop.a_platf_r.as_ref(), stop.a_pltf_r.as_ref())),
             cancelled: stop.d_cncl || stop.a_cncl,
         })
     }
@@ -691,8 +711,8 @@ impl<'a> Reader<'a> {
         let between = calls.get(1..calls.len().saturating_sub(1)).unwrap_or(&[]);
         Ok(Leg {
             kind,
-            departure: self.leg_end(date, &section.dep, Side::Departure)?,
-            arrival: self.leg_end(date, &section.arr, Side::Arrival)?,
+            departure: self.leg_end(date, &section.dep, Board::Departures)?,
+            arrival: self.leg_end(date, &section.arr, Board::Arrivals)?,
             intermediate_stops: between
                 .iter()
                 .map(|stop| self.stopover(date, stop))
@@ -873,7 +893,7 @@ struct Operator {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct Board {
+struct StationBoard {
     #[serde(default)]
     common: Common,
     #[serde(default)]

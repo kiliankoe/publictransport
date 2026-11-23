@@ -10,7 +10,7 @@ use crate::{
     LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, Network, Place, Remark,
     Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
     http::lenient_list,
-    model::{Target, plain_text},
+    model::{Board, Target, plain_text},
     time::WireTime,
 };
 
@@ -111,6 +111,7 @@ pub(crate) fn locations_request(
 pub(crate) fn departures_request(
     network: &Network,
     query: &DeparturesQuery,
+    board: Board,
 ) -> Result<HttpRequest, Error> {
     // The IDs of the Nordic stop registries name the kind of place.
     let stop = query.stop.stop_id(network)?;
@@ -119,8 +120,13 @@ pub(crate) fn departures_request(
     } else {
         "stopPlace"
     };
+    // Without the argument the server lists departures.
+    let calls = match board {
+        Board::Departures => CALLS.to_owned(),
+        Board::Arrivals => CALLS.replacen("){", ",arrivalDeparture:arrivals){", 1),
+    };
     let text =
-        format!("query($id:String!,$limit:Int,$start:DateTime){{{place}(id:$id){{{CALLS}}}}}");
+        format!("query($id:String!,$limit:Int,$start:DateTime){{{place}(id:$id){{{calls}}}}}");
     Ok(request(
         network,
         &text,
@@ -238,6 +244,7 @@ fn explained<T>(entries: Vec<T>, error: Option<Error>) -> Result<Vec<T>, Error> 
 pub(crate) fn parse_departures(
     network: &Network,
     response: &HttpResponse,
+    board: Board,
 ) -> Result<Vec<Departure>, Error> {
     let (data, error) = data(response)?;
     let Some(place) = data.stop_place.or(data.quay) else {
@@ -254,19 +261,23 @@ pub(crate) fn parse_departures(
             );
             let line = call.service_journey.take().and_then(|journey| journey.line);
             let direction = call.direction();
-            let stopover = call.into_stopover(network)?;
             let incomplete = || Error::Parse {
-                message: "a departure has no line or no time".to_owned(),
+                message: "a call has no line or no time".to_owned(),
             };
+            let end = call
+                .into_stopover(network)?
+                .on(board)
+                .ok_or_else(incomplete)?;
             Ok(Departure {
                 line: line.map(WireLine::into_line).ok_or_else(incomplete)?,
-                direction,
-                stop: stopover.stop,
-                scheduled_time: stopover.scheduled_departure.ok_or_else(incomplete)?,
-                realtime_time: stopover.realtime_departure,
-                scheduled_platform: stopover.scheduled_platform,
-                realtime_platform: stopover.realtime_platform,
-                cancelled: stopover.cancelled,
+                // The answer does not say where a vehicle comes from.
+                direction: direction.filter(|_| board == Board::Departures),
+                stop: end.stop,
+                scheduled_time: end.scheduled_time,
+                realtime_time: end.realtime_time,
+                scheduled_platform: end.scheduled_platform,
+                realtime_platform: end.realtime_platform,
+                cancelled: end.cancelled,
                 remarks,
             })
         })
@@ -353,14 +364,14 @@ struct GraphError {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Data {
-    stop_place: Option<Board>,
-    quay: Option<Board>,
+    stop_place: Option<CallBoard>,
+    quay: Option<CallBoard>,
     trip: Option<WireTrip>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct Board {
+struct CallBoard {
     #[serde(default)]
     estimated_calls: Vec<Call>,
 }

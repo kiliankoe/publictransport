@@ -27,6 +27,12 @@ for (departure in client.departures(network, from, limit = 10)) {
 }
 ```
 
+`arrivals` takes the same arguments and lists what arrives at the stop. An arrival has an `origin`, where the vehicle comes from, in place of the `direction`.
+
+```kotlin
+val arrivals = client.arrivals(network, from, limit = 10)
+```
+
 One client serves every network, so create one and keep it. The [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/kotlin) have a program for each kind of request.
 
 ## Trips
@@ -69,7 +75,7 @@ val named = entur.copy(headers = entur.headers + Header("ET-Client-Name", "mycom
 
 ## Times, delays and platforms
 
-Times are `java.time.Instant` values. A departure and an end of a leg also give them as the clocks at their stop show them, as an `OffsetDateTime`, which is what to print.
+Times are `java.time.Instant` values. A departure, an arrival and an end of a leg also give them as the clocks at their stop show them, as an `OffsetDateTime`, which is what to print.
 
 ```kotlin
 departure.localScheduledTime // null where the time zone of the stop is unknown
@@ -113,7 +119,7 @@ What the server or the query cause is a subclass of `PublicTransportException`. 
 
 `Client(userAgent, httpClient)` builds on an `OkHttpClient` of yours, for example to use a proxy or an interceptor. The client uses its connections and settings, except that it never follows a redirect and never sends a request again.
 
-An application with another HTTP stack skips the client. The network builds each request and reads its answer, and the same pair exists for departures and trips:
+An application with another HTTP stack skips the client. The network builds each request and reads its answer, and the same pair exists for departures, arrivals and trips:
 
 ```kotlin
 val request = network.locationsRequest(query) // a LocationQuery

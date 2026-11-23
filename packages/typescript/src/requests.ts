@@ -3,9 +3,11 @@
 
 import { throwing } from "./errors.js";
 import {
+  arrivalsRequest as arrivalsRequestOrThrown,
   departuresRequest as departuresRequestOrThrown,
   locationsRequest as locationsRequestOrThrown,
   networkFromJson as networkFromJsonOrThrown,
+  parseArrivals as parseArrivalsOrThrown,
   parseDepartures as parseDeparturesOrThrown,
   parseLocations as parseLocationsOrThrown,
   parseTrips as parseTripsOrThrown,
@@ -28,6 +30,12 @@ export const departuresRequest = throwing(departuresRequestOrThrown);
 
 /** Reads the answer to a {@link departuresRequest}. The departures are ordered by expected time. */
 export const parseDepartures = throwing(parseDeparturesOrThrown);
+
+/** Builds the request for the next arrivals at a stop, from the query that {@link departuresRequest} takes. */
+export const arrivalsRequest = throwing(arrivalsRequestOrThrown);
+
+/** Reads the answer to an {@link arrivalsRequest}. The arrivals are ordered by expected time. */
+export const parseArrivals = throwing(parseArrivalsOrThrown);
 
 /** Builds the request for trips between two places. */
 export const tripsRequest = throwing(tripsRequestOrThrown);

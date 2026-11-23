@@ -7,7 +7,7 @@ use crate::{
     LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Mode, Network, Remark, Stopover,
     Timestamp, Trip, TripTime, Trips, TripsQuery,
     http::lenient_list,
-    model::{Target, plain_text},
+    model::{Board, Target, plain_text},
     time::WireTime,
 };
 
@@ -66,6 +66,7 @@ pub(crate) fn parse_locations(
 pub(crate) fn departures_request(
     network: &Network,
     query: &DeparturesQuery,
+    board: Board,
 ) -> Result<HttpRequest, Error> {
     let stop = query.stop.stop_id(network)?;
     let limit = query.limit.map(|limit| limit.to_string());
@@ -86,11 +87,15 @@ pub(crate) fn departures_request(
         parameters.push(("limit", limit));
     }
     if let Some((date, time)) = &local_time {
-        parameters.extend([
-            ("itdDate", date.as_str()),
-            ("itdTime", time.as_str()),
-            ("itdDateTimeDepArr", "dep"),
-        ]);
+        parameters.extend([("itdDate", date.as_str()), ("itdTime", time.as_str())]);
+    }
+    // Without it the server lists departures, also for a time.
+    match board {
+        Board::Arrivals => parameters.push(("itdDateTimeDepArr", "arr")),
+        Board::Departures if local_time.is_some() => {
+            parameters.push(("itdDateTimeDepArr", "dep"));
+        }
+        Board::Departures => {}
     }
     Ok(HttpRequest::get(
         &network.endpoint,
@@ -241,6 +246,7 @@ pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<
 pub(crate) fn parse_departures(
     network: &Network,
     response: &HttpResponse,
+    board: Board,
 ) -> Result<Vec<Departure>, Error> {
     let response: DeparturesResponse = response.json()?;
     // Unless the query names exactly one stop, the server sends the places
@@ -253,10 +259,10 @@ pub(crate) fn parse_departures(
             }),
         };
     };
-    let mut departures: Vec<_> = stop_events
+    let mut departures = stop_events
         .into_iter()
-        .map(|event| event.into_departure(network))
-        .collect();
+        .map(|event| event.into_departure(network, board))
+        .collect::<Result<Vec<_>, _>>()?;
     departures.sort_by_key(Departure::expected_time);
     Ok(departures)
 }
@@ -489,8 +495,11 @@ struct Properties {
 #[serde(rename_all = "camelCase")]
 struct StopEvent {
     location: WireLocation,
-    departure_time_planned: WireTime,
+    /// An answer has the times of the side that was asked for.
+    departure_time_planned: Option<WireTime>,
     departure_time_estimated: Option<WireTime>,
+    arrival_time_planned: Option<WireTime>,
+    arrival_time_estimated: Option<WireTime>,
     transportation: Transportation,
     is_cancelled: Option<bool>,
     #[serde(default)]
@@ -512,6 +521,7 @@ struct Transportation {
     properties: Option<TransportationProperties>,
     product: Option<Product>,
     operator: Option<Named>,
+    origin: Option<Named>,
     destination: Option<Named>,
 }
 
@@ -653,23 +663,40 @@ impl Transportation {
 }
 
 impl StopEvent {
-    fn into_departure(self, network: &Network) -> Departure {
+    fn into_departure(mut self, network: &Network, board: Board) -> Result<Departure, Error> {
+        let origin = self.transportation.origin.take();
         let (line, direction) = self.transportation.into_line();
+        let (planned, estimated, direction) = match board {
+            Board::Departures => (
+                self.departure_time_planned,
+                self.departure_time_estimated,
+                direction,
+            ),
+            Board::Arrivals => (
+                self.arrival_time_planned,
+                self.arrival_time_estimated,
+                origin.and_then(|origin| non_empty(origin.name)),
+            ),
+        };
         let mut location = self.location;
         let platforms = location.properties.take();
-        Departure {
+        Ok(Departure {
             stop: location.into_location(network),
             line,
             direction,
-            scheduled_time: self.departure_time_planned.0,
-            realtime_time: self.departure_time_estimated.map(|time| time.0),
+            scheduled_time: planned
+                .ok_or_else(|| Error::Parse {
+                    message: "a stop event has no scheduled time".to_owned(),
+                })?
+                .0,
+            realtime_time: estimated.map(|time| time.0),
             scheduled_platform: platforms
                 .as_ref()
                 .and_then(|platforms| non_empty(platforms.planned_platform_name.clone())),
             realtime_platform: platforms.and_then(|platforms| non_empty(platforms.platform_name)),
             cancelled: is_cancelled(self.is_cancelled, &self.realtime_status),
             remarks: remarks(network, self.infos, self.hints),
-        }
+        })
     }
 }
 

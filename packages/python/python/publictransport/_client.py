@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import httpx
 
 from publictransport._uniffi import (
+    Arrival,
     Coordinate,
     Departure,
     DeparturesQuery,
@@ -234,6 +235,23 @@ class Client:
         request = network.departures_request(_departures_query(stop, time, limit))
         return network.parse_departures(self._send(request))
 
+    def arrivals(
+        self,
+        network: Network,
+        stop: DeparturesQuery | Place | Location | str,
+        *,
+        time: datetime | None = None,
+        limit: int | None = None,
+    ) -> list[Arrival]:
+        """List the next arrivals at a stop, ordered by expected time.
+
+        The arguments are those of `departures`. An arrival has an `origin`,
+        where the vehicle comes from, in place of the direction. It is
+        `None` where the server does not say, as with OpenTripPlanner.
+        """
+        request = network.arrivals_request(_departures_query(stop, time, limit))
+        return network.parse_arrivals(self._send(request))
+
     def trips(  # noqa: PLR0913
         self,
         network: Network,
@@ -361,6 +379,23 @@ class AsyncClient:
         """
         request = network.departures_request(_departures_query(stop, time, limit))
         return network.parse_departures(await self._send(request))
+
+    async def arrivals(
+        self,
+        network: Network,
+        stop: DeparturesQuery | Place | Location | str,
+        *,
+        time: datetime | None = None,
+        limit: int | None = None,
+    ) -> list[Arrival]:
+        """List the next arrivals at a stop, ordered by expected time.
+
+        The arguments are those of `departures`. An arrival has an `origin`,
+        where the vehicle comes from, in place of the direction. It is
+        `None` where the server does not say, as with OpenTripPlanner.
+        """
+        request = network.arrivals_request(_departures_query(stop, time, limit))
+        return network.parse_arrivals(await self._send(request))
 
     async def trips(  # noqa: PLR0913
         self,

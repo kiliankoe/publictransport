@@ -140,6 +140,12 @@ private fun departures(
     call: suspend Client.(Network) -> List<Departure>,
 ) = Case(name, "efa/vvo-departures.json", ::efa, { departuresRequest(query) }, { parseDepartures(it) }, call)
 
+private fun arrivals(
+    name: String,
+    query: DeparturesQuery,
+    call: suspend Client.(Network) -> List<Arrival>,
+) = Case(name, "efa/vvo-arrivals.json", ::efa, { arrivalsRequest(query) }, { parseArrivals(it) }, call)
+
 private fun trips(
     name: String,
     query: () -> TripsQuery,
@@ -163,6 +169,9 @@ private val calls =
             "departures at a location of another network",
             DeparturesQuery(Place.Location(foreignStop)),
         ) { departures(it, foreignStop) },
+        arrivals("arrivals at an ID, with time and limit", DeparturesQuery(hbf, time, 7u)) {
+            arrivals(it, "de:14612:28", time, 7)
+        },
         trips("trips by query", { TripsQuery(hbf, albertplatz) }) { trips(it, TripsQuery(hbf, albertplatz)) },
         trips(
             "trips between locations, departing at a time, with limit",

@@ -20,6 +20,12 @@ with Client(user_agent="my-app/1.0 (+https://example.org)") as client:
         print(departure.scheduled_time, departure.line.name, departure.direction)
 ```
 
+`arrivals` takes the same arguments and lists what arrives at the stop. An arrival has an `origin`, where the vehicle comes from, in place of the `direction`.
+
+```python
+arrivals = client.arrivals(network, stops[0], limit=10)
+```
+
 `AsyncClient` has the same methods as coroutines. The [documentation](https://kiliankoe.github.io/publictransport/python.html) has a program for each kind of request, which are also in [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/python).
 
 ## Trips
@@ -61,7 +67,7 @@ network.headers.append(Header(name="ET-Client-Name", value="mycompany-myapp"))
 
 ## Times, delays and platforms
 
-Times are timezone-aware `datetime` objects in UTC. A departure and an end of a leg also give them as the clocks at their stop show them, which is what to print.
+Times are timezone-aware `datetime` objects in UTC. A departure, an arrival and an end of a leg also give them as the clocks at their stop show them, which is what to print.
 
 ```python
 departure.local_scheduled_time()  # None where the time zone of the stop is unknown
@@ -104,7 +110,7 @@ What the server or the query cause is a subclass of `publictransport.Error`. A f
 
 `Client(http_client=...)` builds on an httpx client of yours, for example to use a proxy. That client has to set the `User-Agent` itself and must not follow redirects.
 
-An application with another HTTP stack skips the clients. The network builds each request and reads its answer, and the same pair exists for departures and trips:
+An application with another HTTP stack skips the clients. The network builds each request and reads its answer, and the same pair exists for departures, arrivals and trips:
 
 ```python
 request = network.locations_request(query)  # a LocationQuery

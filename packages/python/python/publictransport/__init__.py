@@ -9,6 +9,7 @@ applications that bring their own HTTP stack.
 from publictransport._client import AsyncClient, Client, ResponseTooLarge
 from publictransport._uniffi import (
     Area,
+    Arrival,
     Attribution,
     BundledNetwork,
     Coordinate,
@@ -57,6 +58,7 @@ from publictransport._uniffi.publictransport import LocalTime, UtcTime
 
 __all__ = [
     "Area",
+    "Arrival",
     "AsyncClient",
     "Attribution",
     "BundledNetwork",

@@ -156,6 +156,39 @@ class Client(
     ): List<Departure> = network.parseDepartures(send(network.departuresRequest(query)))
 
     /**
+     * Lists the next arrivals at a stop, ordered by expected time. The
+     * arguments are those of [departures]. An arrival has an
+     * [origin][Arrival.origin], where the vehicle comes from, in place of
+     * the direction.
+     *
+     * @throws IllegalArgumentException if the limit is negative.
+     */
+    suspend fun arrivals(
+        network: Network,
+        stop: Location,
+        time: Instant? = null,
+        limit: Int? = null,
+    ): List<Arrival> = arrivals(network, DeparturesQuery(Place.Location(stop), time, count(limit)))
+
+    /**
+     * Lists the next arrivals at the stop with this ID on the network, as
+     * an application stored it. The other arguments are those of the call
+     * with a [Location].
+     */
+    suspend fun arrivals(
+        network: Network,
+        stopId: String,
+        time: Instant? = null,
+        limit: Int? = null,
+    ): List<Arrival> = arrivals(network, DeparturesQuery(Place.Id(stopId), time, count(limit)))
+
+    /** Lists arrivals with a query of the core library, the one of departures. */
+    suspend fun arrivals(
+        network: Network,
+        query: DeparturesQuery,
+    ): List<Arrival> = network.parseArrivals(send(network.arrivalsRequest(query)))
+
+    /**
      * Plans trips between two locations, in the order the server ranks
      * them. A location that another network returned works as well.
      *

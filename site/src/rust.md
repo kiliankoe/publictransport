@@ -26,6 +26,12 @@ for departure in client.departures(&network, DeparturesQuery::new(from).with_lim
 }
 ```
 
+`arrivals` takes the same query and lists what arrives at the stop. An arrival has an `origin`, where the vehicle comes from, in place of the `direction`.
+
+```rust,ignore
+let arrivals = client.arrivals(&network, DeparturesQuery::new(from).with_limit(10)).await?;
+```
+
 ## Trips
 
 ```rust,ignore
@@ -68,7 +74,7 @@ let entur = Network::bundled(BundledNetwork::Entur).with_header("ET-Client-Name"
 
 ## Times, delays and platforms
 
-Times are `Timestamp` values in UTC. A departure and an end of a leg also give them as the clocks at their stop show them, which is what to print.
+Times are `Timestamp` values in UTC. A departure, an arrival and an end of a leg also give them as the clocks at their stop show them, which is what to print.
 
 ```rust,ignore
 departure.local_scheduled_time(); // None where the time zone of the stop is unknown

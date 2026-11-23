@@ -925,6 +925,215 @@ func FfiConverterTypeArea_lower(_ value: Area) -> RustBuffer {
 
 
 /**
+ * A vehicle arriving at a stop. The fields follow the same rules as those
+ * of a ``Departure``.
+ */
+public struct Arrival: Equatable, Hashable, Codable {
+    /**
+     * The stop or platform the vehicle arrives at.
+     */
+    public var stop: Location
+    /**
+     * The line the vehicle runs on.
+     */
+    public var line: Line
+    /**
+     * Where the vehicle comes from, as the server names it. `nil` if the
+     * server does not say, as on `OpenTripPlanner`.
+     */
+    public var origin: String?
+    /**
+     * The arrival time according to the timetable.
+     */
+    public var scheduledTime: UtcTime
+    /**
+     * The predicted arrival time.
+     */
+    public var realtimeTime: UtcTime?
+    /**
+     * The platform according to the timetable.
+     */
+    public var scheduledPlatform: String?
+    /**
+     * The platform the server knows now.
+     */
+    public var realtimePlatform: String?
+    /**
+     * Whether the arrival does not take place.
+     */
+    public var cancelled: Bool
+    /**
+     * What the server says about it: disruptions and hints. Empty if it
+     * says nothing.
+     */
+    public var remarks: [Remark]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The stop or platform the vehicle arrives at.
+         */stop: Location, 
+        /**
+         * The line the vehicle runs on.
+         */line: Line, 
+        /**
+         * Where the vehicle comes from, as the server names it. `nil` if the
+         * server does not say, as on `OpenTripPlanner`.
+         */origin: String?, 
+        /**
+         * The arrival time according to the timetable.
+         */scheduledTime: UtcTime, 
+        /**
+         * The predicted arrival time.
+         */realtimeTime: UtcTime?, 
+        /**
+         * The platform according to the timetable.
+         */scheduledPlatform: String?, 
+        /**
+         * The platform the server knows now.
+         */realtimePlatform: String?, 
+        /**
+         * Whether the arrival does not take place.
+         */cancelled: Bool, 
+        /**
+         * What the server says about it: disruptions and hints. Empty if it
+         * says nothing.
+         */remarks: [Remark]) {
+        self.stop = stop
+        self.line = line
+        self.origin = origin
+        self.scheduledTime = scheduledTime
+        self.realtimeTime = realtimeTime
+        self.scheduledPlatform = scheduledPlatform
+        self.realtimePlatform = realtimePlatform
+        self.cancelled = cancelled
+        self.remarks = remarks
+    }
+
+    
+    /**
+     * The platform to show: the one the server knows now if there is one,
+     * otherwise the one of the timetable.
+     */
+public var platform: String? {
+    return try!  FfiConverterOptionString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_arrival_platform(
+            FfiConverterTypeArrival_lower(self),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * How late the vehicle is, in seconds. Negative if it is
+     * early, zero if it is on time, `nil` without real-time data.
+     */
+public var delaySeconds: Int64? {
+    return try!  FfiConverterOptionInt64.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_arrival_delay_seconds(
+            FfiConverterTypeArrival_lower(self),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * The predicted time if there is one, otherwise the scheduled
+     * time.
+     */
+public var expectedTime: UtcTime {
+    return try!  FfiConverterTypeUtcTime_lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_arrival_expected_time(
+            FfiConverterTypeArrival_lower(self),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * The expected time on the clocks at the stop, with the same
+     * rule for `nil`.
+     */
+func localExpectedTime() -> LocalTime?  {
+    return try!  FfiConverterOptionTypeLocalTime.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_arrival_local_expected_time(
+            FfiConverterTypeArrival_lower(self),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * The scheduled time on the clocks at the stop. `nil` where
+     * ``Location/timeZone`` is, such as for a stop without a
+     * known time zone.
+     */
+func localScheduledTime() -> LocalTime?  {
+    return try!  FfiConverterOptionTypeLocalTime.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_arrival_local_scheduled_time(
+            FfiConverterTypeArrival_lower(self),uniffiCallStatus
+    )
+})
+}
+    
+
+}
+
+#if compiler(>=6)
+extension Arrival: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+struct FfiConverterTypeArrival: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Arrival {
+        return
+            try Arrival(
+                stop: FfiConverterTypeLocation.read(from: &buf), 
+                line: FfiConverterTypeLine.read(from: &buf), 
+                origin: FfiConverterOptionString.read(from: &buf), 
+                scheduledTime: FfiConverterTypeUtcTime.read(from: &buf), 
+                realtimeTime: FfiConverterOptionTypeUtcTime.read(from: &buf), 
+                scheduledPlatform: FfiConverterOptionString.read(from: &buf), 
+                realtimePlatform: FfiConverterOptionString.read(from: &buf), 
+                cancelled: FfiConverterBool.read(from: &buf), 
+                remarks: FfiConverterSequenceTypeRemark.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: Arrival, into buf: inout [UInt8]) {
+        FfiConverterTypeLocation.write(value.stop, into: &buf)
+        FfiConverterTypeLine.write(value.line, into: &buf)
+        FfiConverterOptionString.write(value.origin, into: &buf)
+        FfiConverterTypeUtcTime.write(value.scheduledTime, into: &buf)
+        FfiConverterOptionTypeUtcTime.write(value.realtimeTime, into: &buf)
+        FfiConverterOptionString.write(value.scheduledPlatform, into: &buf)
+        FfiConverterOptionString.write(value.realtimePlatform, into: &buf)
+        FfiConverterBool.write(value.cancelled, into: &buf)
+        FfiConverterSequenceTypeRemark.write(value.remarks, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+func FfiConverterTypeArrival_lift(_ buf: RustBuffer) throws -> Arrival {
+    return try FfiConverterTypeArrival.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+func FfiConverterTypeArrival_lower(_ value: Arrival) -> RustBuffer {
+    return FfiConverterTypeArrival.lower(value)
+}
+
+
+/**
  * Whom to name as the source of a ``Network``'s data.
  */
 public struct Attribution: Equatable, Hashable {
@@ -1339,8 +1548,8 @@ public var platform: String? {
 }
     
     /**
-     * How late the vehicle is, in seconds. Negative if it is early, zero
-     * if it is on time, `nil` without real-time data.
+     * How late the vehicle is, in seconds. Negative if it is
+     * early, zero if it is on time, `nil` without real-time data.
      */
 public var delaySeconds: Int64? {
     return try!  FfiConverterOptionInt64.lift(try! rustCall() {
@@ -1352,8 +1561,8 @@ public var delaySeconds: Int64? {
 }
     
     /**
-     * The time the vehicle is expected to leave: the predicted time if
-     * there is one, otherwise the scheduled time.
+     * The predicted time if there is one, otherwise the scheduled
+     * time.
      */
 public var expectedTime: UtcTime {
     return try!  FfiConverterTypeUtcTime_lift(try! rustCall() {
@@ -1365,8 +1574,8 @@ public var expectedTime: UtcTime {
 }
     
     /**
-     * The expected time on the clocks at the stop, with the same rule for
-     * `nil`.
+     * The expected time on the clocks at the stop, with the same
+     * rule for `nil`.
      */
 func localExpectedTime() -> LocalTime?  {
     return try!  FfiConverterOptionTypeLocalTime.lift(try! rustCall() {
@@ -1379,8 +1588,8 @@ func localExpectedTime() -> LocalTime?  {
     
     /**
      * The scheduled time on the clocks at the stop. `nil` where
-     * ``Location/timeZone`` is, such as for a stop without a known time
-     * zone.
+     * ``Location/timeZone`` is, such as for a stop without a
+     * known time zone.
      */
 func localScheduledTime() -> LocalTime?  {
     return try!  FfiConverterOptionTypeLocalTime.lift(try! rustCall() {
@@ -2270,8 +2479,8 @@ public var platform: String? {
 }
     
     /**
-     * How late the vehicle is, in seconds. Negative if it is early, zero
-     * if it is on time, `nil` without real-time data.
+     * How late the vehicle is, in seconds. Negative if it is
+     * early, zero if it is on time, `nil` without real-time data.
      */
 public var delaySeconds: Int64? {
     return try!  FfiConverterOptionInt64.lift(try! rustCall() {
@@ -2283,7 +2492,8 @@ public var delaySeconds: Int64? {
 }
     
     /**
-     * The predicted time if there is one, otherwise the scheduled time.
+     * The predicted time if there is one, otherwise the scheduled
+     * time.
      */
 public var expectedTime: UtcTime {
     return try!  FfiConverterTypeUtcTime_lift(try! rustCall() {
@@ -2295,8 +2505,8 @@ public var expectedTime: UtcTime {
 }
     
     /**
-     * The expected time on the clocks at the stop, with the same rule for
-     * `nil`.
+     * The expected time on the clocks at the stop, with the same
+     * rule for `nil`.
      */
 func localExpectedTime() -> LocalTime?  {
     return try!  FfiConverterOptionTypeLocalTime.lift(try! rustCall() {
@@ -2309,8 +2519,8 @@ func localExpectedTime() -> LocalTime?  {
     
     /**
      * The scheduled time on the clocks at the stop. `nil` where
-     * ``Location/timeZone`` is, such as for a stop without a known time
-     * zone.
+     * ``Location/timeZone`` is, such as for a stop without a
+     * known time zone.
      */
 func localScheduledTime() -> LocalTime?  {
     return try!  FfiConverterOptionTypeLocalTime.lift(try! rustCall() {
@@ -2943,6 +3153,26 @@ public struct Network: Equatable, Hashable {
 
     
     /**
+     * Builds the request for the arrivals at a stop, from the query that
+     * ``Network/departuresRequest`` takes: its time is the one from
+     * which arrivals are wanted.
+     *
+     * # Errors
+     *
+     * The same as ``Network/departuresRequest``. A network that lists
+     * departures as unsupported has no arrivals either.
+     */
+public func arrivalsRequest(query: DeparturesQuery)throws  -> HttpRequest  {
+    return try  FfiConverterTypeHttpRequest_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_arrivals_request(
+            FfiConverterTypeNetwork_lower(self),
+        FfiConverterTypeDeparturesQuery_lower(query),uniffiCallStatus
+    )
+})
+}
+    
+    /**
      * Builds the request for the next departures at a stop.
      *
      * EFA takes the time as local time to the minute. In the hour that
@@ -2988,6 +3218,24 @@ public func locationsRequest(query: LocationQuery)throws  -> HttpRequest  {
     uniffi_publictransport_fn_method_network_locations_request(
             FfiConverterTypeNetwork_lower(self),
         FfiConverterTypeLocationQuery_lower(query),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Parses the response to a ``Network/arrivalsRequest``. The arrivals
+     * are ordered by ``Arrival/expectedTime``.
+     *
+     * # Errors
+     *
+     * The same as ``Network/parseDepartures``.
+     */
+public func parseArrivals(response: HttpResponse)throws  -> [Arrival]  {
+    return try  FfiConverterSequenceTypeArrival.lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_parse_arrivals(
+            FfiConverterTypeNetwork_lower(self),
+        FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
     )
 })
 }
@@ -4983,7 +5231,7 @@ func FfiConverterTypeMode_lower(_ value: Mode) -> RustBuffer {
 
 
 /**
- * One of the three things a ``Network`` can be asked.
+ * One of the kinds of request that a ``Network`` can be asked.
  */
 
 public enum NetworkOperation: Equatable, Hashable, CaseIterable {
@@ -4993,7 +5241,7 @@ public enum NetworkOperation: Equatable, Hashable, CaseIterable {
      */
     case locations
     /**
-     * The departures at a stop.
+     * The departures at a stop, and with them the arrivals.
      */
     case departures
     /**
@@ -6078,6 +6326,31 @@ fileprivate struct FfiConverterSequenceString: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterString.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeArrival: FfiConverterRustBuffer {
+    typealias SwiftType = [Arrival]
+
+    public static func write(_ value: [Arrival], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeArrival.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [Arrival] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [Arrival]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeArrival.read(from: &buf))
         }
         return seq
     }

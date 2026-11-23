@@ -1,4 +1,5 @@
 import type {
+  Arrival,
   Departure,
   DeparturesQuery,
   HttpRequest,
@@ -11,8 +12,10 @@ import type {
   TripsQuery,
 } from "./generated/publictransport_wasm.js";
 import {
+  arrivalsRequest,
   departuresRequest,
   locationsRequest,
+  parseArrivals,
   parseDepartures,
   parseLocations,
   parseTrips,
@@ -147,11 +150,36 @@ export class Client {
     query: Place | DeparturesQuery,
     { signal, ...rest }: Omit<DeparturesQuery, "stop"> & RequestOptions = {},
   ): Promise<Departure[]> {
-    const request = departuresRequest(
-      network,
-      typeof query === "object" && "stop" in query ? query : { ...rest, stop: query },
-    );
+    const request = departuresRequest(network, departuresQuery(query, rest));
     return parseDepartures(network, await this.#send(request, signal));
+  }
+
+  /** Lists arrivals with a query, the one of departures. */
+  arrivals(network: Network, query: DeparturesQuery, options?: RequestOptions): Promise<Arrival[]>;
+  /**
+   * Lists the next arrivals at a stop, ordered by expected time. An arrival
+   * has an `origin`, where the vehicle comes from, in place of the
+   * direction.
+   *
+   * @param stop A location or the ID of a stop on this network, as for
+   *   {@link Client.departures}.
+   * @param options The other fields of a {@link DeparturesQuery}: the `time`
+   *   from which on arrivals are wanted, now if left out, and how many are
+   *   wanted as `limit`. That is not a maximum: servers treat it as a guide
+   *   and may return more or fewer.
+   */
+  arrivals(
+    network: Network,
+    stop: Place,
+    options?: Omit<DeparturesQuery, "stop"> & RequestOptions,
+  ): Promise<Arrival[]>;
+  async arrivals(
+    network: Network,
+    query: Place | DeparturesQuery,
+    { signal, ...rest }: Omit<DeparturesQuery, "stop"> & RequestOptions = {},
+  ): Promise<Arrival[]> {
+    const request = arrivalsRequest(network, departuresQuery(query, rest));
+    return parseArrivals(network, await this.#send(request, signal));
   }
 
   /** Plans trips with a query. */
@@ -228,6 +256,14 @@ export class Client {
       body: await read(response),
     };
   }
+}
+
+/** The query of a call that names a stop, with the other fields, or gives the whole query. */
+function departuresQuery(
+  query: Place | DeparturesQuery,
+  rest: Omit<DeparturesQuery, "stop">,
+): DeparturesQuery {
+  return typeof query === "object" && "stop" in query ? query : { ...rest, stop: query };
 }
 
 /** Reads the answer, up to the largest size. */

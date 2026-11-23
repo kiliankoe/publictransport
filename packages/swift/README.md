@@ -23,6 +23,12 @@ for departure in try await client.departures(in: network, at: from, limit: 10) {
 }
 ```
 
+`arrivals` takes the same arguments and lists what arrives at the stop. An arrival has an `origin`, where the vehicle comes from, in place of the `direction`.
+
+```swift
+let arrivals = try await client.arrivals(in: network, at: from, limit: 10)
+```
+
 The [documentation](https://kiliankoe.github.io/publictransport/swift.html) has a program for each kind of request, which are also in [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/swift).
 
 ## Trips

@@ -601,47 +601,137 @@ pub enum RemarkKind {
     Hint,
 }
 
-#[cfg_attr(feature = "uniffi", uniffi::export)]
-impl Departure {
-    /// The time the vehicle is expected to leave: the predicted time if
-    /// there is one, otherwise the scheduled time.
-    #[must_use]
-    pub fn expected_time(&self) -> Timestamp {
-        self.realtime_time.unwrap_or(self.scheduled_time)
-    }
+/// The members that a departure, an arrival and an end of a leg share:
+/// each is a vehicle at a stop with a scheduled and maybe a predicted time
+/// and platform.
+macro_rules! at_a_stop {
+    ($type:ident) => {
+        #[cfg_attr(feature = "uniffi", uniffi::export)]
+        impl $type {
+            /// The predicted time if there is one, otherwise the scheduled
+            /// time.
+            #[must_use]
+            pub fn expected_time(&self) -> Timestamp {
+                self.realtime_time.unwrap_or(self.scheduled_time)
+            }
 
-    /// The scheduled time on the clocks at the stop. `None` where
-    /// [`Location::local_time`] is, such as for a stop without a known time
-    /// zone.
-    #[must_use]
-    pub fn local_scheduled_time(&self) -> Option<LocalTime> {
-        self.stop.local_time(self.scheduled_time)
-    }
+            /// The scheduled time on the clocks at the stop. `None` where
+            /// [`Location::local_time`] is, such as for a stop without a
+            /// known time zone.
+            #[must_use]
+            pub fn local_scheduled_time(&self) -> Option<LocalTime> {
+                self.stop.local_time(self.scheduled_time)
+            }
 
-    /// The expected time on the clocks at the stop, with the same rule for
-    /// `None`.
-    #[must_use]
-    pub fn local_expected_time(&self) -> Option<LocalTime> {
-        self.stop.local_time(self.expected_time())
-    }
+            /// The expected time on the clocks at the stop, with the same
+            /// rule for `None`.
+            #[must_use]
+            pub fn local_expected_time(&self) -> Option<LocalTime> {
+                self.stop.local_time(self.expected_time())
+            }
 
-    /// How late the vehicle is, in seconds. Negative if it is early, zero
-    /// if it is on time, `None` without real-time data.
-    #[must_use]
-    pub fn delay_seconds(&self) -> Option<i64> {
-        let predicted = self.realtime_time?.unix_seconds;
-        Some(predicted.saturating_sub(self.scheduled_time.unix_seconds))
-    }
+            /// How late the vehicle is, in seconds. Negative if it is
+            /// early, zero if it is on time, `None` without real-time data.
+            #[must_use]
+            pub fn delay_seconds(&self) -> Option<i64> {
+                let predicted = self.realtime_time?.unix_seconds;
+                Some(predicted.saturating_sub(self.scheduled_time.unix_seconds))
+            }
+        }
+
+        impl $type {
+            /// The platform to show: the one the server knows now if there
+            /// is one, otherwise the one of the timetable.
+            #[must_use]
+            pub fn platform(&self) -> Option<&str> {
+                self.realtime_platform
+                    .as_deref()
+                    .or(self.scheduled_platform.as_deref())
+            }
+        }
+    };
 }
 
-impl Departure {
-    /// The platform to show: the one the server knows now if there is one,
-    /// otherwise the one of the timetable.
-    #[must_use]
-    pub fn platform(&self) -> Option<&str> {
-        self.realtime_platform
-            .as_deref()
-            .or(self.scheduled_platform.as_deref())
+at_a_stop!(Departure);
+at_a_stop!(Arrival);
+at_a_stop!(LegEnd);
+
+/// A vehicle arriving at a stop. The fields follow the same rules as those
+/// of a [`Departure`].
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
+pub struct Arrival {
+    /// The stop or platform the vehicle arrives at.
+    pub stop: Location,
+    /// The line the vehicle runs on.
+    pub line: Line,
+    /// Where the vehicle comes from, as the server names it. `None` if the
+    /// server does not say, as on `OpenTripPlanner`.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub origin: Option<String>,
+    /// The arrival time according to the timetable.
+    pub scheduled_time: Timestamp,
+    /// The predicted arrival time.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub realtime_time: Option<Timestamp>,
+    /// The platform according to the timetable.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub scheduled_platform: Option<String>,
+    /// The platform the server knows now.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub realtime_platform: Option<String>,
+    /// Whether the arrival does not take place.
+    pub cancelled: bool,
+    /// What the server says about it: disruptions and hints. Empty if it
+    /// says nothing.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(default, deserialize_with = "crate::wasm::or_default")
+    )]
+    pub remarks: Vec<Remark>,
+}
+
+/// Which side of the vehicles at a stop an answer lists. The parsers read
+/// both into a [`Departure`], with the origin as its direction for
+/// arrivals, which [`Arrival::read_as_departure`] turns around.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Board {
+    Departures,
+    Arrivals,
+}
+
+impl Arrival {
+    pub(crate) fn read_as_departure(read: Departure) -> Self {
+        Self {
+            stop: read.stop,
+            line: read.line,
+            origin: read.direction,
+            scheduled_time: read.scheduled_time,
+            realtime_time: read.realtime_time,
+            scheduled_platform: read.scheduled_platform,
+            realtime_platform: read.realtime_platform,
+            cancelled: read.cancelled,
+            remarks: read.remarks,
+        }
     }
 }
 
@@ -1200,49 +1290,6 @@ pub struct LegEnd {
     pub cancelled: bool,
 }
 
-#[cfg_attr(feature = "uniffi", uniffi::export)]
-impl LegEnd {
-    /// The predicted time if there is one, otherwise the scheduled time.
-    #[must_use]
-    pub fn expected_time(&self) -> Timestamp {
-        self.realtime_time.unwrap_or(self.scheduled_time)
-    }
-
-    /// The scheduled time on the clocks at the stop. `None` where
-    /// [`Location::local_time`] is, such as for a stop without a known time
-    /// zone.
-    #[must_use]
-    pub fn local_scheduled_time(&self) -> Option<LocalTime> {
-        self.stop.local_time(self.scheduled_time)
-    }
-
-    /// The expected time on the clocks at the stop, with the same rule for
-    /// `None`.
-    #[must_use]
-    pub fn local_expected_time(&self) -> Option<LocalTime> {
-        self.stop.local_time(self.expected_time())
-    }
-
-    /// How late the vehicle is, in seconds. Negative if it is early, zero
-    /// if it is on time, `None` without real-time data.
-    #[must_use]
-    pub fn delay_seconds(&self) -> Option<i64> {
-        let predicted = self.realtime_time?.unix_seconds;
-        Some(predicted.saturating_sub(self.scheduled_time.unix_seconds))
-    }
-}
-
-impl LegEnd {
-    /// The platform to show: the one the server knows now if there is one,
-    /// otherwise the one of the timetable.
-    #[must_use]
-    pub fn platform(&self) -> Option<&str> {
-        self.realtime_platform
-            .as_deref()
-            .or(self.scheduled_platform.as_deref())
-    }
-}
-
 impl Stopover {
     /// The stopover as the start of a leg, if it has a departure time.
     pub(crate) fn into_leg_start(self) -> Option<LegEnd> {
@@ -1254,6 +1301,15 @@ impl Stopover {
             realtime_platform: self.realtime_platform,
             cancelled: self.cancelled,
         })
+    }
+
+    /// The stopover as the vehicle leaving or arriving there, if it has
+    /// the time of that side.
+    pub(crate) fn on(self, board: Board) -> Option<LegEnd> {
+        match board {
+            Board::Departures => self.into_leg_start(),
+            Board::Arrivals => self.into_leg_end(),
+        }
     }
 
     /// The stopover as the end of a leg, if it has an arrival time.

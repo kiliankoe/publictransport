@@ -48,9 +48,11 @@ export {
   transfers,
 } from "./generated/publictransport_wasm.js";
 export {
+  arrivalsRequest,
   departuresRequest,
   locationsRequest,
   networkFromJson,
+  parseArrivals,
   parseDepartures,
   parseLocations,
   parseTrips,

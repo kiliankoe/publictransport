@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import type { ServerResponse } from "node:http";
 import { test } from "node:test";
 import {
+  arrivalsRequest,
   BlockedError,
   Client,
   type DeparturesQuery,
@@ -20,6 +21,7 @@ import {
   NotFoundError,
   ParseError,
   PublicTransportError,
+  parseArrivals,
   parseDepartures,
   parseLocations,
   parseTrips,
@@ -95,6 +97,11 @@ function departures(name: string, query: DeparturesQuery, call: Case["call"]): C
   return { name, fixture: "efa/vvo-departures.json", request, parse: parseDepartures, call };
 }
 
+function arrivals(name: string, query: DeparturesQuery, call: Case["call"]): Case {
+  const request = (network: Network) => arrivalsRequest(network, query);
+  return { name, fixture: "efa/vvo-arrivals.json", request, parse: parseArrivals, call };
+}
+
 function trips(name: string, query: TripsQuery, call: Case["call"]): Case {
   const request = (network: Network) => tripsRequest(network, query);
   return { name, fixture: "efa/vvo-trip.json", request, parse: parseTrips, call };
@@ -119,6 +126,9 @@ const calls: Case[] = [
   ),
   departures("departures at an ID, with time and limit", { stop: hbf, time, limit: 7 }, (c, n) =>
     c.departures(n, hbf, { time, limit: 7 }),
+  ),
+  arrivals("arrivals at an ID, with time and limit", { stop: hbf, time, limit: 7 }, (c, n) =>
+    c.arrivals(n, hbf, { time, limit: 7 }),
   ),
   trips("trips by query", { origin: hbf, destination: albertplatz }, (client, network) =>
     client.trips(network, { origin: hbf, destination: albertplatz }),

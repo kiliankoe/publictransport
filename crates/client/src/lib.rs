@@ -166,6 +166,24 @@ impl Client {
         Ok(network.parse_departures(&response)?)
     }
 
+    /// Lists the next arrivals at a stop, from the same query as
+    /// [`Client::departures`]. See [`Network::parse_arrivals`] for the
+    /// result.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Transport`] if the request got no answer and
+    /// [`Error::Api`] for everything the server or the query got wrong.
+    pub async fn arrivals(
+        &self,
+        network: &Network,
+        query: impl Into<DeparturesQuery>,
+    ) -> Result<Vec<Arrival>, Error> {
+        let request = network.arrivals_request(&query.into())?;
+        let response = self.send(request).await?;
+        Ok(network.parse_arrivals(&response)?)
+    }
+
     /// Plans trips between two places. The query is a [`TripsQuery`],
     /// whose ends are locations, coordinates or IDs. See
     /// [`Network::parse_trips`] for the result. Its references continue the search:

@@ -12,7 +12,7 @@
 )]
 
 use publictransport::{
-    BundledNetwork, Coordinate, Coverage, CoverageTier, CoveringNetwork, Departure,
+    Arrival, BundledNetwork, Coordinate, Coverage, CoverageTier, CoveringNetwork, Departure,
     DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, LegEnd, LocalTime, Location,
     LocationQuery, Network, Place, Timestamp, Trip, Trips, TripsQuery,
 };
@@ -107,6 +107,28 @@ pub fn parse_departures(
     write_all(&departures.map_err(thrown)?)
 }
 
+/// Builds the request for the next arrivals at a stop, from the query that
+/// `departuresRequest` takes.
+#[wasm_bindgen(js_name = arrivalsRequest)]
+pub fn arrivals_request(
+    network: &Ts<Network>,
+    query: &Ts<DeparturesQuery>,
+) -> Result<Ts<HttpRequest>, JsValue> {
+    let request = read("network", network)?.arrivals_request(&read("query", query)?);
+    write(&request.map_err(thrown)?)
+}
+
+/// Reads the answer to an `arrivalsRequest`. The arrivals are ordered by
+/// their expected time.
+#[wasm_bindgen(js_name = parseArrivals)]
+pub fn parse_arrivals(
+    network: &Ts<Network>,
+    response: &Ts<HttpResponse>,
+) -> Result<Vec<Ts<Arrival>>, JsValue> {
+    let arrivals = read("network", network)?.parse_arrivals(&read("response", response)?);
+    write_all(&arrivals.map_err(thrown)?)
+}
+
 /// Builds the request for trips between two places.
 #[wasm_bindgen(js_name = tripsRequest)]
 pub fn trips_request(
@@ -189,56 +211,57 @@ pub fn same_station(location: &Ts<Location>, other: &Ts<Location>) -> Result<boo
     Ok(read("location", location)?.same_station(&read("other location", other)?))
 }
 
-/// The time a vehicle is expected at a departure or at an end of a leg: the
+/// The time a vehicle is expected at a departure, an arrival or an end of a leg: the
 /// predicted time if there is one, otherwise the scheduled time.
 #[wasm_bindgen(js_name = expectedTime)]
 pub fn expected_time(
-    // A departure has every field of an end of a leg, with the same rules.
-    #[wasm_bindgen(unchecked_param_type = "Departure | LegEnd")] end: &Ts<LegEnd>,
+    // A departure and an arrival have every field of an end of a leg, with
+    // the same rules.
+    #[wasm_bindgen(unchecked_param_type = "Departure | Arrival | LegEnd")] end: &Ts<LegEnd>,
 ) -> Result<Ts<Timestamp>, JsValue> {
-    write(&read("departure or end of a leg", end)?.expected_time())
+    write(&read("departure, arrival or end of a leg", end)?.expected_time())
 }
 
-/// The scheduled time on the clocks at the stop of a departure or of an end
+/// The scheduled time on the clocks at the stop of a departure, an arrival or an end
 /// of a leg, as `localTime` gives it. `undefined` where that is, such as
 /// for a stop without a known time zone.
 #[wasm_bindgen(js_name = localScheduledTime)]
 pub fn local_scheduled_time(
-    #[wasm_bindgen(unchecked_param_type = "Departure | LegEnd")] end: &Ts<LegEnd>,
+    #[wasm_bindgen(unchecked_param_type = "Departure | Arrival | LegEnd")] end: &Ts<LegEnd>,
 ) -> Result<Option<Ts<LocalTime>>, JsValue> {
-    let local = read("departure or end of a leg", end)?.local_scheduled_time();
+    let local = read("departure, arrival or end of a leg", end)?.local_scheduled_time();
     local.as_ref().map(write).transpose()
 }
 
-/// The expected time on the clocks at the stop of a departure or of an end
+/// The expected time on the clocks at the stop of a departure, an arrival or an end
 /// of a leg, with the same rule for `undefined`.
 #[wasm_bindgen(js_name = localExpectedTime)]
 pub fn local_expected_time(
-    #[wasm_bindgen(unchecked_param_type = "Departure | LegEnd")] end: &Ts<LegEnd>,
+    #[wasm_bindgen(unchecked_param_type = "Departure | Arrival | LegEnd")] end: &Ts<LegEnd>,
 ) -> Result<Option<Ts<LocalTime>>, JsValue> {
-    let local = read("departure or end of a leg", end)?.local_expected_time();
+    let local = read("departure, arrival or end of a leg", end)?.local_expected_time();
     local.as_ref().map(write).transpose()
 }
 
-/// How late the vehicle is at a departure or at an end of a leg, in
+/// How late the vehicle is at a departure, an arrival or an end of a leg, in
 /// seconds. Negative if it is early, zero if it is on time, `undefined`
 /// without real-time data.
 #[wasm_bindgen(js_name = delaySeconds)]
 pub fn delay_seconds(
-    #[wasm_bindgen(unchecked_param_type = "Departure | LegEnd")] end: &Ts<LegEnd>,
+    #[wasm_bindgen(unchecked_param_type = "Departure | Arrival | LegEnd")] end: &Ts<LegEnd>,
 ) -> Result<Option<f64>, JsValue> {
-    Ok(read("departure or end of a leg", end)?
+    Ok(read("departure, arrival or end of a leg", end)?
         .delay_seconds()
         .map(number))
 }
 
-/// The platform to show for a departure or an end of a leg: the one the
+/// The platform to show for a departure, an arrival or an end of a leg: the one the
 /// server knows now if there is one, otherwise the one of the timetable.
 #[wasm_bindgen]
 pub fn platform(
-    #[wasm_bindgen(unchecked_param_type = "Departure | LegEnd")] end: &Ts<LegEnd>,
+    #[wasm_bindgen(unchecked_param_type = "Departure | Arrival | LegEnd")] end: &Ts<LegEnd>,
 ) -> Result<Option<String>, JsValue> {
-    Ok(read("departure or end of a leg", end)?
+    Ok(read("departure, arrival or end of a leg", end)?
         .platform()
         .map(str::to_owned))
 }

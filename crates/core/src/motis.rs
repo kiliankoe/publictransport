@@ -5,7 +5,9 @@ use serde::Deserialize;
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, Leg,
     LegKind, Line, Location, LocationKind, LocationQuery, Mode, Network, Stopover, Trip, TripTime,
-    Trips, TripsQuery, model::Target, time::WireTime,
+    Trips, TripsQuery,
+    model::{Board, Target},
+    time::WireTime,
 };
 
 pub(crate) fn locations_request(
@@ -118,6 +120,7 @@ fn global_id(id: &str) -> Option<GlobalId> {
 pub(crate) fn departures_request(
     network: &Network,
     query: &DeparturesQuery,
+    board: Board,
 ) -> Result<HttpRequest, Error> {
     // The server needs `n` or a time window.
     let limit = query.limit.unwrap_or(10).to_string();
@@ -130,6 +133,9 @@ pub(crate) fn departures_request(
     if let Some(time) = &time {
         parameters.push(("time", time));
     }
+    if board == Board::Arrivals {
+        parameters.push(("arriveBy", "true"));
+    }
     Ok(HttpRequest::get(
         &network.endpoint,
         "v6/stoptimes",
@@ -137,12 +143,15 @@ pub(crate) fn departures_request(
     ))
 }
 
-pub(crate) fn parse_departures(response: &HttpResponse) -> Result<Vec<Departure>, Error> {
+pub(crate) fn parse_departures(
+    response: &HttpResponse,
+    board: Board,
+) -> Result<Vec<Departure>, Error> {
     let response: StopTimesResponse = json(response)?;
     let mut departures = response
         .stop_times
         .into_iter()
-        .map(StopTime::into_departure)
+        .map(|stop_time| stop_time.into_departure(board))
         .collect::<Result<Vec<_>, _>>()?;
     departures.sort_by_key(Departure::expected_time);
     Ok(departures)
@@ -276,6 +285,13 @@ struct StopTime {
     vehicle: Vehicle,
     #[serde(default)]
     trip_cancelled: bool,
+    /// Where the vehicle starts its run.
+    trip_from: Option<TripEnd>,
+}
+
+#[derive(Deserialize)]
+struct TripEnd {
+    name: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -368,7 +384,7 @@ impl Vehicle {
 }
 
 impl StopTime {
-    fn into_departure(self) -> Result<Departure, Error> {
+    fn into_departure(self, board: Board) -> Result<Departure, Error> {
         let cancelled = self.vehicle.cancelled || self.trip_cancelled || self.place.cancelled;
         if self.place.stop_id.is_none() {
             return Err(Error::Parse {
@@ -378,16 +394,21 @@ impl StopTime {
         let stopover = self.place.into_stopover(self.vehicle.real_time);
         let mode = transit_mode(&self.vehicle.mode).unwrap_or(Mode::Other);
         let (line, direction) = self.vehicle.into_line(mode);
+        let origin = self.trip_from.and_then(|from| from.name);
+        let end = stopover.on(board).ok_or_else(|| Error::Parse {
+            message: "a stop time has no scheduled time".to_owned(),
+        })?;
         Ok(Departure {
-            stop: stopover.stop,
+            stop: end.stop,
             line,
-            direction,
-            scheduled_time: stopover.scheduled_departure.ok_or_else(|| Error::Parse {
-                message: "a stop time has no scheduled departure".to_owned(),
-            })?,
-            realtime_time: stopover.realtime_departure,
-            scheduled_platform: stopover.scheduled_platform,
-            realtime_platform: stopover.realtime_platform,
+            direction: match board {
+                Board::Departures => direction,
+                Board::Arrivals => origin.filter(|origin| !origin.is_empty()),
+            },
+            scheduled_time: end.scheduled_time,
+            realtime_time: end.realtime_time,
+            scheduled_platform: end.scheduled_platform,
+            realtime_platform: end.realtime_platform,
             cancelled,
             remarks: Vec::new(),
         })

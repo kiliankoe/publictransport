@@ -29,9 +29,10 @@
 //! # }
 //! ```
 //!
-//! Departures and trips work the same way, with
-//! [`Network::departures_request`] and [`Network::parse_departures`], and
-//! with [`Network::trips_request`] and [`Network::parse_trips`]. An EFA
+//! Departures, arrivals and trips work the same way, with
+//! [`Network::departures_request`] and [`Network::parse_departures`], with
+//! [`Network::arrivals_request`] and [`Network::parse_arrivals`], and with
+//! [`Network::trips_request`] and [`Network::parse_trips`]. An EFA
 //! network needs [`Network::with_timezone`] for requests that carry a time,
 //! a TRIAS or OJP network needs [`Network::with_requestor_ref`], and a
 //! HAFAS network needs [`Network::with_hafas`] and a time zone. Entur
@@ -75,9 +76,9 @@ pub use error::Error;
 pub use hafas::{HafasOptions, HafasProduct};
 pub use http::{Header, HttpRequest, HttpResponse, Method};
 pub use model::{
-    Coordinate, Departure, DeparturesQuery, GlobalId, IdScheme, Leg, LegEnd, LegKind, Line,
-    LocalTime, Location, LocationKind, LocationQuery, Mode, Place, Remark, RemarkKind, Stopover,
-    Timestamp, Trip, TripTime, Trips, TripsQuery,
+    Arrival, Coordinate, Departure, DeparturesQuery, GlobalId, IdScheme, Leg, LegEnd, LegKind,
+    Line, LocalTime, Location, LocationKind, LocationQuery, Mode, Place, Remark, RemarkKind,
+    Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
 };
 pub use network::{Network, Protocol};
 pub use registry::{

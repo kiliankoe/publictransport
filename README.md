@@ -4,7 +4,7 @@
 
 A client library for public transport APIs, for Rust, Python, Swift, Kotlin and TypeScript. The libraries use a shared model for stops, departures and trips that covers several server types, so an application can query any supported network the same way.
 
-The project is at an early stage. It can search for locations by name, list the departures at a stop and plan trips between two places, on servers that speak one of six protocols:
+The project is at an early stage. It can search for locations by name, list the departures and arrivals at a stop and plan trips between two places, on servers that speak one of six protocols:
 
 - EFA, the JSON interface of MDV's journey planner, used by many German transport associations
 - MOTIS, the routing engine behind [Transitous](https://transitous.org)
@@ -17,7 +17,7 @@ It ships with [networks](https://kiliankoe.github.io/publictransport/networks.ht
 
 ## Usage
 
-Every language has the same three requests. This is Python, and the guides in the [documentation](https://kiliankoe.github.io/publictransport/) show the others.
+Every language has the same requests. This is Python, and the guides in the [documentation](https://kiliankoe.github.io/publictransport/) show the others.
 
 ```python
 from publictransport import BundledNetwork, Client, LocationKind
