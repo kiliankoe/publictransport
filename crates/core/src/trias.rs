@@ -536,6 +536,8 @@ struct Attribute {
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
 struct ErrorMessage {
+    /// A number of the server, which can come without a text.
+    code: Option<String>,
     #[serde(default)]
     text: Vec<Text>,
 }
@@ -595,7 +597,7 @@ impl Failure {
         });
         let mut texts: Vec<String> = messages
             .into_iter()
-            .filter_map(|message| text(message.text))
+            .filter_map(|message| text(message.text).or(message.code))
             .chain(condition)
             .map(|text| text.trim().to_owned())
             .filter(|text| !text.is_empty())

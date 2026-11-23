@@ -1236,7 +1236,7 @@ fn errors_are_read_at_every_level_and_without_a_text() {
             Protocol::Trias,
             trias("<trias:ErrorMessage><trias:Code>-100</trias:Code></trias:ErrorMessage>")
         ),
-        no_text
+        "server: -100"
     );
     // "Nothing found" does not hide the reason next to it.
     assert_eq!(
