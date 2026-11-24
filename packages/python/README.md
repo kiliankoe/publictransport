@@ -35,6 +35,17 @@ for stop in client.nearby(network, position, radius_meters=500):
 arrivals = client.arrivals(network, stops[0], limit=10)
 ```
 
+`journey` gives the run of one vehicle: every stop it calls at, with times and platforms. It takes the `journey_id` of a departure, an arrival or a leg of a trip. The ID only works on the network it came from, and for about a day.
+
+```python
+departure = client.departures(network, stops[0], limit=1)[0]
+if departure.journey_id:
+    journey = client.journey(network, departure.journey_id)
+    for stopover in journey.stops:
+        time = stopover.scheduled_departure or stopover.scheduled_arrival
+        print(time, stopover.stop.name)
+```
+
 `AsyncClient` has the same methods as coroutines. The [documentation](https://kiliankoe.github.io/publictransport/python.html) has a program for each kind of request, which are also in [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/python).
 
 ## Trips
@@ -88,7 +99,7 @@ stop.local_time(any_time)  # the same for any time at a location
 
 ## Disruptions and hints
 
-A departure and a leg of a trip have `remarks`: the texts that the server sends with them. Every protocol but MOTIS fills them. A remark is one of two kinds. A disruption is a message from the incident system of the operator, such as a closed road or a broken elevator. A hint is a fixed property of the ride, such as air conditioning or a note for wheelchair users.
+A departure, a leg of a trip and the run of a vehicle have `remarks`: the texts that the server sends with them. Every protocol but MOTIS fills them. A remark is one of two kinds. A disruption is a message from the incident system of the operator, such as a closed road or a broken elevator. A hint is a fixed property of the ride, such as air conditioning or a note for wheelchair users.
 
 ```python
 for remark in departure.remarks:

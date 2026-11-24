@@ -1,7 +1,7 @@
 use crate::{
     Arrival, Attribution, Coverage, Departure, DeparturesQuery, Error, HafasOptions, Header,
-    HttpRequest, HttpResponse, IdScheme, Location, LocationKind, LocationQuery, NearbyQuery,
-    Operation, Place, Trips, TripsQuery, efa, hafas, model::Board, motis, otp, trias,
+    HttpRequest, HttpResponse, IdScheme, Journey, Location, LocationKind, LocationQuery,
+    NearbyQuery, Operation, Place, Trips, TripsQuery, efa, hafas, model::Board, motis, otp, trias,
 };
 
 /// One server that answers public transport queries.
@@ -291,6 +291,7 @@ impl Network {
                 Operation::Departures => "departure or arrival requests",
                 Operation::Trips => "trip requests",
                 Operation::Nearby => "searches for nearby stops",
+                Operation::Journeys => "requests for the run of a vehicle",
             };
             return Err(Error::Unsupported {
                 message: format!("{} does not answer {requests}", self.id),
@@ -494,6 +495,56 @@ impl Network {
             .into_iter()
             .map(Arrival::read_as_departure)
             .collect())
+    }
+
+    /// Builds the request for the run of one vehicle, from the
+    /// [`Departure::journey_id`] of a departure, an arrival or a leg that
+    /// this network returned.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidQuery`] if the ID is not one of this
+    /// network. MOTIS and HAFAS send any text on, and their servers do not
+    /// know a foreign one. [`Error::Unsupported`] and
+    /// [`Error::InvalidNetwork`] are as for
+    /// [`Network::departures_request`]; EFA and HAFAS always need the
+    /// time zone here.
+    pub fn journey_request(&self, id: &str) -> Result<HttpRequest, Error> {
+        self.check(Operation::Journeys)?;
+        let request = match self.protocol {
+            Protocol::Efa => efa::journey_request(self, id),
+            Protocol::Motis => Ok(motis::journey_request(self, id)),
+            Protocol::Trias | Protocol::Ojp1 => trias::journey_request(self, id),
+            Protocol::HafasMgate => hafas::journey_request(self, id),
+            Protocol::OtpTransmodel => otp::journey_request(self, id),
+        }?;
+        Ok(self.sent(request))
+    }
+
+    /// Parses the response to a [`Network::journey_request`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::NotFound`] if the server does not know the run,
+    /// as for an ID that is older than about a day, and another error if
+    /// the status code reports a failure or if the body is not what the
+    /// protocol defines.
+    pub fn parse_journey(&self, response: &HttpResponse) -> Result<Journey, Error> {
+        let mut journey = match self.protocol {
+            Protocol::Efa => efa::parse_journey(self, response),
+            Protocol::Motis => motis::parse_journey(response),
+            Protocol::Trias | Protocol::Ojp1 => trias::parse_journey(self, response),
+            Protocol::HafasMgate => hafas::parse_journey(self, response),
+            Protocol::OtpTransmodel => otp::parse_journey(self, response),
+        }?;
+        // A server may know the line and the day and still not the run.
+        if journey.stops.is_empty() {
+            return Err(Journey::unknown());
+        }
+        for stopover in &mut journey.stops {
+            self.mark(&mut stopover.stop);
+        }
+        Ok(journey)
     }
 
     /// Builds the request for trips between two places.

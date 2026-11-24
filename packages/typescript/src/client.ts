@@ -5,6 +5,7 @@ import type {
   DeparturesQuery,
   HttpRequest,
   HttpResponse,
+  Journey,
   Location,
   LocationQuery,
   NearbyQuery,
@@ -16,10 +17,12 @@ import type {
 import {
   arrivalsRequest,
   departuresRequest,
+  journeyRequest,
   locationsRequest,
   nearbyRequest,
   parseArrivals,
   parseDepartures,
+  parseJourney,
   parseLocations,
   parseNearby,
   parseTrips,
@@ -214,6 +217,18 @@ export class Client {
   ): Promise<Arrival[]> {
     const request = arrivalsRequest(network, departuresQuery(query, rest));
     return parseArrivals(network, await this.#send(request, signal));
+  }
+
+  /**
+   * Fetches the run of one vehicle: all its stops with times and platforms.
+   *
+   * @param id The `journeyId` of a departure, an arrival or a leg that this
+   *   network returned. It has no meaning on another network, and a server
+   *   knows a run for about a day: after that the call rejects with a
+   *   {@link NotFoundError}.
+   */
+  async journey(network: Network, id: string, { signal }: RequestOptions = {}): Promise<Journey> {
+    return parseJourney(network, await this.#send(journeyRequest(network, id), signal));
   }
 
   /** Plans trips with a query. */

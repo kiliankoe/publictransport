@@ -39,6 +39,18 @@ for stop in try await client.nearby(in: network, at: position, radiusMeters: 500
 let arrivals = try await client.arrivals(in: network, at: from, limit: 10)
 ```
 
+`journey` gives the run of one vehicle: every stop it calls at, with times and platforms. It takes the `journeyId` of a departure, an arrival or a leg of a trip. The ID only works on the network it came from, and for about a day.
+
+```swift
+let departures = try await client.departures(in: network, at: from, limit: 10)
+if let id = departures.compactMap(\.journeyId).first {
+    for stopover in try await client.journey(in: network, id: id).stops {
+        guard let time = stopover.scheduledDeparture ?? stopover.scheduledArrival else { continue }
+        print(time, stopover.stop.name)
+    }
+}
+```
+
 The [documentation](https://kiliankoe.github.io/publictransport/swift.html) has a program for each kind of request, which are also in [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/swift).
 
 ## Trips
@@ -94,7 +106,7 @@ An end of a leg has the same properties.
 
 ## Disruptions and hints
 
-A departure and a leg of a trip have `remarks`: the texts that the server sends with them. Every protocol but MOTIS fills them. A remark is one of two kinds. A disruption is a message from the incident system of the operator, such as a closed road or a broken elevator. A hint is a fixed property of the ride, such as air conditioning or a note for wheelchair users.
+A departure, a leg of a trip and the run of a vehicle have `remarks`: the texts that the server sends with them. Every protocol but MOTIS fills them. A remark is one of two kinds. A disruption is a message from the incident system of the operator, such as a closed road or a broken elevator. A hint is a fixed property of the ride, such as air conditioning or a note for wheelchair users.
 
 ```swift
 for remark in departure.remarks where remark.kind == .disruption {

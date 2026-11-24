@@ -39,8 +39,9 @@ pub enum Error {
         /// What is not supported.
         message: String,
     },
-    /// The network does not know the stop the query names, or cannot plan
-    /// a trip from or to a place because it knows no stop near it.
+    /// The network does not know the stop or the run of a vehicle that the
+    /// query names, or cannot plan a trip from or to a place because it
+    /// knows no stop near it.
     #[error("not found: {message}")]
     NotFound {
         /// What the server said, or what was missing in its answer.

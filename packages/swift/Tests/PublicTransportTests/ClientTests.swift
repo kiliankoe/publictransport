@@ -113,6 +113,21 @@ struct Call: Sendable, CustomTestStringConvertible {
         )
     }
 
+    /// The ID is the one of a departure in the answer that was recorded
+    /// with the run.
+    static let journey: Call = {
+        let id: @Sendable (Network) throws -> String = {
+            let departures = try $0.parseDepartures(
+                response: ok(PublicTransportTests.fixture("efa/vvo-journey-departure.json")))
+            return try #require(departures.compactMap(\.journeyId).first)
+        }
+        return Call(
+            testDescription: "journey of a departure", fixture: "efa/vvo-journey.json",
+            request: { try $0.journeyRequest(id: id($0)) },
+            check: { try #expect(await $0.journey(in: $1, id: id($1)) == $1.parseJourney(response: $2)) }
+        )
+    }()
+
     /// The query gets the reference to the trips after those of the fixture.
     static func trips(
         _ name: String, query: @escaping @Sendable (_ later: String?) -> TripsQuery,
@@ -187,6 +202,7 @@ struct Call: Sendable, CustomTestStringConvertible {
         ) {
             try await $0.arrivals(in: $1, at: "de:14612:28", after: time, limit: 7)
         },
+        .journey,
         .trips("trips from a location to an ID, departing at a time, with limit") { _ in
             TripsQuery(
                 origin: .location(foreignStop), destination: .id("de:14612:13"),

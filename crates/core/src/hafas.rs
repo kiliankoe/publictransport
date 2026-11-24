@@ -6,9 +6,9 @@ use serde_json::{Value, json};
 
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, GlobalId, Header, HttpRequest, HttpResponse,
-    Leg, LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, NearbyQuery,
-    Network, Place, Remark, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
-    http::lenient_list,
+    Journey, Leg, LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode,
+    NearbyQuery, Network, Place, Remark, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
+    http::{lenient_list, lenient_text},
     model::{Board, Target, plain_text},
 };
 
@@ -404,6 +404,33 @@ pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<Htt
     request(network, "TripSearch", &arguments)
 }
 
+pub(crate) fn journey_request(network: &Network, id: &str) -> Result<HttpRequest, Error> {
+    // The answer holds local times, so it could not be read without one.
+    network.zone()?;
+    request(network, "JourneyDetails", &json!({"jid": id}))
+}
+
+pub(crate) fn parse_journey(network: &Network, response: &HttpResponse) -> Result<Journey, Error> {
+    // The only parameter is the ID, so this is a run the server does not
+    // know.
+    let Some(found) = result::<Details>(response, &["PARAMETER"])? else {
+        return Err(Journey::unknown());
+    };
+    let reader = Reader::new(network, &found.common);
+    let journey = found.journey;
+    Ok(Journey {
+        line: reader.line(journey.prod_x)?,
+        direction: journey.dir_txt,
+        stops: journey
+            .stop_l
+            .iter()
+            .map(|stop| reader.stopover(&journey.date, stop))
+            .collect::<Result<_, _>>()?,
+        cancelled: journey.is_cncl,
+        remarks: reader.remarks([&journey.msg_l]),
+    })
+}
+
 /// The result of the one method a request names. `None` if the server
 /// reports one of the `empty` codes, which stand for "nothing found".
 fn result<T: for<'a> Deserialize<'a>>(
@@ -486,6 +513,7 @@ pub(crate) fn parse_departures(
                 realtime_platform: end.realtime_platform,
                 cancelled: end.cancelled || journey.is_cncl,
                 remarks: reader.remarks([&journey.msg_l, &stop.msg_l]),
+                journey_id: journey.jid.filter(|id| !id.is_empty()),
             })
         })
         .collect::<Result<Vec<_>, Error>>()?;
@@ -762,6 +790,10 @@ impl<'a> Reader<'a> {
                     .into_iter()
                     .chain([&section.dep.msg_l, &section.arr.msg_l]),
             ),
+            journey_id: journey
+                .filter(|_| section.kind == "JNY")
+                .and_then(|journey| journey.jid.clone())
+                .filter(|id| !id.is_empty()),
         })
     }
 }
@@ -935,12 +967,23 @@ struct StationBoard {
     #[serde(default)]
     common: Common,
     #[serde(default)]
-    jny_l: Vec<Journey>,
+    jny_l: Vec<WireJourney>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct Journey {
+struct Details {
+    #[serde(default)]
+    common: Common,
+    journey: WireJourney,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WireJourney {
+    /// Names the run for `JourneyDetails`.
+    #[serde(default, deserialize_with = "lenient_text")]
+    jid: Option<String>,
     #[serde(default)]
     date: String,
     prod_x: Option<usize>,
@@ -1017,5 +1060,5 @@ struct Section {
     kind: String,
     dep: Stop,
     arr: Stop,
-    jny: Option<Journey>,
+    jny: Option<WireJourney>,
 }

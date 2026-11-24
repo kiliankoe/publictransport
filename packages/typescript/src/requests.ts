@@ -5,11 +5,13 @@ import { throwing } from "./errors.js";
 import {
   arrivalsRequest as arrivalsRequestOrThrown,
   departuresRequest as departuresRequestOrThrown,
+  journeyRequest as journeyRequestOrThrown,
   locationsRequest as locationsRequestOrThrown,
   nearbyRequest as nearbyRequestOrThrown,
   networkFromJson as networkFromJsonOrThrown,
   parseArrivals as parseArrivalsOrThrown,
   parseDepartures as parseDeparturesOrThrown,
+  parseJourney as parseJourneyOrThrown,
   parseLocations as parseLocationsOrThrown,
   parseNearby as parseNearbyOrThrown,
   parseTrips as parseTripsOrThrown,
@@ -44,6 +46,15 @@ export const arrivalsRequest = throwing(arrivalsRequestOrThrown);
 
 /** Reads the answer to an {@link arrivalsRequest}. The arrivals are ordered by expected time. */
 export const parseArrivals = throwing(parseArrivalsOrThrown);
+
+/**
+ * Builds the request for the run of one vehicle, from the `journeyId` of a
+ * departure, an arrival or a leg that the network returned.
+ */
+export const journeyRequest = throwing(journeyRequestOrThrown);
+
+/** Reads the answer to a {@link journeyRequest}. The stops are in the order of travel. */
+export const parseJourney = throwing(parseJourneyOrThrown);
 
 /** Builds the request for trips between two places. */
 export const tripsRequest = throwing(tripsRequestOrThrown);

@@ -19,7 +19,8 @@ func localTime(at stop: Location, _ time: Date) -> String {
 
 print("Departures at \(stop.name):")
 // From now on. `after:` asks for another time.
-for departure in try await client.departures(in: network, at: stop, limit: 10) {
+let departures = try await client.departures(in: network, at: stop, limit: 10)
+for departure in departures {
     // Only departures with real-time data have a delay.
     var delay = ""
     if let seconds = departure.delaySeconds {
@@ -33,5 +34,18 @@ for departure in try await client.departures(in: network, at: stop, limit: 10) {
     // What the operator reports about the ride, such as a closed road.
     for remark in departure.remarks where remark.kind == .disruption {
         if let title = remark.title { print("      ! \(title)") }
+    }
+}
+
+// The run of the first vehicle: every stop it calls at. The ID only works
+// on the network it came from, and for about a day.
+if let id = departures.compactMap(\.journeyId).first {
+    let journey = try await client.journey(in: network, id: id)
+    print("Stops of \(journey.line.name):")
+    for stopover in journey.stops {
+        // The first stop has no arrival and the last no departure.
+        let time = (stopover.scheduledDeparture ?? stopover.scheduledArrival)
+            .map { localTime(at: stopover.stop, $0) }
+        print("  \(time ?? "??:??") \(stopover.stop.name)")
     }
 }

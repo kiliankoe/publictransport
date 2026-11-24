@@ -967,6 +967,14 @@ public struct Arrival: Equatable, Hashable, Codable {
      * says nothing.
      */
     public var remarks: [Remark]
+    /**
+     * Names the run of the vehicle for
+     * ``Network/journeyRequest``.
+     * `nil` if the server does not name the run. The text is made for
+     * the network it came from and has no meaning elsewhere; a server
+     * knows a run for about a day.
+     */
+    public var journeyId: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -999,7 +1007,14 @@ public struct Arrival: Equatable, Hashable, Codable {
         /**
          * What the server says about it: disruptions and hints. Empty if it
          * says nothing.
-         */remarks: [Remark]) {
+         */remarks: [Remark], 
+        /**
+         * Names the run of the vehicle for
+         * ``Network/journeyRequest``.
+         * `nil` if the server does not name the run. The text is made for
+         * the network it came from and has no meaning elsewhere; a server
+         * knows a run for about a day.
+         */journeyId: String?) {
         self.stop = stop
         self.line = line
         self.origin = origin
@@ -1009,6 +1024,7 @@ public struct Arrival: Equatable, Hashable, Codable {
         self.realtimePlatform = realtimePlatform
         self.cancelled = cancelled
         self.remarks = remarks
+        self.journeyId = journeyId
     }
 
     
@@ -1100,7 +1116,8 @@ struct FfiConverterTypeArrival: FfiConverterRustBuffer {
                 scheduledPlatform: FfiConverterOptionString.read(from: &buf), 
                 realtimePlatform: FfiConverterOptionString.read(from: &buf), 
                 cancelled: FfiConverterBool.read(from: &buf), 
-                remarks: FfiConverterSequenceTypeRemark.read(from: &buf)
+                remarks: FfiConverterSequenceTypeRemark.read(from: &buf), 
+                journeyId: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -1114,6 +1131,7 @@ struct FfiConverterTypeArrival: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.realtimePlatform, into: &buf)
         FfiConverterBool.write(value.cancelled, into: &buf)
         FfiConverterSequenceTypeRemark.write(value.remarks, into: &buf)
+        FfiConverterOptionString.write(value.journeyId, into: &buf)
     }
 }
 
@@ -1499,6 +1517,14 @@ public struct Departure: Equatable, Hashable, Codable {
      * says nothing.
      */
     public var remarks: [Remark]
+    /**
+     * Names the run of the vehicle for
+     * ``Network/journeyRequest``.
+     * `nil` if the server does not name the run. The text is made for
+     * the network it came from and has no meaning elsewhere; a server
+     * knows a run for about a day.
+     */
+    public var journeyId: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -1535,7 +1561,14 @@ public struct Departure: Equatable, Hashable, Codable {
         /**
          * What the server says about it: disruptions and hints. Empty if it
          * says nothing.
-         */remarks: [Remark]) {
+         */remarks: [Remark], 
+        /**
+         * Names the run of the vehicle for
+         * ``Network/journeyRequest``.
+         * `nil` if the server does not name the run. The text is made for
+         * the network it came from and has no meaning elsewhere; a server
+         * knows a run for about a day.
+         */journeyId: String?) {
         self.stop = stop
         self.line = line
         self.direction = direction
@@ -1545,6 +1578,7 @@ public struct Departure: Equatable, Hashable, Codable {
         self.realtimePlatform = realtimePlatform
         self.cancelled = cancelled
         self.remarks = remarks
+        self.journeyId = journeyId
     }
 
     
@@ -1636,7 +1670,8 @@ struct FfiConverterTypeDeparture: FfiConverterRustBuffer {
                 scheduledPlatform: FfiConverterOptionString.read(from: &buf), 
                 realtimePlatform: FfiConverterOptionString.read(from: &buf), 
                 cancelled: FfiConverterBool.read(from: &buf), 
-                remarks: FfiConverterSequenceTypeRemark.read(from: &buf)
+                remarks: FfiConverterSequenceTypeRemark.read(from: &buf), 
+                journeyId: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -1650,6 +1685,7 @@ struct FfiConverterTypeDeparture: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.realtimePlatform, into: &buf)
         FfiConverterBool.write(value.cancelled, into: &buf)
         FfiConverterSequenceTypeRemark.write(value.remarks, into: &buf)
+        FfiConverterOptionString.write(value.journeyId, into: &buf)
     }
 }
 
@@ -2300,6 +2336,115 @@ func FfiConverterTypeHttpResponse_lower(_ value: HttpResponse) -> RustBuffer {
 
 
 /**
+ * The run of one vehicle from its first stop to its last, as
+ * ``Network/parseJourney`` returns it.
+ * A ``Trip`` is a way from one place to another and can use several
+ * runs, each for a part of it.
+ */
+public struct Journey: Equatable, Hashable, Codable {
+    /**
+     * The line the vehicle runs on.
+     */
+    public var line: Line
+    /**
+     * Where the vehicle is headed, as shown on it.
+     */
+    public var direction: String?
+    /**
+     * Every call of the vehicle in the order of travel. The first has no
+     * arrival and the last no departure. The departure that named the
+     * run is among them, with the ID of its stop and its scheduled time.
+     */
+    public var stops: [Stopover]
+    /**
+     * Whether the whole run does not take place. A single stop that the
+     * vehicle skips is marked on that stop.
+     */
+    public var cancelled: Bool
+    /**
+     * What the server says about the run: disruptions and hints. Empty if
+     * it says nothing.
+     */
+    public var remarks: [Remark]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The line the vehicle runs on.
+         */line: Line, 
+        /**
+         * Where the vehicle is headed, as shown on it.
+         */direction: String?, 
+        /**
+         * Every call of the vehicle in the order of travel. The first has no
+         * arrival and the last no departure. The departure that named the
+         * run is among them, with the ID of its stop and its scheduled time.
+         */stops: [Stopover], 
+        /**
+         * Whether the whole run does not take place. A single stop that the
+         * vehicle skips is marked on that stop.
+         */cancelled: Bool, 
+        /**
+         * What the server says about the run: disruptions and hints. Empty if
+         * it says nothing.
+         */remarks: [Remark]) {
+        self.line = line
+        self.direction = direction
+        self.stops = stops
+        self.cancelled = cancelled
+        self.remarks = remarks
+    }
+
+    
+
+}
+
+#if compiler(>=6)
+extension Journey: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+struct FfiConverterTypeJourney: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Journey {
+        return
+            try Journey(
+                line: FfiConverterTypeLine.read(from: &buf), 
+                direction: FfiConverterOptionString.read(from: &buf), 
+                stops: FfiConverterSequenceTypeStopover.read(from: &buf), 
+                cancelled: FfiConverterBool.read(from: &buf), 
+                remarks: FfiConverterSequenceTypeRemark.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: Journey, into buf: inout [UInt8]) {
+        FfiConverterTypeLine.write(value.line, into: &buf)
+        FfiConverterOptionString.write(value.direction, into: &buf)
+        FfiConverterSequenceTypeStopover.write(value.stops, into: &buf)
+        FfiConverterBool.write(value.cancelled, into: &buf)
+        FfiConverterSequenceTypeRemark.write(value.remarks, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+func FfiConverterTypeJourney_lift(_ buf: RustBuffer) throws -> Journey {
+    return try FfiConverterTypeJourney.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+func FfiConverterTypeJourney_lower(_ value: Journey) -> RustBuffer {
+    return FfiConverterTypeJourney.lower(value)
+}
+
+
+/**
  * One part of a ``Trip``: a ride in one vehicle, or a walk.
  */
 public struct Leg: Equatable, Hashable, Codable {
@@ -2329,6 +2474,14 @@ public struct Leg: Equatable, Hashable, Codable {
      * says nothing.
      */
     public var remarks: [Remark]
+    /**
+     * Names the run of the vehicle for
+     * ``Network/journeyRequest``.
+     * `nil` for a walk, and if the server does not name the run. The
+     * text is made for the network it came from and has no meaning
+     * elsewhere; a server knows a run for about a day.
+     */
+    public var journeyId: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -2352,13 +2505,21 @@ public struct Leg: Equatable, Hashable, Codable {
         /**
          * What the server says about it: disruptions and hints. Empty if it
          * says nothing.
-         */remarks: [Remark]) {
+         */remarks: [Remark], 
+        /**
+         * Names the run of the vehicle for
+         * ``Network/journeyRequest``.
+         * `nil` for a walk, and if the server does not name the run. The
+         * text is made for the network it came from and has no meaning
+         * elsewhere; a server knows a run for about a day.
+         */journeyId: String?) {
         self.kind = kind
         self.departure = departure
         self.arrival = arrival
         self.intermediateStops = intermediateStops
         self.cancelled = cancelled
         self.remarks = remarks
+        self.journeyId = journeyId
     }
 
     
@@ -2381,7 +2542,8 @@ struct FfiConverterTypeLeg: FfiConverterRustBuffer {
                 arrival: FfiConverterTypeLegEnd.read(from: &buf), 
                 intermediateStops: FfiConverterSequenceTypeStopover.read(from: &buf), 
                 cancelled: FfiConverterBool.read(from: &buf), 
-                remarks: FfiConverterSequenceTypeRemark.read(from: &buf)
+                remarks: FfiConverterSequenceTypeRemark.read(from: &buf), 
+                journeyId: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -2392,6 +2554,7 @@ struct FfiConverterTypeLeg: FfiConverterRustBuffer {
         FfiConverterSequenceTypeStopover.write(value.intermediateStops, into: &buf)
         FfiConverterBool.write(value.cancelled, into: &buf)
         FfiConverterSequenceTypeRemark.write(value.remarks, into: &buf)
+        FfiConverterOptionString.write(value.journeyId, into: &buf)
     }
 }
 
@@ -3300,6 +3463,30 @@ public func departuresRequest(query: DeparturesQuery)throws  -> HttpRequest  {
 }
     
     /**
+     * Builds the request for the run of one vehicle, from the
+     * ``Departure/journeyId`` of a departure, an arrival or a leg that
+     * this network returned.
+     *
+     * # Errors
+     *
+     * Returns ``PublicTransportError/invalidQuery`` if the ID is not one of this
+     * network. MOTIS and HAFAS send any text on, and their servers do not
+     * know a foreign one. ``PublicTransportError/unsupported`` and
+     * ``PublicTransportError/invalidNetwork`` are as for
+     * ``Network/departuresRequest``; EFA and HAFAS always need the
+     * time zone here.
+     */
+public func journeyRequest(id: String)throws  -> HttpRequest  {
+    return try  FfiConverterTypeHttpRequest_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_journey_request(
+            FfiConverterTypeNetwork_lower(self),
+        FfiConverterString.lower(id),uniffiCallStatus
+    )
+})
+}
+    
+    /**
      * Builds the request that searches for locations by name.
      *
      * # Errors
@@ -3378,6 +3565,26 @@ public func parseDepartures(response: HttpResponse)throws  -> [Departure]  {
     return try  FfiConverterSequenceTypeDeparture.lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
         uniffiCallStatus in
     uniffi_publictransport_fn_method_network_parse_departures(
+            FfiConverterTypeNetwork_lower(self),
+        FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Parses the response to a ``Network/journeyRequest``.
+     *
+     * # Errors
+     *
+     * Returns ``PublicTransportError/notFound`` if the server does not know the run,
+     * as for an ID that is older than about a day, and another error if
+     * the status code reports a failure or if the body is not what the
+     * protocol defines.
+     */
+public func parseJourney(response: HttpResponse)throws  -> Journey  {
+    return try  FfiConverterTypeJourney_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_parse_journey(
             FfiConverterTypeNetwork_lower(self),
         FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
     )
@@ -5394,6 +5601,10 @@ public enum NetworkOperation: Equatable, Hashable, CaseIterable {
      * The stops near a position.
      */
     case nearby
+    /**
+     * The run of one vehicle.
+     */
+    case journeys
 
 
 
@@ -5422,6 +5633,8 @@ struct FfiConverterTypeNetworkOperation: FfiConverterRustBuffer {
         
         case 4: return .nearby
         
+        case 5: return .journeys
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -5444,6 +5657,10 @@ struct FfiConverterTypeNetworkOperation: FfiConverterRustBuffer {
         
         case .nearby:
             writeInt(&buf, Int32(4))
+        
+        
+        case .journeys:
+            writeInt(&buf, Int32(5))
         
         }
     }
@@ -5727,8 +5944,9 @@ enum PublicTransportError: Swift.Error, Equatable, Hashable, Foundation.Localize
          */message: String
     )
     /**
-     * The network does not know the stop the query names, or cannot plan
-     * a trip from or to a place because it knows no stop near it.
+     * The network does not know the stop or the run of a vehicle that the
+     * query names, or cannot plan a trip from or to a place because it
+     * knows no stop near it.
      */
     case notFound(
         /**

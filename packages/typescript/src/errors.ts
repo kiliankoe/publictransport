@@ -32,7 +32,7 @@ export class UnsupportedError extends PublicTransportError {
   override name = "UnsupportedError";
 }
 
-/** The network does not know the stop the query names, or knows no stop near a place of a trip. */
+/** The network does not know the stop or the run of a vehicle that the query names, or knows no stop near a place of a trip. */
 export class NotFoundError extends PublicTransportError {
   override name = "NotFoundError";
 }

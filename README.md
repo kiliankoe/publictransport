@@ -4,7 +4,7 @@
 
 A client library for public transport APIs, for Rust, Python, Swift, Kotlin and TypeScript. The libraries use a shared model for stops, departures and trips that covers several server types, so an application can query any supported network the same way.
 
-The project is at an early stage. It can search for locations by name, find the stops near a position, list the departures and arrivals at a stop and plan trips between two places, on servers that speak one of six protocols:
+The project is at an early stage. It can search for locations by name, find the stops near a position, list the departures and arrivals at a stop, follow the run of a vehicle through its stops and plan trips between two places, on servers that speak one of six protocols:
 
 - EFA, the JSON interface of MDV's journey planner, used by many German transport associations
 - MOTIS, the routing engine behind [Transitous](https://transitous.org)

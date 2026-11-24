@@ -44,6 +44,17 @@ for (stop in client.nearby(network, position, radiusMeters = 500)) {
 val arrivals = client.arrivals(network, from, limit = 10)
 ```
 
+`journey` gives the run of one vehicle: every stop it calls at, with times and platforms. It takes the `journeyId` of a departure, an arrival or a leg of a trip. The ID only works on the network it came from, and for about a day.
+
+```kotlin
+val id = client.departures(network, from, limit = 10).firstNotNullOfOrNull { it.journeyId }
+if (id != null) {
+    for (stopover in client.journey(network, id).stops) {
+        println("${stopover.scheduledDeparture ?: stopover.scheduledArrival} ${stopover.stop.name}")
+    }
+}
+```
+
 One client serves every network, so create one and keep it. The [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/kotlin) have a program for each kind of request.
 
 ## Trips
@@ -98,7 +109,7 @@ stop.localTime(anyTime)      // the same for any time at a location
 
 ## Disruptions and hints
 
-A departure and a leg of a trip have `remarks`: the texts that the server sends with them. Every protocol but MOTIS fills them. A remark is one of two kinds. A disruption is a message from the incident system of the operator, such as a closed road or a broken elevator. A hint is a fixed property of the ride, such as air conditioning or a note for wheelchair users.
+A departure, a leg of a trip and the run of a vehicle have `remarks`: the texts that the server sends with them. Every protocol but MOTIS fills them. A remark is one of two kinds. A disruption is a message from the incident system of the operator, such as a closed road or a broken elevator. A hint is a fixed property of the ride, such as air conditioning or a note for wheelchair users.
 
 ```kotlin
 for (remark in departure.remarks.filter { it.kind == RemarkKind.DISRUPTION }) {

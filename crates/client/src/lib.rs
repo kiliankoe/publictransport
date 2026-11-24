@@ -202,6 +202,22 @@ impl Client {
         Ok(network.parse_arrivals(&response)?)
     }
 
+    /// Fetches the run of one vehicle: all its stops with times and
+    /// platforms. The ID is the [`Departure::journey_id`] of a departure,
+    /// an arrival or a leg that this network returned. See
+    /// [`Network::parse_journey`] for the result.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Transport`] if the request got no answer and
+    /// [`Error::Api`] for everything the server or the ID got wrong, such
+    /// as [`ApiError::NotFound`] for a run the server no longer knows.
+    pub async fn journey(&self, network: &Network, id: &str) -> Result<Journey, Error> {
+        let request = network.journey_request(id)?;
+        let response = self.send(request).await?;
+        Ok(network.parse_journey(&response)?)
+    }
+
     /// Plans trips between two places. The query is a [`TripsQuery`],
     /// whose ends are locations, coordinates or IDs. See
     /// [`Network::parse_trips`] for the result. Its references continue the search:

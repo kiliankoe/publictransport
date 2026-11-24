@@ -4,9 +4,13 @@
 use std::{error::Error, fs, path::PathBuf};
 
 use publictransport::{
-    Coordinate, DeparturesQuery, HttpRequest, LocationKind, LocationQuery, NearbyQuery, Network,
-    Place, Protocol, Timestamp, TripsQuery,
+    Coordinate, DeparturesQuery, HttpRequest, HttpResponse, LocationKind, LocationQuery,
+    NearbyQuery, Network, Place, Protocol, Timestamp, TripsQuery,
 };
+
+/// An answer with a departure per protocol: only an answer names a run.
+const TRIAS_DEPARTURE: &[u8] = include_bytes!("../tests/fixtures/trias/vvo-journey-departure.xml");
+const OJP_DEPARTURE: &[u8] = include_bytes!("../tests/fixtures/ojp/vrr-journey-departure.xml");
 
 fn main() -> Result<(), Box<dyn Error>> {
     let directory = PathBuf::from(std::env::args().nth(1).ok_or("usage: xml_requests <dir>")?);
@@ -19,9 +23,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         longitude: 13.7467,
     });
 
-    for (name, protocol) in [("trias", Protocol::Trias), ("ojp", Protocol::Ojp1)] {
+    for (name, protocol, departure) in [
+        ("trias", Protocol::Trias, TRIAS_DEPARTURE),
+        ("ojp", Protocol::Ojp1, OJP_DEPARTURE),
+    ] {
         let network = Network::new(name, name, "https://example.org", protocol)
             .with_requestor_ref("OpenService");
+        let departures = network.parse_departures(&HttpResponse {
+            status: 200,
+            headers: Vec::new(),
+            body: departure.to_vec(),
+        })?;
+        let run = departures
+            .into_iter()
+            .find_map(|departure| departure.journey_id)
+            .ok_or("the recorded departure names no run")?;
         let requests = [
             (
                 "locations",
@@ -75,6 +91,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         .with_limit(3),
                 )?,
             ),
+            ("journey", network.journey_request(&run)?),
         ];
         for (kind, HttpRequest { body, .. }) in requests {
             let file = directory.join(format!("{name}-{kind}.xml"));

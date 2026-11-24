@@ -218,6 +218,20 @@ class Client(
     ): List<Arrival> = network.parseArrivals(send(network.arrivalsRequest(query)))
 
     /**
+     * Fetches the run of one vehicle: all its stops with times and
+     * platforms.
+     *
+     * @param id The [journeyId][Departure.journeyId] of a departure, an
+     *   arrival or a leg that this network returned. It has no meaning on
+     *   another network, and a server knows a run for about a day: after
+     *   that the call throws [PublicTransportException.NotFound].
+     */
+    suspend fun journey(
+        network: Network,
+        id: String,
+    ): Journey = network.parseJourney(send(network.journeyRequest(id)))
+
+    /**
      * Plans trips between two locations, in the order the server ranks
      * them. A location that another network returned works as well.
      *

@@ -3,9 +3,10 @@
 use serde::Deserialize;
 
 use crate::{
-    Coordinate, Departure, DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, Leg,
-    LegKind, Line, Location, LocationKind, LocationQuery, Mode, NearbyQuery, Network, Stopover,
-    Trip, TripTime, Trips, TripsQuery,
+    Coordinate, Departure, DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, Journey,
+    Leg, LegKind, Line, Location, LocationKind, LocationQuery, Mode, NearbyQuery, Network,
+    Stopover, Trip, TripTime, Trips, TripsQuery,
+    http::lenient_text,
     model::{Board, Target},
     time::WireTime,
 };
@@ -208,6 +209,37 @@ pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<Htt
     Ok(HttpRequest::get(&network.endpoint, "v6/plan", parameters))
 }
 
+pub(crate) fn journey_request(network: &Network, id: &str) -> HttpRequest {
+    HttpRequest::get(&network.endpoint, "v6/trip", vec![("tripId", id)])
+}
+
+/// The server answers with a trip of one leg, which is the whole run.
+pub(crate) fn parse_journey(response: &HttpResponse) -> Result<Journey, Error> {
+    let itinerary: Itinerary = json(response)?;
+    let leg = itinerary
+        .legs
+        .into_iter()
+        .next()
+        .ok_or_else(|| Error::Parse {
+            message: "the run has no leg".to_owned(),
+        })?;
+    let real_time = leg.vehicle.real_time;
+    let cancelled = leg.vehicle.cancelled;
+    let mode = transit_mode(&leg.vehicle.mode).unwrap_or(Mode::Other);
+    let (line, direction) = leg.vehicle.into_line(mode);
+    Ok(Journey {
+        line,
+        direction,
+        stops: std::iter::once(leg.from)
+            .chain(leg.intermediate_stops)
+            .chain([leg.to])
+            .map(|place| place.into_stopover(real_time))
+            .collect(),
+        cancelled,
+        remarks: Vec::new(),
+    })
+}
+
 fn place(place: Target) -> String {
     match place {
         Target::Id(id) => id,
@@ -291,6 +323,9 @@ struct Vehicle {
     route_short_name: Option<String>,
     #[serde(default)]
     cancelled: bool,
+    /// Names the run for `v6/trip`.
+    #[serde(default, deserialize_with = "lenient_text")]
+    trip_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -400,7 +435,7 @@ impl Vehicle {
 }
 
 impl StopTime {
-    fn into_departure(self, board: Board) -> Result<Departure, Error> {
+    fn into_departure(mut self, board: Board) -> Result<Departure, Error> {
         let cancelled = self.vehicle.cancelled || self.trip_cancelled || self.place.cancelled;
         if self.place.stop_id.is_none() {
             return Err(Error::Parse {
@@ -408,6 +443,7 @@ impl StopTime {
             });
         }
         let stopover = self.place.into_stopover(self.vehicle.real_time);
+        let journey_id = non_empty(self.vehicle.trip_id.take());
         let mode = transit_mode(&self.vehicle.mode).unwrap_or(Mode::Other);
         let (line, direction) = self.vehicle.into_line(mode);
         let origin = self.trip_from.and_then(|from| from.name);
@@ -427,13 +463,15 @@ impl StopTime {
             realtime_platform: end.realtime_platform,
             cancelled,
             remarks: Vec::new(),
+            journey_id,
         })
     }
 }
 
 impl WireLeg {
     fn into_leg(self) -> Result<Leg, Error> {
-        let wire = self;
+        let mut wire = self;
+        let journey_id = non_empty(wire.vehicle.trip_id.take());
         let no_time = || Error::Parse {
             message: "a leg has no scheduled time at one of its ends".to_owned(),
         };
@@ -469,6 +507,7 @@ impl WireLeg {
                 }
             },
             remarks: Vec::new(),
+            journey_id,
         })
     }
 }

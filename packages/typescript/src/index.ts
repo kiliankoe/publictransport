@@ -51,11 +51,13 @@ export {
 export {
   arrivalsRequest,
   departuresRequest,
+  journeyRequest,
   locationsRequest,
   nearbyRequest,
   networkFromJson,
   parseArrivals,
   parseDepartures,
+  parseJourney,
   parseLocations,
   parseNearby,
   parseTrips,

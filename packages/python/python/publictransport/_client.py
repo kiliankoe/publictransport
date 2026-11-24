@@ -14,6 +14,7 @@ from publictransport._uniffi import (
     Header,
     HttpRequest,
     HttpResponse,
+    Journey,
     Location,
     LocationQuery,
     NearbyQuery,
@@ -284,6 +285,17 @@ class Client:
         request = network.arrivals_request(_departures_query(stop, time, limit))
         return network.parse_arrivals(self._send(request))
 
+    def journey(self, network: Network, journey_id: str) -> Journey:
+        """Fetch the run of one vehicle: all its stops with times and platforms.
+
+        `journey_id` is the `journey_id` of a departure, an arrival or a leg
+        that this network returned. It has no meaning on another network,
+        and a server knows a run for about a day: after that the call
+        raises `Error.NotFound`.
+        """
+        request = network.journey_request(journey_id)
+        return network.parse_journey(self._send(request))
+
     def trips(  # noqa: PLR0913
         self,
         network: Network,
@@ -450,6 +462,17 @@ class AsyncClient:
         """
         request = network.arrivals_request(_departures_query(stop, time, limit))
         return network.parse_arrivals(await self._send(request))
+
+    async def journey(self, network: Network, journey_id: str) -> Journey:
+        """Fetch the run of one vehicle: all its stops with times and platforms.
+
+        `journey_id` is the `journey_id` of a departure, an arrival or a leg
+        that this network returned. It has no meaning on another network,
+        and a server knows a run for about a day: after that the call
+        raises `Error.NotFound`.
+        """
+        request = network.journey_request(journey_id)
+        return network.parse_journey(await self._send(request))
 
     async def trips(  # noqa: PLR0913
         self,

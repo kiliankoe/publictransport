@@ -6,11 +6,11 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::{
-    Coordinate, Departure, DeparturesQuery, Error, Header, HttpRequest, HttpResponse, Leg, LegEnd,
-    LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, NearbyQuery, Network,
-    Place, Remark, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
-    http::lenient_list,
-    model::{Board, Target, plain_text},
+    Coordinate, Departure, DeparturesQuery, Error, Header, HttpRequest, HttpResponse, Journey, Leg,
+    LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, NearbyQuery,
+    Network, Place, Remark, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
+    http::{lenient_list, lenient_text},
+    model::{Board, Target, journey_id, journey_parts, plain_text},
     time::WireTime,
 };
 
@@ -21,10 +21,11 @@ const QUAY: &str =
     "fragment quay on Quay{id name publicCode latitude longitude timeZone stopPlace{name}}";
 const LINE: &str =
     "fragment line on Line{publicCode name transportMode transportSubmode authority{name}}";
-const CALL: &str = "fragment call on EstimatedCall{aimedArrivalTime expectedArrivalTime \
+// `date` and the ID of the service journey name the run of the vehicle.
+const CALL: &str = "fragment call on EstimatedCall{date aimedArrivalTime expectedArrivalTime \
     aimedDepartureTime expectedDepartureTime realtime cancellation \
     destinationDisplay{frontText} quay{...quay} scheduledQuay{publicCode} \
-    serviceJourney{line{...line}}}";
+    serviceJourney{id line{...line}}}";
 // Only the calls that become a departure or start a leg ask for remarks:
 // every call of a ride would repeat the same ones.
 const SITUATION: &str = "fragment situation on PtSituationElement{situationNumber \
@@ -35,6 +36,8 @@ const NEAREST: &str = "query($latitude:Float!,$longitude:Float!,$radius:Float!,$
     nearest(latitude:$latitude,longitude:$longitude,maximumDistance:$radius,\
     maximumResults:$limit,filterByPlaceTypes:[stopPlace]){\
     edges{node{place{... on StopPlace{id name latitude longitude}}}}}}";
+const JOURNEY: &str = "query($id:String!,$date:Date){serviceJourney(id:$id){line{...line} \
+    situations{...situation} notices{text} estimatedCalls(date:$date){...call}}}";
 const TRIPS: &str = "query($from:Location!,$to:Location!,$time:DateTime,$arriveBy:Boolean,\
     $limit:Int,$page:String){trip(from:$from,to:$to,dateTime:$time,arriveBy:$arriveBy,\
     numTripPatterns:$limit,pageCursor:$page){previousPageCursor nextPageCursor routingErrors{code} \
@@ -271,6 +274,51 @@ pub(crate) fn parse_locations(
         .collect())
 }
 
+/// A run is a service journey on one day.
+pub(crate) fn journey_request(network: &Network, id: &str) -> Result<HttpRequest, Error> {
+    let (date, id): (String, String) = journey_parts(id)?;
+    Ok(request(
+        network,
+        JOURNEY,
+        [("id", Some(json!(id))), ("date", Some(json!(date)))],
+    ))
+}
+
+pub(crate) fn parse_journey(network: &Network, response: &HttpResponse) -> Result<Journey, Error> {
+    let (data, error) = data(response)?;
+    let Some(journey) = data.service_journey else {
+        return Err(error.unwrap_or_else(Journey::unknown));
+    };
+    let calls = explained(journey.estimated_calls.unwrap_or_default(), error)?;
+    Ok(Journey {
+        line: journey
+            .line
+            .map(WireLine::into_line)
+            .ok_or_else(|| Error::Parse {
+                message: "the run has no line".to_owned(),
+            })?,
+        direction: calls.first().and_then(Call::direction),
+        cancelled: !calls.is_empty() && calls.iter().all(|call| call.cancellation),
+        remarks: remarks(journey.situations, journey.notices),
+        stops: {
+            let mut stops = calls
+                .into_iter()
+                .map(|call| call.into_stopover(network))
+                .collect::<Result<Vec<_>, _>>()?;
+            // The server sends all four times for every call.
+            if let Some(first) = stops.first_mut() {
+                first.scheduled_arrival = None;
+                first.realtime_arrival = None;
+            }
+            if let Some(last) = stops.last_mut() {
+                last.scheduled_departure = None;
+                last.realtime_departure = None;
+            }
+            stops
+        },
+    })
+}
+
 /// The data of a GraphQL answer, and the first error the server reports
 /// next to it. An answer can have both: the error then explains what is
 /// missing in the data.
@@ -321,6 +369,7 @@ pub(crate) fn parse_departures(
                 std::mem::take(&mut call.situations),
                 std::mem::take(&mut call.notices),
             );
+            let journey_id = call.journey_id();
             let line = call.service_journey.take().and_then(|journey| journey.line);
             let direction = call.direction();
             let incomplete = || Error::Parse {
@@ -341,6 +390,7 @@ pub(crate) fn parse_departures(
                 realtime_platform: end.realtime_platform,
                 cancelled: end.cancelled,
                 remarks,
+                journey_id,
             })
         })
         .collect::<Result<Vec<_>, Error>>()?;
@@ -430,6 +480,7 @@ struct Data {
     quay: Option<CallBoard>,
     trip: Option<WireTrip>,
     nearest: Option<Nearest>,
+    service_journey: Option<ServiceJourney>,
 }
 
 #[derive(Deserialize)]
@@ -468,6 +519,9 @@ struct CallBoard {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Call {
+    /// The day of operation of the run.
+    #[serde(default, deserialize_with = "lenient_text")]
+    date: Option<String>,
     aimed_arrival_time: Option<WireTime>,
     expected_arrival_time: Option<WireTime>,
     aimed_departure_time: Option<WireTime>,
@@ -560,6 +614,13 @@ fn remarks(situations: Vec<Situation>, notices: Vec<Notice>) -> Vec<Remark> {
 }
 
 impl Call {
+    /// The ID of the run of the vehicle, if the answer names it.
+    fn journey_id(&self) -> Option<String> {
+        let date = self.date.as_deref().filter(|date| !date.is_empty())?;
+        let id = self.service_journey.as_ref()?.id.as_deref()?;
+        (!id.is_empty()).then(|| journey_id(&(date, id))).flatten()
+    }
+
     fn direction(&self) -> Option<String> {
         self.destination_display
             .as_ref()
@@ -651,9 +712,19 @@ struct StopPlace {
     name: Option<String>,
 }
 
+/// A run. Inside a call it has the ID and the line; asked for on its own
+/// it has the calls and the remarks.
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ServiceJourney {
+    #[serde(default, deserialize_with = "lenient_text")]
+    id: Option<String>,
     line: Option<WireLine>,
+    estimated_calls: Option<Vec<Call>>,
+    #[serde(default, deserialize_with = "lenient_list")]
+    situations: Vec<Situation>,
+    #[serde(default, deserialize_with = "lenient_list")]
+    notices: Vec<Notice>,
 }
 
 #[derive(Deserialize)]
@@ -757,6 +828,8 @@ impl WireLeg {
             notices.unwrap_or_default(),
         );
         let direction = self.from_estimated_call.as_ref().and_then(Call::direction);
+        // Only a ride has calls.
+        let journey_id = self.from_estimated_call.as_ref().and_then(Call::journey_id);
         let cancelled = |call: &Option<Call>| call.as_ref().is_some_and(|call| call.cancellation);
         let end =
             |place: WirePlace, call: &Option<Call>, planned: WireTime, now: Option<WireTime>| {
@@ -800,6 +873,7 @@ impl WireLeg {
                 .map(|call| call.into_stopover(network))
                 .collect::<Result<_, _>>()?,
             remarks,
+            journey_id,
         })
     }
 }

@@ -18,7 +18,8 @@ suspend fun main() {
 
     println("Departures at ${stop.name}:")
     // From now on. `time =` asks for another time.
-    for (departure in client.departures(network, stop, limit = 10)) {
+    val departures = client.departures(network, stop, limit = 10)
+    for (departure in departures) {
         // Times are `Instant` values. A departure also gives them as on the
         // clocks at its stop, where the server names the time zone.
         val time = departure.localScheduledTime?.format(clock) ?: "??:??"
@@ -32,5 +33,16 @@ suspend fun main() {
         for (remark in departure.remarks.filter { it.kind == RemarkKind.DISRUPTION }) {
             remark.title?.let { println("            ! $it") }
         }
+    }
+
+    // The run of the first vehicle: every stop it calls at. The ID only works
+    // on the network it came from, and for about a day.
+    val id = departures.firstNotNullOfOrNull { it.journeyId } ?: return
+    val journey = client.journey(network, id)
+    println("Stops of ${journey.line.name}:")
+    for (stopover in journey.stops) {
+        // The first stop has no arrival and the last no departure.
+        val time = (stopover.scheduledDeparture ?: stopover.scheduledArrival)?.let(stopover.stop::localTime)
+        println("  ${time?.format(clock) ?: "??:??"} ${stopover.stop.name}")
     }
 }

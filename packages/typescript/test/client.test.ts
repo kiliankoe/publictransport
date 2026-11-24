@@ -14,6 +14,7 @@ import {
   type HttpResponse,
   InvalidNetworkError,
   InvalidQueryError,
+  journeyRequest,
   type LocationQuery,
   locationsRequest,
   MovedError,
@@ -25,6 +26,7 @@ import {
   PublicTransportError,
   parseArrivals,
   parseDepartures,
+  parseJourney,
   parseLocations,
   parseNearby,
   parseTrips,
@@ -67,6 +69,13 @@ function trias(url: string): Network {
 /** The reference to the trips after those of the trips fixture. */
 const later = parseTrips(efa("http://localhost"), ok(fixture("efa/vvo-trip.json"))).later;
 assert.ok(later);
+
+/** The run of a departure in the answer that was recorded with the run. */
+const journeyId = parseDepartures(
+  efa("http://localhost"),
+  ok(fixture("efa/vvo-journey-departure.json")),
+).find((each) => each.journeyId)?.journeyId;
+assert.ok(journeyId);
 
 /** One call of the client, next to the request the core builds for it. */
 interface Case {
@@ -143,6 +152,13 @@ const calls: Case[] = [
   arrivals("arrivals at an ID, with time and limit", { stop: hbf, time, limit: 7 }, (c, n) =>
     c.arrivals(n, hbf, { time, limit: 7 }),
   ),
+  {
+    name: "journey of a departure",
+    fixture: "efa/vvo-journey.json",
+    request: (network) => journeyRequest(network, journeyId),
+    parse: parseJourney,
+    call: (client, network) => client.journey(network, journeyId),
+  },
   trips("trips by query", { origin: hbf, destination: albertplatz }, (client, network) =>
     client.trips(network, { origin: hbf, destination: albertplatz }),
   ),

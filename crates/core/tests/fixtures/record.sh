@@ -120,7 +120,7 @@ curl --silent --show-error --fail --max-time 30 --user-agent "$user_agent" --hea
 quay='fragment quay on Quay{id name publicCode latitude longitude timeZone stopPlace{name}}'
 line='fragment line on Line{publicCode name transportMode transportSubmode authority{name}}'
 situation='fragment situation on PtSituationElement{situationNumber summary{value} description{value} infoLinks{uri} validityPeriods{startTime endTime}}'
-call="fragment call on EstimatedCall{aimedArrivalTime expectedArrivalTime aimedDepartureTime expectedDepartureTime realtime cancellation destinationDisplay{frontText} quay{...quay} scheduledQuay{publicCode} serviceJourney{line{...line}}} $quay $line $situation"
+call="fragment call on EstimatedCall{date aimedArrivalTime expectedArrivalTime aimedDepartureTime expectedDepartureTime realtime cancellation destinationDisplay{frontText} quay{...quay} scheduledQuay{publicCode} serviceJourney{id line{...line}}} $quay $line $situation"
 departures="query(\$id:String!,\$limit:Int,\$start:DateTime){stopPlace(id:\$id){estimatedCalls(numberOfDepartures:\$limit,startTime:\$start,includeCancelledTrips:true){...call situations{...situation} notices{text}}}} $call"
 trips="query(\$from:Location!,\$to:Location!,\$time:DateTime,\$arriveBy:Boolean,\$limit:Int,\$page:String){trip(from:\$from,to:\$to,dateTime:\$time,arriveBy:\$arriveBy,numTripPatterns:\$limit,pageCursor:\$page){previousPageCursor nextPageCursor tripPatterns{legs{mode aimedStartTime expectedStartTime aimedEndTime expectedEndTime realtime fromPlace{...place} toPlace{...place} line{...line} situations{...situation} fromEstimatedCall{...call notices{text}} toEstimatedCall{...call} intermediateEstimatedCalls{...call}}}}} fragment place on Place{name latitude longitude quay{...quay}} $call"
 
@@ -135,3 +135,37 @@ otp otp/entur-arrivals.json ${departures/includeCancelledTrips:true/includeCance
 otp otp/entur-departures-unknown-stop.json $departures '{"id":"NSR:StopPlace:0"}'
 otp otp/entur-trip.json $trips '{"from":{"place":"NSR:StopPlace:59872"},"to":{"place":"NSR:StopPlace:58211"},"limit":3}'
 otp otp/entur-nearby.json '{nearest(latitude:59.9109,longitude:10.7530,maximumDistance:500,maximumResults:5,filterByPlaceTypes:[stopPlace]){edges{node{distance place{... on StopPlace{id name latitude longitude}}}}}}' '{}'
+
+# The run of one vehicle: the next departure at a stop and then the run it
+# belongs to. A server knows a run for about a day, so the two files of a
+# network only fit together when they are recorded together.
+efa_common='outputFormat=rapidJSON&coordOutputFormat=WGS84%5Bdd.ddddd%5D'
+fetch efa/vvo-journey-departure.json "https://efa.vvo-online.de/std3/XML_DM_REQUEST?type_dm=any&name_dm=de:14612:28&mode=direct&useRealtime=1&limit=1&$efa_common"
+TZ=Europe/Berlin jq -r '.stopEvents[0] | (.departureTimePlanned | fromdate) as $time | [.transportation.id, .location.parent.id, .transportation.properties.tripCode, ($time | strflocaltime("%Y%m%d")), ($time | strflocaltime("%H%M"))] | join("\t")' efa/vvo-journey-departure.json | IFS=$'\t' read -r run_line run_stop run_code run_date run_time
+curl --silent --show-error --fail --max-time 30 --user-agent "$user_agent" --output efa/vvo-journey.json --get \
+  --data-urlencode "line=$run_line" --data-urlencode "stopID=$run_stop" --data-urlencode "tripCode=$run_code" \
+  --data-urlencode "date=$run_date" --data-urlencode "time=$run_time" \
+  "https://efa.vvo-online.de/std3/XML_TRIPSTOPTIMES_REQUEST?tStOTType=ALL&useRealtime=1&$efa_common"
+
+fetch motis/transitous-journey-departure.json "$motis/v6/stoptimes?stopId=de-DELFI_de:14612:28&n=1"
+curl --silent --show-error --fail --max-time 30 --user-agent "$user_agent" --output motis/transitous-journey.json --get \
+  --data-urlencode "tripId=$(jq -r '.stopTimes[0].tripId' motis/transitous-journey-departure.json)" "$motis/v6/trip"
+
+# first <element> <file>: the text of the first element of that name
+first() {
+  grep --only-matching "$1>[^<]*" "$2" | head -1 | cut -d'>' -f2
+}
+
+post trias/vvo-journey-departure.xml $vvo_trias "$(trias_departures de:14612:28 | sed 's/<NumberOfResults>10</<NumberOfResults>1</')"
+post trias/vvo-journey.xml $vvo_trias "$(trias "<TripInfoRequest><JourneyRef>$(first JourneyRef trias/vvo-journey-departure.xml)</JourneyRef><OperatingDayRef>$(first OperatingDayRef trias/vvo-journey-departure.xml)</OperatingDayRef><Params><UseTimetabledDataOnly>false</UseTimetabledDataOnly><IncludeCalls>true</IncludeCalls></Params></TripInfoRequest>")"
+post ojp/vrr-journey-departure.xml $vrr_ojp "$(ojp_departures de:05111:18235 | sed 's/NumberOfResults>10</NumberOfResults>1</')"
+post ojp/vrr-journey.xml $vrr_ojp "$(ojp "<ojp:OJPTripInfoRequest><ojp:JourneyRef>$(first JourneyRef ojp/vrr-journey-departure.xml)</ojp:JourneyRef><ojp:OperatingDayRef>$(first OperatingDayRef ojp/vrr-journey-departure.xml)</ojp:OperatingDayRef><ojp:Params><ojp:UseTimetabledDataOnly>false</ojp:UseTimetabledDataOnly><ojp:IncludeCalls>true</ojp:IncludeCalls></ojp:Params></ojp:OJPTripInfoRequest>")"
+
+hafas hafas/vbb-journey-departure.json $vbb StationBoard '{"type":"DEP","stbLoc":{"lid":"A=1@L=900100003@"},"maxJny":1}'
+hafas hafas/vbb-journey.json $vbb JourneyDetails "$(jq -c '{jid: .svcResL[0].res.jnyL[0].jid}' hafas/vbb-journey-departure.json)"
+
+otp otp/entur-journey-departure.json $departures '{"id":"NSR:StopPlace:59872","limit":1}'
+otp otp/entur-journey.json "query(\$id:String!,\$date:Date){serviceJourney(id:\$id){line{...line} situations{...situation} notices{text} estimatedCalls(date:\$date){...call}}} $call" \
+  "$(jq -c '.data.stopPlace.estimatedCalls[0] | {id: .serviceJourney.id, date: .date}' otp/entur-journey-departure.json)"
+# A trip whose legs name their runs, which the older file lacks.
+otp otp/entur-journey-trip.json $trips '{"from":{"place":"NSR:StopPlace:59872"},"to":{"place":"NSR:StopPlace:58211"},"limit":1}'

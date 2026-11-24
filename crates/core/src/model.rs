@@ -557,6 +557,16 @@ pub struct Departure {
         serde(default, deserialize_with = "crate::wasm::or_default")
     )]
     pub remarks: Vec<Remark>,
+    /// Names the run of the vehicle for
+    /// [`Network::journey_request`](crate::Network::journey_request).
+    /// `None` if the server does not name the run. The text is made for
+    /// the network it came from and has no meaning elsewhere; a server
+    /// knows a run for about a day.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub journey_id: Option<String>,
 }
 
 /// A text that a server sends with a departure or with a leg of a trip.
@@ -830,6 +840,16 @@ pub struct Arrival {
         serde(default, deserialize_with = "crate::wasm::or_default")
     )]
     pub remarks: Vec<Remark>,
+    /// Names the run of the vehicle for
+    /// [`Network::journey_request`](crate::Network::journey_request).
+    /// `None` if the server does not name the run. The text is made for
+    /// the network it came from and has no meaning elsewhere; a server
+    /// knows a run for about a day.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub journey_id: Option<String>,
 }
 
 /// Which side of the vehicles at a stop an answer lists. The parsers read
@@ -853,6 +873,7 @@ impl Arrival {
             realtime_platform: read.realtime_platform,
             cancelled: read.cancelled,
             remarks: read.remarks,
+            journey_id: read.journey_id,
         }
     }
 }
@@ -1305,6 +1326,66 @@ impl Trip {
     }
 }
 
+/// The run of one vehicle from its first stop to its last, as
+/// [`Network::parse_journey`](crate::Network::parse_journey) returns it.
+/// A [`Trip`] is a way from one place to another and can use several
+/// runs, each for a part of it.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+#[cfg_attr(feature = "uniffi", uniffi::export(Debug))]
+#[cfg_attr(
+    feature = "unstable-wasm",
+    derive(serde::Serialize, serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
+pub struct Journey {
+    /// The line the vehicle runs on.
+    pub line: Line,
+    /// Where the vehicle is headed, as shown on it.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub direction: Option<String>,
+    /// Every call of the vehicle in the order of travel. The first has no
+    /// arrival and the last no departure. The departure that named the
+    /// run is among them, with the ID of its stop and its scheduled time.
+    pub stops: Vec<Stopover>,
+    /// Whether the whole run does not take place. A single stop that the
+    /// vehicle skips is marked on that stop.
+    pub cancelled: bool,
+    /// What the server says about the run: disruptions and hints. Empty if
+    /// it says nothing.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(default, deserialize_with = "crate::wasm::or_default")
+    )]
+    pub remarks: Vec<Remark>,
+}
+
+impl Journey {
+    /// What a server's answer without a run stands for.
+    pub(crate) fn unknown() -> crate::Error {
+        crate::Error::NotFound {
+            message: "the server does not know the run".to_owned(),
+        }
+    }
+}
+
+/// The text of a [`Departure::journey_id`] for protocols that name a run
+/// by more than one value.
+pub(crate) fn journey_id<T: serde::Serialize>(parts: &T) -> Option<String> {
+    serde_json::to_string(parts).ok()
+}
+
+/// The values in an ID that [`journey_id`] made.
+pub(crate) fn journey_parts<'a, T: serde::Deserialize<'a>>(id: &'a str) -> Result<T, crate::Error> {
+    serde_json::from_str(id).map_err(|_| crate::Error::InvalidQuery {
+        message: "the ID does not name a run on this network".to_owned(),
+    })
+}
+
 /// One part of a [`Trip`]: a ride in one vehicle, or a walk.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
@@ -1334,6 +1415,16 @@ pub struct Leg {
         serde(default, deserialize_with = "crate::wasm::or_default")
     )]
     pub remarks: Vec<Remark>,
+    /// Names the run of the vehicle for
+    /// [`Network::journey_request`](crate::Network::journey_request).
+    /// `None` for a walk, and if the server does not name the run. The
+    /// text is made for the network it came from and has no meaning
+    /// elsewhere; a server knows a run for about a day.
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub journey_id: Option<String>,
 }
 
 /// How a [`Leg`] is traveled.

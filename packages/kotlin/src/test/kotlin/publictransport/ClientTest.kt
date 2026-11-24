@@ -70,6 +70,14 @@ private val later: String by lazy {
     )
 }
 
+/** The run of a departure in the answer that was recorded with the run. */
+private val journeyId: String by lazy {
+    BundledNetwork.VVO_EFA
+        .network()
+        .parseDepartures(ok(fixture("efa/vvo-journey-departure.json")))
+        .firstNotNullOf { it.journeyId }
+}
+
 internal fun fixture(path: String): ByteArray = File("../../crates/core/tests/fixtures/$path").readBytes()
 
 internal fun ok(body: ByteArray) = HttpResponse(status = 200u, headers = emptyList(), body = body)
@@ -181,6 +189,12 @@ private val calls =
         arrivals("arrivals at an ID, with time and limit", DeparturesQuery(hbf, time, 7u)) {
             arrivals(it, "de:14612:28", time, 7)
         },
+        Case(
+            "journey of a departure",
+            "efa/vvo-journey.json",
+            request = { journeyRequest(journeyId) },
+            parse = { parseJourney(it) },
+        ) { journey(it, journeyId) },
         trips("trips by query", { TripsQuery(hbf, albertplatz) }) { trips(it, TripsQuery(hbf, albertplatz)) },
         trips(
             "trips between locations, departing at a time, with limit",

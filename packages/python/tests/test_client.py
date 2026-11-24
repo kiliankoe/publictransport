@@ -60,10 +60,22 @@ UNREACHABLE = Network(
     id="none", name="None", endpoint="http://127.0.0.1:1", protocol=Protocol.MOTIS
 )
 LOCATIONS = LocationQuery(text="Hauptbahnhof")
+# The run of a departure in the answer that was recorded with the run.
+JOURNEY_ID = next(
+    departure.journey_id
+    for departure in EFA.parse_departures(
+        HttpResponse(
+            status=200,
+            headers=[],
+            body=(FIXTURES / "efa/vvo-journey-departure.json").read_bytes(),
+        )
+    )
+    if departure.journey_id
+)
 
 Handler = Callable[[httpx.Request], httpx.Response]
-# Runs one operation ("locations", "nearby", "departures", "arrivals" or
-# "trips") of a client whose requests the handler answers.
+# Runs one operation ("locations", "nearby", "departures", "arrivals",
+# "journey" or "trips") of a client whose requests the handler answers.
 Call = Callable[[Handler, str, Network, object], object]
 
 
@@ -135,6 +147,7 @@ class TooLarge(httpx.SyncByteStream, httpx.AsyncByteStream):
             ),
             "efa/vvo-arrivals.json",
         ),
+        (EFA, "journey", JOURNEY_ID, "efa/vvo-journey.json"),
         (
             EFA,
             "trips",

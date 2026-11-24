@@ -26,6 +26,8 @@ pub enum Operation {
     Trips,
     /// The stops near a position.
     Nearby,
+    /// The run of one vehicle.
+    Journeys,
 }
 
 /// Where a [`Network`] has data, in three tiers of quality.

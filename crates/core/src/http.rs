@@ -99,6 +99,22 @@ impl std::fmt::Display for Header {
     }
 }
 
+/// A text that only adds to an answer, such as the name of a run for a
+/// later request. A number is read as its digits and a value of any other
+/// shape as none, so that it never costs the answer.
+pub(crate) fn lenient_text<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(
+        match <serde_json::Value as serde::Deserialize>::deserialize(deserializer)? {
+            serde_json::Value::String(text) => Some(text),
+            serde_json::Value::Number(number) => Some(number.to_string()),
+            _ => None,
+        },
+    )
+}
+
 /// A list of which every entry of another shape than `T` is left out, and
 /// which is empty if the value is no list. For data next to the answer, such
 /// as remarks, that must not cost the answer when a server writes it in a

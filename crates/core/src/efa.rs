@@ -3,11 +3,11 @@
 use serde::Deserialize;
 
 use crate::{
-    Coordinate, Departure, DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, Leg,
-    LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Mode, NearbyQuery, Network,
+    Coordinate, Departure, DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, Journey,
+    Leg, LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Mode, NearbyQuery, Network,
     Remark, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
-    http::lenient_list,
-    model::{Board, Target, plain_text},
+    http::{lenient_list, lenient_text},
+    model::{Board, Target, journey_id, journey_parts, plain_text},
     time::WireTime,
 };
 
@@ -181,6 +181,47 @@ pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<Htt
     ))
 }
 
+/// The server finds a run by its line, its trip code and one of its calls:
+/// a stop and the planned time there. The ID holds these four.
+pub(crate) fn journey_request(network: &Network, id: &str) -> Result<HttpRequest, Error> {
+    let (line, stop, trip_code, time): (String, String, String, i64) = journey_parts(id)?;
+    let (date, time) = local_time(network, Timestamp { unix_seconds: time })?;
+    let mut parameters = common();
+    parameters.extend([
+        ("line", line.as_str()),
+        ("stopID", stop.as_str()),
+        ("tripCode", trip_code.as_str()),
+        ("date", date.as_str()),
+        ("time", time.as_str()),
+        // Every stop of the run and not only those from `stopID` on.
+        ("tStOTType", "ALL"),
+        ("useRealtime", "1"),
+    ]);
+    Ok(HttpRequest::get(
+        &network.endpoint,
+        "XML_TRIPSTOPTIMES_REQUEST",
+        parameters,
+    ))
+}
+
+pub(crate) fn parse_journey(network: &Network, response: &HttpResponse) -> Result<Journey, Error> {
+    let response: JourneyResponse = response.json()?;
+    // For a run it does not know, the server sends the line without stops.
+    let leg = response.leg.ok_or_else(Journey::unknown)?;
+    let (line, direction) = leg.transportation.into_line();
+    Ok(Journey {
+        line,
+        direction,
+        stops: leg
+            .stop_sequence
+            .into_iter()
+            .map(|call| call.into_stopover(network))
+            .collect(),
+        cancelled: is_cancelled(leg.is_cancelled, &leg.realtime_status),
+        remarks: remarks(network, leg.infos, leg.hints),
+    })
+}
+
 /// The walk from one leg to the next. The server does not send it as a leg
 /// of its own when it is a change of platform inside a station. `None` if
 /// one of the two legs is a walk already or if the walk would not fit
@@ -216,6 +257,7 @@ fn walk_between(previous: &Leg, next: &Leg, seconds: i64) -> Option<Leg> {
         intermediate_stops: Vec::new(),
         cancelled: false,
         remarks: Vec::new(),
+        journey_id: None,
     })
 }
 
@@ -330,7 +372,31 @@ struct TripsResponse {
     _version: String,
     #[serde(default)]
     system_messages: Vec<SystemMessage>,
-    journeys: Option<Vec<Journey>>,
+    journeys: Option<Vec<WireTrip>>,
+}
+
+#[derive(Deserialize)]
+struct JourneyResponse {
+    /// Tells an EFA response from other JSON.
+    #[serde(rename = "version")]
+    _version: String,
+    leg: Option<JourneyLeg>,
+}
+
+/// A run: a leg of a trip without its two ends.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct JourneyLeg {
+    transportation: Transportation,
+    #[serde(default)]
+    stop_sequence: Vec<WireLocation>,
+    is_cancelled: Option<bool>,
+    #[serde(default)]
+    realtime_status: Vec<String>,
+    #[serde(default, deserialize_with = "lenient_list")]
+    infos: Vec<Info>,
+    #[serde(default, deserialize_with = "lenient_list")]
+    hints: Vec<Hint>,
 }
 
 #[derive(Deserialize)]
@@ -342,7 +408,7 @@ struct SystemMessage {
 }
 
 #[derive(Deserialize)]
-struct Journey {
+struct WireTrip {
     legs: Vec<WireLeg>,
 }
 
@@ -507,6 +573,8 @@ struct WireLocation {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Ancestor {
+    #[serde(default, deserialize_with = "lenient_text")]
+    id: Option<String>,
     name: Option<String>,
     disassembled_name: Option<String>,
     #[serde(rename = "type")]
@@ -553,6 +621,8 @@ struct StopEvent {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Transportation {
+    #[serde(default, deserialize_with = "lenient_text")]
+    id: Option<String>,
     /// The product and the number, e.g. "Straßenbahn 7".
     name: Option<String>,
     number: Option<String>,
@@ -571,6 +641,9 @@ struct TransportationProperties {
     train_type: Option<String>,
     /// "TRAIN" for trains that have a number but no line.
     line_display: Option<String>,
+    /// Tells the runs of a line apart.
+    #[serde(default, deserialize_with = "lenient_text")]
+    trip_code: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -656,6 +729,19 @@ fn is_cancelled(is_cancelled: Option<bool>, realtime_status: &[String]) -> bool 
             .any(|status| status == "TRIP_CANCELLED")
 }
 
+/// The ID of the run of a vehicle that calls at a place at a planned time.
+/// `None` for a walk and if the server leaves out a part.
+fn run_id(vehicle: &Transportation, place: &WireLocation, planned: Timestamp) -> Option<String> {
+    let trip_code = vehicle.properties.as_ref()?.trip_code.as_ref()?;
+    // The server knows the run by the stop, not by the platform.
+    let stop = place
+        .ancestor("stop")
+        .and_then(|stop| stop.id.as_ref())
+        .unwrap_or(&place.id);
+    let line = non_empty(vehicle.id.clone())?;
+    journey_id(&(line, stop, trip_code, planned.unix_seconds))
+}
+
 impl Transportation {
     /// How a leg with this transportation is traveled, if not by public
     /// transport. Classes 99 and 100 are footpaths. The other classes from
@@ -703,6 +789,12 @@ impl Transportation {
 impl StopEvent {
     fn into_departure(mut self, network: &Network, board: Board) -> Result<Departure, Error> {
         let origin = self.transportation.origin.take();
+        // The server finds a run by an arrival time as well.
+        let journey_id = match board {
+            Board::Departures => self.departure_time_planned.as_ref(),
+            Board::Arrivals => self.arrival_time_planned.as_ref(),
+        }
+        .and_then(|planned| run_id(&self.transportation, &self.location, planned.0));
         let (line, direction) = self.transportation.into_line();
         let (planned, estimated, direction) = match board {
             Board::Departures => (
@@ -734,6 +826,7 @@ impl StopEvent {
             realtime_platform: platforms.and_then(|platforms| non_empty(platforms.platform_name)),
             cancelled: is_cancelled(self.is_cancelled, &self.realtime_status),
             remarks: remarks(network, self.infos, self.hints),
+            journey_id,
         })
     }
 }
@@ -754,6 +847,12 @@ impl WireLeg {
             message: "a leg has no scheduled time at one of its ends".to_owned(),
         };
         let street_kind = self.transportation.street_kind();
+        let journey_id = self
+            .origin
+            .departure_time_planned
+            .as_ref()
+            .filter(|_| street_kind.is_none())
+            .and_then(|planned| run_id(&self.transportation, &self.origin, planned.0));
         let predicted = self.is_realtime_controlled || (trip_is_live && street_kind.is_some());
         let kind = street_kind.unwrap_or_else(|| {
             let (line, direction) = self.transportation.into_line();
@@ -787,6 +886,7 @@ impl WireLeg {
                 .collect(),
             cancelled: is_cancelled(self.is_cancelled, &self.realtime_status),
             remarks: remarks(network, self.infos, self.hints),
+            journey_id,
         })
     }
 }

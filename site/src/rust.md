@@ -43,6 +43,17 @@ for stop in client.nearby(&network, NearbyQuery::new(position).with_radius_meter
 let arrivals = client.arrivals(&network, DeparturesQuery::new(from).with_limit(10)).await?;
 ```
 
+`journey` gives the run of one vehicle: every stop it calls at, with times and platforms. It takes the `journey_id` of a departure, an arrival or a leg of a trip. The ID only works on the network it came from, and for about a day.
+
+```rust,ignore
+let departures = client.departures(&network, DeparturesQuery::new(from).with_limit(10)).await?;
+if let Some(id) = departures.iter().find_map(|departure| departure.journey_id.as_deref()) {
+    for stopover in client.journey(&network, id).await?.stops {
+        println!("{:?} {}", stopover.scheduled_departure.or(stopover.scheduled_arrival), stopover.stop.name);
+    }
+}
+```
+
 ## Trips
 
 ```rust,ignore
@@ -97,7 +108,7 @@ stop.local_time(any_time);        // the same for any time at a location
 
 ## Disruptions and hints
 
-A departure and a leg of a trip have `remarks`: the texts that the server sends with them. Every protocol but MOTIS fills them. A remark is one of two kinds. A disruption is a message from the incident system of the operator, such as a closed road or a broken elevator. A hint is a fixed property of the ride, such as air conditioning or a note for wheelchair users.
+A departure, a leg of a trip and the run of a vehicle have `remarks`: the texts that the server sends with them. Every protocol but MOTIS fills them. A remark is one of two kinds. A disruption is a message from the incident system of the operator, such as a closed road or a broken elevator. A hint is a fixed property of the ride, such as air conditioning or a note for wheelchair users.
 
 ```rust,ignore
 for remark in &departure.remarks {

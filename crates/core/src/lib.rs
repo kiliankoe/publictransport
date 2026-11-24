@@ -76,9 +76,9 @@ pub use error::Error;
 pub use hafas::{HafasOptions, HafasProduct};
 pub use http::{Header, HttpRequest, HttpResponse, Method};
 pub use model::{
-    Arrival, Coordinate, Departure, DeparturesQuery, GlobalId, IdScheme, Leg, LegEnd, LegKind,
-    Line, LocalTime, Location, LocationKind, LocationQuery, Mode, NearbyQuery, Place, Remark,
-    RemarkKind, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
+    Arrival, Coordinate, Departure, DeparturesQuery, GlobalId, IdScheme, Journey, Leg, LegEnd,
+    LegKind, Line, LocalTime, Location, LocationKind, LocationQuery, Mode, NearbyQuery, Place,
+    Remark, RemarkKind, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
 };
 pub use network::{Network, Protocol};
 pub use registry::{

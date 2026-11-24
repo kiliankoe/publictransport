@@ -13,8 +13,8 @@
 
 use publictransport::{
     Arrival, BundledNetwork, Coordinate, Coverage, CoverageTier, CoveringNetwork, Departure,
-    DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, LegEnd, LocalTime, Location,
-    LocationQuery, NearbyQuery, Network, Place, Timestamp, Trip, Trips, TripsQuery,
+    DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, Journey, LegEnd, LocalTime,
+    Location, LocationQuery, NearbyQuery, Network, Place, Timestamp, Trip, Trips, TripsQuery,
 };
 use serde::{Serialize, de::DeserializeOwned};
 use tsify::{Ts, Tsify};
@@ -155,6 +155,25 @@ pub fn parse_arrivals(
 ) -> Result<Vec<Ts<Arrival>>, JsValue> {
     let arrivals = read("network", network)?.parse_arrivals(&read("response", response)?);
     write_all(&arrivals.map_err(thrown)?)
+}
+
+/// Builds the request for the run of one vehicle, from the `journeyId` of
+/// a departure, an arrival or a leg that the network returned.
+#[wasm_bindgen(js_name = journeyRequest)]
+pub fn journey_request(network: &Ts<Network>, id: &str) -> Result<Ts<HttpRequest>, JsValue> {
+    let request = read("network", network)?.journey_request(id);
+    write(&request.map_err(thrown)?)
+}
+
+/// Reads the answer to a `journeyRequest`: the line and every stop of the
+/// run in the order of travel.
+#[wasm_bindgen(js_name = parseJourney)]
+pub fn parse_journey(
+    network: &Ts<Network>,
+    response: &Ts<HttpResponse>,
+) -> Result<Ts<Journey>, JsValue> {
+    let journey = read("network", network)?.parse_journey(&read("response", response)?);
+    write(&journey.map_err(thrown)?)
 }
 
 /// Builds the request for trips between two places.

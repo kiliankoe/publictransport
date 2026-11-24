@@ -11,6 +11,10 @@ with Client(user_agent=USER_AGENT) as client:
     stop = client.locations(network, "S+U Alexanderplatz", kinds=[LocationKind.STOP])[0]
     # From now on. `time=` asks for another time.
     departures = client.departures(network, stop, limit=10)
+    # The run of the first vehicle: every stop it calls at. The ID only works
+    # on the network it came from, and for about a day.
+    journey_id = next((each.journey_id for each in departures if each.journey_id), None)
+    journey = client.journey(network, journey_id) if journey_id else None
 
 print(f"Departures at {stop.name}:")
 for departure in departures:
@@ -30,3 +34,11 @@ for departure in departures:
     for remark in departure.remarks:
         if remark.kind == RemarkKind.DISRUPTION and remark.title:
             print(f"            ! {remark.title}")
+
+if journey:
+    print(f"Stops of {journey.line.name}:")
+    for stopover in journey.stops:
+        # The first stop has no arrival and the last no departure.
+        at = stopover.scheduled_departure or stopover.scheduled_arrival
+        local = stopover.stop.local_time(at) if at else None
+        print(f"  {local:%H:%M}" if local else "  ??:??", stopover.stop.name)

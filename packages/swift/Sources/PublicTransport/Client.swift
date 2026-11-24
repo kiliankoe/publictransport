@@ -296,6 +296,21 @@ public struct Client: Sendable {
         return try network.parseArrivals(response: response)
     }
 
+    /// Fetches the run of one vehicle: all its stops with times and
+    /// platforms.
+    ///
+    /// - Parameters:
+    ///   - id: The ``Departure/journeyId`` of a departure, an arrival or a
+    ///     leg that this network returned. It has no meaning on another
+    ///     network, and a server knows a run for about a day.
+    /// - Throws: ``PublicTransportError``, such as `notFound` for a run
+    ///   the server no longer knows, and `URLError` if the request got no
+    ///   answer.
+    public func journey(in network: Network, id: String) async throws -> Journey {
+        let response = try await send(network.journeyRequest(id: id))
+        return try network.parseJourney(response: response)
+    }
+
     /// Plans trips between two places, in the order the server ranks them.
     ///
     /// Each end is a location, also one that another network returned, a

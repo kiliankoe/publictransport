@@ -13,9 +13,10 @@ use serde::Deserialize;
 
 use crate::{
     Coordinate, Departure, DeparturesQuery, Error, GlobalId, Header, HttpRequest, HttpResponse,
-    Leg, LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode, NearbyQuery,
-    Network, Place, Protocol, Remark, Stopover, Timestamp, Trip, TripTime, Trips, TripsQuery,
-    model::{Board, Target, plain_text},
+    Journey, Leg, LegEnd, LegKind, Line, Location, LocationKind, LocationQuery, Method, Mode,
+    NearbyQuery, Network, Place, Protocol, Remark, Stopover, Timestamp, Trip, TripTime, Trips,
+    TripsQuery,
+    model::{Board, Target, journey_id, journey_parts, plain_text},
     time::WireTime,
 };
 
@@ -269,6 +270,49 @@ pub(crate) fn departures_request(
     dialect.post(network, &request)
 }
 
+/// A run is named by a reference and the day of operation it belongs to.
+pub(crate) fn journey_request(network: &Network, id: &str) -> Result<HttpRequest, Error> {
+    let (day, reference): (String, String) = journey_parts(id)?;
+    let dialect = Dialect::of(network);
+    let parameters = dialect.element(
+        "Params",
+        &(dialect.element("UseTimetabledDataOnly", "false")
+            + &dialect.element("IncludeCalls", "true")),
+    );
+    let request = dialect.request(
+        "TripInfoRequest",
+        &(dialect.text("JourneyRef", query_text(&reference)?)
+            + &dialect.text("OperatingDayRef", query_text(&day)?)
+            + &parameters),
+    );
+    dialect.post(network, &request)
+}
+
+pub(crate) fn parse_journey(network: &Network, response: &HttpResponse) -> Result<Journey, Error> {
+    let (answers, failure) = answers(network, response)?;
+    let answer = answer(answers.trip_info, &failure, response.status)?;
+    let situations = situations(response);
+    let mut result = answer
+        .results(failure, response.status, &["NOJOURNEYFOUND"])?
+        .into_iter()
+        .next()
+        .ok_or_else(Journey::unknown)?;
+    let remarks = result.service.remarks(&situations);
+    let (line, direction, cancelled) = result.service.into_line(result.extension);
+    Ok(Journey {
+        line,
+        direction,
+        stops: result
+            .previous
+            .into_iter()
+            .chain(result.onward)
+            .map(|call| call.into_stopover(network))
+            .collect(),
+        cancelled,
+        remarks,
+    })
+}
+
 pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<HttpRequest, Error> {
     let dialect = Dialect::of(network);
     let (departure, arrival) = match query.paged_time()? {
@@ -385,6 +429,7 @@ fn answers(network: &Network, response: &HttpResponse) -> Result<(Answers, Failu
         locations: delivery.locations,
         stop_events: delivery.stop_events,
         trips: delivery.trips,
+        trip_info: delivery.trip_info,
     });
     Ok((answers, failure))
 }
@@ -442,6 +487,8 @@ struct Delivery {
     stop_events: Option<Answer<StopEventResult>>,
     #[serde(rename = "OJPTripDelivery")]
     trips: Option<Answer<TripResult>>,
+    #[serde(rename = "OJPTripInfoDelivery")]
+    trip_info: Option<Answer<TripInfoResult>>,
 }
 
 #[derive(Deserialize)]
@@ -452,6 +499,8 @@ struct Answers {
     stop_events: Option<Answer<StopEventResult>>,
     #[serde(rename = "TripResponse")]
     trips: Option<Answer<TripResult>>,
+    #[serde(rename = "TripInfoResponse")]
+    trip_info: Option<Answer<TripInfoResult>>,
 }
 
 /// The results of one request, or the reason there are none. TRIAS reports
@@ -463,7 +512,8 @@ struct Answer<T> {
         rename = "LocationResult",
         alias = "Location",
         alias = "StopEventResult",
-        alias = "TripResult"
+        alias = "TripResult",
+        alias = "TripInfoResult"
     )]
     results: Vec<T>,
     #[serde(rename = "Status")]
@@ -590,9 +640,17 @@ struct ErrorMessage {
 struct ErrorCondition {
     #[serde(rename = "Description")]
     description: Option<String>,
+    /// The request names something the server does not know. It comes
+    /// without a text.
+    #[serde(rename = "InvalidDataReferencesError")]
+    unknown_reference: Option<serde::de::IgnoredAny>,
     #[serde(default, rename = "$value")]
     kinds: Vec<ErrorKind>,
 }
+
+/// How the servers report a run they do not know: TRIAS by this code, OJP
+/// by the name of the SIRI error.
+const UNKNOWN_REFERENCE: [&str; 2] = ["ERROR_INVALID_JOURNEY_REF", "InvalidDataReferencesError"];
 
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -636,6 +694,11 @@ impl Failure {
                 .into_iter()
                 .filter_map(|kind| kind.error_text)
                 .chain(condition.description)
+                .chain(
+                    condition
+                        .unknown_reference
+                        .map(|_| "InvalidDataReferencesError".to_owned()),
+                )
         });
         let mut texts: Vec<String> = messages
             .into_iter()
@@ -662,9 +725,10 @@ impl Failure {
             })
         };
         let not_found = |text: &&String| {
-            code(text).is_some_and(|code| {
-                code == "LOCATIONUNSERVED" || (code.len() > 7 && code.ends_with("UNKNOWN"))
-            })
+            UNKNOWN_REFERENCE.contains(&text.as_str())
+                || code(text).is_some_and(|code| {
+                    code == "LOCATIONUNSERVED" || (code.len() > 7 && code.ends_with("UNKNOWN"))
+                })
         };
         let harmless = |text: &&String| {
             no_results.contains(&text.as_str())
@@ -914,6 +978,9 @@ struct ServiceTime {
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
 struct Service {
+    /// The two that name the run.
+    operating_day_ref: Option<String>,
+    journey_ref: Option<String>,
     #[serde(default, rename = "ServiceSection")]
     sections: Vec<Section>,
     mode: Option<WireMode>,
@@ -1014,6 +1081,15 @@ impl Call {
 }
 
 impl Service {
+    /// The ID of the run, if the server names it.
+    fn journey_id(&self) -> Option<String> {
+        let day = self.operating_day_ref.as_deref()?.trim();
+        let reference = self.journey_ref.as_deref()?.trim();
+        (!day.is_empty() && !reference.is_empty())
+            .then(|| journey_id(&(day, reference)))
+            .flatten()
+    }
+
     /// The situations of the answer that the service refers to, and its
     /// attributes. Call this before `into_line`, which takes the rest.
     fn remarks(&mut self, situations: &[Situation]) -> Vec<Remark> {
@@ -1082,6 +1158,7 @@ impl StopEvent {
         board: Board,
     ) -> Result<Departure, Error> {
         let remarks = self.service.remarks(situations);
+        let journey_id = self.service.journey_id();
         let origin = text(std::mem::take(&mut self.service.origin_text));
         let (line, direction, cancelled) = self.service.into_line(self.extension);
         let stopover = self.this_call.call_at_stop.into_stopover(network);
@@ -1102,8 +1179,21 @@ impl StopEvent {
             // The vehicle may skip this stop only.
             cancelled: cancelled || end.cancelled,
             remarks,
+            journey_id,
         })
     }
+}
+
+/// A run: the calls the vehicle has made, then those to come.
+#[derive(Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct TripInfoResult {
+    #[serde(default, rename = "PreviousCall")]
+    previous: Vec<Call>,
+    #[serde(default, rename = "OnwardCall")]
+    onward: Vec<Call>,
+    service: Service,
+    extension: Option<Extension>,
 }
 
 #[derive(Deserialize)]
@@ -1169,6 +1259,7 @@ impl TripLeg {
         };
         if let Some(mut ride) = self.timed {
             let remarks = ride.service.remarks(situations);
+            let journey_id = ride.service.journey_id();
             let (line, direction, cancelled) = ride.service.into_line(ride.extension);
             return Ok(Some(Leg {
                 kind: LegKind::Transit { line, direction },
@@ -1189,6 +1280,7 @@ impl TripLeg {
                     .collect(),
                 cancelled,
                 remarks,
+                journey_id,
             }));
         }
         let Some(leg) = self.interchange.or(self.continuous) else {
@@ -1222,6 +1314,7 @@ impl TripLeg {
             intermediate_stops: Vec::new(),
             cancelled: false,
             remarks: Vec::new(),
+            journey_id: None,
         }))
     }
 }
