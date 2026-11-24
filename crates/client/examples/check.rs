@@ -15,8 +15,8 @@ use std::error::Error;
 use std::path::Path;
 
 use publictransport_client::{
-    Client, DeparturesQuery, LegKind, LocationKind, LocationQuery, Mode, Network, Operation,
-    Registry, Trips, TripsQuery,
+    BundledNetwork, Client, DeparturesQuery, LegKind, LocationKind, LocationQuery, Mode, Network,
+    Operation, Trips, TripsQuery,
 };
 
 const USER_AGENT: &str = concat!(
@@ -37,7 +37,6 @@ const SEARCHES: [&str; 5] = [
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let registry = Registry::bundled();
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     let mut networks = Vec::new();
     let mut failed = 0;
@@ -51,8 +50,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let json = std::fs::read_to_string(path)?;
             Network::from_json(id.unwrap_or("entry"), &json).map_err(|error| error.to_string())
         } else {
-            registry
-                .get(argument)
+            BundledNetwork::ALL
+                .iter()
+                .find(|network| network.id() == argument)
+                .map(|network| Network::bundled(*network))
                 .ok_or_else(|| "not a bundled network".to_owned())
         };
         match network {
@@ -64,7 +65,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     if arguments.is_empty() {
-        networks = registry.networks();
+        networks = BundledNetwork::ALL
+            .iter()
+            .map(|network| Network::bundled(*network))
+            .collect();
     }
 
     let client = Client::new(USER_AGENT)?;

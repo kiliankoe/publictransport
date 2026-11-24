@@ -6,7 +6,7 @@ This sends no request: the networks and their areas ship with the package.
 from publictransport import Coordinate, Registry
 
 registry = Registry.bundled()
-print(f"{len(registry.networks())} networks are bundled.")
+print(f"{len(registry.networks())} networks are in the registry.")
 
 duesseldorf = Coordinate(latitude=51.2198, longitude=6.7943)
 # The best coverage comes first: real-time data, then complete timetables,

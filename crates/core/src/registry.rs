@@ -631,7 +631,7 @@ bundled! {
 }
 
 impl BundledNetwork {
-    /// The network, as [`Registry::bundled`] has it.
+    /// The network, as [`Registry::bundled`] has or would have it.
     pub(crate) fn network(self) -> Network {
         #[expect(clippy::expect_used, reason = "the entries are part of the crate")]
         let network =
@@ -651,6 +651,15 @@ impl Network {
         network.network()
     }
 }
+
+/// The bundled networks of operators that [`Registry::bundled`] has
+/// another server of. Their answers hold less than those of the EFA server.
+const FURTHER_SERVERS: [BundledNetwork; 4] = [
+    BundledNetwork::VvoTrias,
+    BundledNetwork::VvoOjp,
+    BundledNetwork::VrrTrias,
+    BundledNetwork::VrrOjp,
+];
 
 /// A set of networks to choose from.
 #[derive(Debug, Clone)]
@@ -694,13 +703,16 @@ fn corrected(mut network: Network) -> Network {
 
 #[cfg_attr(feature = "uniffi", uniffi::export)]
 impl Registry {
-    /// The networks that ship with the crate. Each was checked against its
-    /// live server when it was added.
+    /// The networks that ship with the crate, one for each operator. Each
+    /// was checked against its live server when it was added. Where an
+    /// operator has servers for several protocols, this is the one with
+    /// the most data; [`Network::bundled`] gives the others.
     #[cfg_attr(feature = "uniffi", uniffi::constructor)]
     #[must_use]
     pub fn bundled() -> Self {
         let networks = BundledNetwork::ALL
             .iter()
+            .filter(|network| !FURTHER_SERVERS.contains(network))
             .map(|network| network.network())
             .collect();
         Self { networks }

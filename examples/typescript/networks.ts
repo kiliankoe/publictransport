@@ -4,7 +4,7 @@
 import { Registry } from "@kiliankoe/publictransport";
 
 const registry = Registry.bundled();
-console.log(`${registry.networks().length} networks are bundled.`);
+console.log(`${registry.networks().length} networks are in the registry.`);
 
 const duesseldorf = { latitude: 51.2198, longitude: 6.7943 };
 // The best coverage comes first: real-time data, then complete timetables,

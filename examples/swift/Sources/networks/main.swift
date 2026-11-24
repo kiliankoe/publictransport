@@ -4,7 +4,7 @@
 import PublicTransport
 
 let registry = Registry.bundled()
-print("\(registry.networks().count) networks are bundled.")
+print("\(registry.networks().count) networks are in the registry.")
 
 let duesseldorf = Coordinate(latitude: 51.2198, longitude: 6.7943)
 // The best coverage comes first: real-time data, then complete timetables,

@@ -1,17 +1,22 @@
 //! Prints the page of the documentation site that lists the bundled
 //! networks, as Markdown. `just site` writes it into the site.
 
-use publictransport::{Operation, Protocol, Registry};
+use publictransport::{BundledNetwork, Network, Operation, Protocol, Registry};
 
 fn main() {
     println!("# Bundled networks\n");
     println!(
         "These networks ship with the library. Each was checked against its live server. \
-         The ID finds a network in the registry, and `BundledNetwork` has a name for each, spelled like the ID.\n"
+         `BundledNetwork` has a name for each, spelled like the ID. The registry has one network for each operator, \
+         found by its ID: where an operator runs servers for several protocols, it has the one whose answers hold the most.\n"
     );
     println!("| Network | ID | Protocol | Notes |");
     println!("| --- | --- | --- | --- |");
-    for network in Registry::bundled().networks() {
+    let registry = Registry::bundled();
+    for network in BundledNetwork::ALL
+        .iter()
+        .map(|name| Network::bundled(*name))
+    {
         let protocol = match network.protocol {
             Protocol::Efa => "EFA",
             Protocol::Motis => "MOTIS",
@@ -30,6 +35,9 @@ fn main() {
         }
         if network.requires_key {
             notes.push("needs a key");
+        }
+        if registry.get(&network.id).is_none() {
+            notes.push("not in the registry");
         }
         println!(
             "| {} | `{}` | {protocol} | {} |",

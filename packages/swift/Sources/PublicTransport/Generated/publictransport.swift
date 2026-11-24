@@ -754,8 +754,10 @@ public convenience init(networks: [Network]) {
 
     
     /**
-     * The networks that ship with the library. Each was checked against its
-     * live server when it was added.
+     * The networks that ship with the library, one for each operator. Each
+     * was checked against its live server when it was added. Where an
+     * operator has servers for several protocols, this is the one with
+     * the most data; ``Network/bundled`` gives the others.
      */
 public static func bundled() -> Registry  {
     return try!  FfiConverterTypeRegistry_lift(try! rustCall() {
@@ -4694,7 +4696,7 @@ public var id: String {
 }
 
     /**
-     * The network, as the bundled registry has it.
+     * The network, as the bundled registry has or would have it.
      */
 public func network() -> Network  {
     return try!  FfiConverterTypeNetwork_lift(try! rustCall() {
@@ -7318,7 +7320,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_publictransport_checksum_method_registry_networks() != 10968) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_publictransport_checksum_constructor_registry_bundled() != 23131) {
+    if (uniffi_publictransport_checksum_constructor_registry_bundled() != 17247) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_publictransport_checksum_constructor_registry_new() != 6613) {

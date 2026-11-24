@@ -66,7 +66,7 @@ impl BundledNetwork {
         self.id().to_owned()
     }
 
-    /// The network, as the bundled registry has it.
+    /// The network, as the bundled registry has or would have it.
     #[uniffi::method(name = "network")]
     #[expect(
         clippy::trivially_copy_pass_by_ref,

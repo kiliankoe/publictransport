@@ -43,7 +43,8 @@
 //! [`BundledNetwork`] names networks that were checked against their live
 //! servers, so that they need not be described by hand:
 //! `Network::bundled(BundledNetwork::VvoEfa)`. [`Registry::bundled`] holds
-//! them all, and [`Registry::covering`] finds the ones for a position.
+//! one for each operator, and [`Registry::covering`] finds the ones for a
+//! position.
 //!
 //! The HTTP client has two duties:
 //!

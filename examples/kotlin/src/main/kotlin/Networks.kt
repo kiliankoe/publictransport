@@ -6,7 +6,7 @@ import publictransport.Registry
 
 fun main() {
     val registry = Registry.bundled()
-    println("${registry.networks().size} networks are bundled.")
+    println("${registry.networks().size} networks are in the registry.")
 
     val duesseldorf = Coordinate(latitude = 51.2198, longitude = 6.7943)
     // The best coverage comes first: real-time data, then complete timetables,

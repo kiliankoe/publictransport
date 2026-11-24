@@ -413,8 +413,10 @@ impl Registry {
         Ok(Self(publictransport::Registry::new(networks)))
     }
 
-    /// The networks that ship with the package. Each was checked against
-    /// its live server when it was added.
+    /// The networks that ship with the package, one for each operator. Each
+    /// was checked against its live server when it was added. Where an
+    /// operator has servers for several protocols, this is the one whose
+    /// answers hold the most; `bundledNetwork` gives the others.
     #[must_use]
     pub fn bundled() -> Self {
         Self(publictransport::Registry::bundled())

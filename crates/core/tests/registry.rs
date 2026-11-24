@@ -485,12 +485,12 @@ fn registry_keeps_the_given_networks() {
 #[test]
 fn bundled_networks_are_usable() {
     let registry = Registry::bundled();
-    let networks = registry.networks();
-    for id in ["vvo-efa", "vrr-ojp", "vbb-hafas", "transitous", "entur"] {
+    for id in ["vvo-efa", "vrr-efa", "vbb-hafas", "transitous", "entur"] {
         assert!(registry.get(id).is_some(), "{id}");
     }
     let stop = || Place::Id("1".into());
-    for network in &networks {
+    // The ones that the registry leaves out are among them.
+    for network in BundledNetwork::ALL.iter().map(|id| Network::bundled(*id)) {
         let request = network.locations_request(&LocationQuery::new("Hauptbahnhof"));
         assert!(request.is_ok(), "{}: {request:?}", network.id);
         // What a request needs beyond the entry's options, such as the
@@ -522,7 +522,7 @@ fn bundled_networks_are_usable() {
         Some("https://api.entur.io/geocoder/v1")
     );
 
-    let vvo_ojp = registry.get("vvo-ojp").expect("vvo-ojp");
+    let vvo_ojp = Network::bundled(BundledNetwork::VvoOjp);
     assert!(refuses(&vvo_ojp, Operation::Departures));
 
     let covering = |latitude, longitude| -> Vec<String> {
@@ -530,13 +530,46 @@ fn bundled_networks_are_usable() {
         covering.into_iter().map(|c| c.network.id).collect()
     };
     let dresden = covering(51.05, 13.74);
-    for id in ["vvo-efa", "vvo-trias", "vvo-ojp", "transitous"] {
+    for id in ["vvo-efa", "transitous"] {
         assert!(dresden.iter().any(|d| d == id), "{id} in Dresden");
     }
     let duesseldorf = covering(51.22, 6.79);
-    for id in ["vrr-efa", "vrr-trias", "vrr-ojp"] {
-        assert!(duesseldorf.iter().any(|d| d == id), "{id} in Düsseldorf");
+    assert!(
+        duesseldorf.iter().any(|d| d == "vrr-efa"),
+        "{duesseldorf:?}"
+    );
+}
+
+/// VVO and VRR each run three servers, which would show as three networks
+/// of one name to someone who picks from the registry. The others stay for
+/// those who ask for them by name.
+#[test]
+fn bundled_registry_holds_one_network_of_each_operator() {
+    let left_out = [
+        BundledNetwork::VvoTrias,
+        BundledNetwork::VvoOjp,
+        BundledNetwork::VrrTrias,
+        BundledNetwork::VrrOjp,
+    ];
+    let registry = Registry::bundled();
+    for bundled in left_out {
+        assert_eq!(registry.get(bundled.id()), None, "{bundled:?}");
+        assert_eq!(Network::bundled(bundled).id, bundled.id());
     }
+
+    // Every other one, in the order of the list.
+    let expected: Vec<Network> = BundledNetwork::ALL
+        .iter()
+        .filter(|bundled| !left_out.contains(bundled))
+        .map(|bundled| Network::bundled(*bundled))
+        .collect();
+    let networks = registry.networks();
+    assert_eq!(networks, expected);
+
+    let mut names: Vec<&str> = networks.iter().map(|n| n.name.as_str()).collect();
+    names.sort_unstable();
+    let twice: Vec<_> = names.windows(2).filter(|pair| pair[0] == pair[1]).collect();
+    assert!(twice.is_empty(), "{twice:?}");
 }
 
 /// The list of bundled networks pairs names, IDs and entries by hand.
@@ -557,11 +590,6 @@ fn bundled_network_is_named_after_its_id_and_gives_the_network_with_it() {
         assert!(!ids.contains(&bundled.id()), "{bundled:?} is there twice");
         ids.push(bundled.id());
     }
-    // The registry holds the same networks, with its corrections.
-    let registry = Registry::bundled();
-    assert_eq!(registry.networks().len(), ids.len());
-    let moved = BundledNetwork::OoevvHafas;
-    assert_eq!(Some(Network::bundled(moved)), registry.get(moved.id()));
 }
 
 #[test]

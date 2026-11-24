@@ -5,7 +5,10 @@ use publictransport_client::{Coordinate, Registry};
 
 fn main() {
     let registry = Registry::bundled();
-    println!("{} networks are bundled.", registry.networks().len());
+    println!(
+        "{} networks are in the registry.",
+        registry.networks().len()
+    );
 
     let duesseldorf = Coordinate {
         latitude: 51.2198,

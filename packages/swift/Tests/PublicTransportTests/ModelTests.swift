@@ -84,7 +84,11 @@ private func stop(_ ifopt: String, timezone: String? = nil) -> Location {
     #expect(registry.network(id: "vvo-efa") == vvo)
     #expect(registry.network(id: "no-such-network") == nil)
     // A case is sent to Rust as its position in the list, so the order matters.
-    #expect(BundledNetwork.allCases.map(\.id) == registry.networks().map(\.id))
+    // The registry has one network of each operator, in that order.
+    let listed = BundledNetwork.allCases.map(\.id).filter { registry.network(id: $0) != nil }
+    #expect(listed == registry.networks().map(\.id))
+    #expect(registry.network(id: "vvo-trias") == nil)
+    #expect(Network.bundled(.vvoTrias).id == "vvo-trias")
 
     #expect(vvo.coverage.tier(at: dresden) == .realtime)
     #expect(vvo.coverage.tier(at: Coordinate(latitude: 0, longitude: 0)) == nil)
