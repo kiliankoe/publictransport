@@ -225,9 +225,10 @@ impl Network {
     /// `options.geocoder`, which that repository does not have, so its
     /// entries give a network without one. An entry of the type
     /// `hafasMgate` gives a network with [`Network::hafas`] that asks in the
-    /// first of the entry's `supportedLanguages`. Its salts for signed
-    /// requests are not read: the crate does not sign, and no server that
-    /// was tried asks for it. For
+    /// first of the entry's `supportedLanguages` unless the network has a
+    /// [`Network::language`]. No entry gives a network one, because not
+    /// every server honors the languages its entry lists. Its salts for signed requests are not read: the crate does not
+    /// sign, and no server that was tried asks for it. For
     /// MOTIS the entry names the root of the server, and the endpoint gets
     /// `api` appended unless it ends in it.
     ///
@@ -349,6 +350,7 @@ impl Network {
             terms: entry.usage_terms.filter(|terms| !terms.is_empty()),
             headers: Vec::new(),
             geocoder: options.geocoder.filter(|url| !url.is_empty()),
+            language: None,
             hafas,
         })
     }

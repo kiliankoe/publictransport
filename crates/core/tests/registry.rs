@@ -292,6 +292,7 @@ fn reads_the_hafas_options() {
         assert_eq!(options.ext.as_deref(), Some("EX.1"));
         assert_eq!(options.version, "1.33", "{version_key}");
         assert_eq!(options.language, language);
+        assert_eq!(network.language, None, "the wish of the application");
         assert_eq!(
             options.products,
             [HafasProduct {

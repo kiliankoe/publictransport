@@ -39,6 +39,7 @@ pub(crate) fn locations_request(
     if let Some(limit) = &limit {
         parameters.push(("numResults", limit));
     }
+    parameters.extend(network.language_as("language"));
     Ok(HttpRequest::get(
         &network.endpoint,
         "v1/geocode",
@@ -51,6 +52,7 @@ pub(crate) fn nearby_request(network: &Network, query: &NearbyQuery) -> Result<H
     let position = query.position.checked()?;
     let place = format!("{},{}", position.latitude, position.longitude);
     let limit = query.limit.map(|limit| limit.to_string());
+    // This search takes no language.
     let mut parameters = vec![("place", place.as_str()), ("type", "STOP")];
     if let Some(limit) = &limit {
         parameters.push(("numResults", limit));
@@ -153,6 +155,7 @@ pub(crate) fn departures_request(
     if board == Board::Arrivals {
         parameters.push(("arriveBy", "true"));
     }
+    parameters.extend(network.language_as("language"));
     Ok(HttpRequest::get(
         &network.endpoint,
         "v6/stoptimes",
@@ -206,11 +209,17 @@ pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<Htt
     if let Some(page) = &query.page {
         parameters.push(("pageCursor", page));
     }
+    parameters.extend(network.language_as("language"));
     Ok(HttpRequest::get(&network.endpoint, "v6/plan", parameters))
 }
 
 pub(crate) fn journey_request(network: &Network, id: &str) -> HttpRequest {
-    HttpRequest::get(&network.endpoint, "v6/trip", vec![("tripId", id)])
+    let language = network.language_as("language");
+    HttpRequest::get(
+        &network.endpoint,
+        "v6/trip",
+        [("tripId", id)].into_iter().chain(language),
+    )
 }
 
 /// The server answers with a trip of one leg, which is the whole run.

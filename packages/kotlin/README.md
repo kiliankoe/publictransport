@@ -121,7 +121,7 @@ for (remark in departure.remarks.filter { it.kind == RemarkKind.DISRUPTION }) {
 }
 ```
 
-At least one of `title` and `text` is set. `text` is plain text without HTML, in the language of the server. The server sends a disruption with every departure and leg it concerns, so an application that shows each message once tells them apart by `id`. A hint has no `id`. It has the `code` that the server gives its kind, such as `A__KL` for air conditioning on German EFA servers, for an application that shows icons for the ones it knows. Operators define these codes, so they differ between networks.
+At least one of `title` and `text` is set. `text` is plain text without HTML, in the language the server answers in. The `language` of the network asks for one, and the [list of networks](https://kiliankoe.github.io/publictransport/networks.html) says what servers make of it. The server sends a disruption with every departure and leg it concerns, so an application that shows each message once tells them apart by `id`. A hint has no `id`. It has the `code` that the server gives its kind, such as `A__KL` for air conditioning on German EFA servers, for an application that shows icons for the ones it knows. Operators define these codes, so they differ between networks.
 
 ## Errors
 

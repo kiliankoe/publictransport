@@ -136,6 +136,22 @@ pub struct Network {
         serde(skip_serializing_if = "Option::is_none")
     )]
     pub hafas: Option<HafasOptions>,
+    /// The language to ask names and remarks in, such as `en`. Every
+    /// request carries it the way the protocol has for it, as it is written
+    /// here without the whitespace around it, and an empty one counts as
+    /// none: most servers take a lower-case ISO 639-1 code, a few have
+    /// codes of their own. `None` leaves the choice to the server, and
+    /// HAFAS, which has to name one, asks in [`HafasOptions::language`].
+    /// A server answers in
+    /// its own language where it has no translation, and some ignore the
+    /// wish altogether. An `OpenTripPlanner` server sends its disruptions
+    /// in every language it has, and the crate takes the one named here.
+    #[cfg_attr(feature = "uniffi", uniffi(default = None))]
+    #[cfg_attr(
+        feature = "unstable-wasm",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    pub language: Option<String>,
 }
 
 /// The protocol a [`Network`] speaks.
@@ -219,6 +235,7 @@ impl Network {
             headers: Vec::new(),
             hafas: None,
             geocoder: None,
+            language: None,
         }
     }
 
@@ -233,6 +250,13 @@ impl Network {
     #[must_use]
     pub fn with_requestor_ref(mut self, requestor_ref: impl Into<String>) -> Self {
         self.requestor_ref = Some(requestor_ref.into());
+        self
+    }
+
+    /// Sets [`Network::language`].
+    #[must_use]
+    pub fn with_language(mut self, language: impl Into<String>) -> Self {
+        self.language = Some(language.into());
         self
     }
 
@@ -270,6 +294,17 @@ impl Network {
         request.headers.retain(|header| !replaced(header));
         request.headers.extend(self.headers.iter().cloned());
         request
+    }
+
+    /// The [`Network::language`] as a query parameter of this name.
+    pub(crate) fn language_as(&self, name: &'static str) -> Option<(&'static str, &str)> {
+        self.asked_language().map(|language| (name, language))
+    }
+
+    /// The [`Network::language`], if it names one.
+    pub(crate) fn asked_language(&self) -> Option<&str> {
+        let language = self.language.as_deref().map(str::trim);
+        language.filter(|language| !language.is_empty())
     }
 
     /// Records this network as the origin of a parsed location.

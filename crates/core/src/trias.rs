@@ -109,13 +109,31 @@ impl Dialect {
                 message: "a TRIAS or OJP network needs a requestor reference".to_owned(),
             })?;
         let requestor = escaped(requestor);
+        let language = match network.asked_language() {
+            Some(language) if !is_xml_text(language) => {
+                return Err(Error::InvalidNetwork {
+                    message: "the language holds a character that XML cannot carry".to_owned(),
+                });
+            }
+            language => language.map(escaped),
+        };
+        // TRIAS has the element after the requestor, OJP takes the one of
+        // SIRI, which comes first.
+        let language = language.map_or_else(String::new, |language| {
+            let language = format!("<Language>{language}</Language>");
+            if self.ojp {
+                format!("<ServiceRequestContext>{language}</ServiceRequestContext>")
+            } else {
+                language
+            }
+        });
         let body = if self.ojp {
             format!(
-                r#"<?xml version="1.0" encoding="UTF-8"?><OJP xmlns="http://www.siri.org.uk/siri" xmlns:ojp="http://www.vdv.de/ojp" version="1.0"><OJPRequest><ServiceRequest><RequestorRef>{requestor}</RequestorRef>{request}</ServiceRequest></OJPRequest></OJP>"#
+                r#"<?xml version="1.0" encoding="UTF-8"?><OJP xmlns="http://www.siri.org.uk/siri" xmlns:ojp="http://www.vdv.de/ojp" version="1.0"><OJPRequest><ServiceRequest>{language}<RequestorRef>{requestor}</RequestorRef>{request}</ServiceRequest></OJPRequest></OJP>"#
             )
         } else {
             format!(
-                r#"<?xml version="1.0" encoding="UTF-8"?><Trias xmlns="http://www.vdv.de/trias" xmlns:siri="http://www.siri.org.uk/siri" version="1.2"><ServiceRequest><siri:RequestorRef>{requestor}</siri:RequestorRef><RequestPayload>{request}</RequestPayload></ServiceRequest></Trias>"#
+                r#"<?xml version="1.0" encoding="UTF-8"?><Trias xmlns="http://www.vdv.de/trias" xmlns:siri="http://www.siri.org.uk/siri" version="1.2"><ServiceRequest><siri:RequestorRef>{requestor}</siri:RequestorRef>{language}<RequestPayload>{request}</RequestPayload></ServiceRequest></Trias>"#
             )
         };
         Ok(HttpRequest {

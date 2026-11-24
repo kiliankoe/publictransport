@@ -1884,7 +1884,8 @@ public struct HafasOptions: Equatable, Hashable, CustomDebugStringConvertible, C
      */
     public var version: String
     /**
-     * The language for names and remarks, such as `de`.
+     * The language the server is asked in where the network has no
+     * ``Network/language``, such as `de`. The server needs one.
      */
     public var language: String
     /**
@@ -1910,7 +1911,8 @@ public struct HafasOptions: Equatable, Hashable, CustomDebugStringConvertible, C
          * The version of the interface to ask for, such as `1.33`.
          */version: String, 
         /**
-         * The language for names and remarks, such as `de`.
+         * The language the server is asked in where the network has no
+         * ``Network/language``, such as `de`. The server needs one.
          */language: String = "en", 
         /**
          * The operator's kinds of vehicles, which give a line its mode.
@@ -3322,6 +3324,19 @@ public struct Network: Equatable, Hashable {
      * without it.
      */
     public var hafas: HafasOptions?
+    /**
+     * The language to ask names and remarks in, such as `en`. Every
+     * request carries it the way the protocol has for it, as it is written
+     * here without the whitespace around it, and an empty one counts as
+     * none: most servers take a lower-case ISO 639-1 code, a few have
+     * codes of their own. `nil` leaves the choice to the server, and
+     * HAFAS, which has to name one, asks in ``HafasOptions/language``.
+     * A server answers in
+     * its own language where it has no translation, and some ignore the
+     * wish altogether. An `OpenTripPlanner` server sends its disruptions
+     * in every language it has, and the library takes the one named here.
+     */
+    public var language: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -3401,7 +3416,19 @@ public struct Network: Equatable, Hashable {
         /**
          * What a HAFAS mgate server needs. Requests to such a network fail
          * without it.
-         */hafas: HafasOptions? = nil) {
+         */hafas: HafasOptions? = nil, 
+        /**
+         * The language to ask names and remarks in, such as `en`. Every
+         * request carries it the way the protocol has for it, as it is written
+         * here without the whitespace around it, and an empty one counts as
+         * none: most servers take a lower-case ISO 639-1 code, a few have
+         * codes of their own. `nil` leaves the choice to the server, and
+         * HAFAS, which has to name one, asks in ``HafasOptions/language``.
+         * A server answers in
+         * its own language where it has no translation, and some ignore the
+         * wish altogether. An `OpenTripPlanner` server sends its disruptions
+         * in every language it has, and the library takes the one named here.
+         */language: String? = nil) {
         self.id = id
         self.name = name
         self.endpoint = endpoint
@@ -3416,6 +3443,7 @@ public struct Network: Equatable, Hashable {
         self.headers = headers
         self.geocoder = geocoder
         self.hafas = hafas
+        self.language = language
     }
 
     
@@ -3769,7 +3797,8 @@ struct FfiConverterTypeNetwork: FfiConverterRustBuffer {
                 terms: FfiConverterOptionString.read(from: &buf), 
                 headers: FfiConverterSequenceTypeHeader.read(from: &buf), 
                 geocoder: FfiConverterOptionString.read(from: &buf), 
-                hafas: FfiConverterOptionTypeHafasOptions.read(from: &buf)
+                hafas: FfiConverterOptionTypeHafasOptions.read(from: &buf), 
+                language: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -3788,6 +3817,7 @@ struct FfiConverterTypeNetwork: FfiConverterRustBuffer {
         FfiConverterSequenceTypeHeader.write(value.headers, into: &buf)
         FfiConverterOptionString.write(value.geocoder, into: &buf)
         FfiConverterOptionTypeHafasOptions.write(value.hafas, into: &buf)
+        FfiConverterOptionString.write(value.language, into: &buf)
     }
 }
 
@@ -3879,9 +3909,10 @@ public struct Remark: Equatable, Hashable, Codable {
      */
     public var title: String?
     /**
-     * The message as plain text, in the language of the server. Paragraphs
-     * are separated by line breaks, and a link is followed by its target
-     * in brackets. At least one of `title` and `text` is set.
+     * The message as plain text, in the language the server answers in,
+     * see ``Network/language``. Paragraphs are
+     * separated by line breaks, and a link is followed by its target in
+     * brackets. At least one of `title` and `text` is set.
      */
     public var text: String?
     /**
@@ -3921,9 +3952,10 @@ public struct Remark: Equatable, Hashable, Codable {
          * A short headline.
          */title: String?, 
         /**
-         * The message as plain text, in the language of the server. Paragraphs
-         * are separated by line breaks, and a link is followed by its target
-         * in brackets. At least one of `title` and `text` is set.
+         * The message as plain text, in the language the server answers in,
+         * see ``Network/language``. Paragraphs are
+         * separated by line breaks, and a link is followed by its target in
+         * brackets. At least one of `title` and `text` is set.
          */text: String?, 
         /**
          * A page with more about it.

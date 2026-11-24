@@ -28,7 +28,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         ("ojp", Protocol::Ojp1, OJP_DEPARTURE),
     ] {
         let network = Network::new(name, name, "https://example.org", protocol)
-            .with_requestor_ref("OpenService");
+            .with_requestor_ref("OpenService")
+            .with_language("en");
         let departures = network.parse_departures(&HttpResponse {
             status: 200,
             headers: Vec::new(),

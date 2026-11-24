@@ -40,7 +40,8 @@ pub struct HafasOptions {
     pub ext: Option<String>,
     /// The version of the interface to ask for, such as `1.33`.
     pub version: String,
-    /// The language for names and remarks, such as `de`.
+    /// The language the server is asked in where the network has no
+    /// [`Network::language`], such as `de`. The server needs one.
     #[cfg_attr(feature = "uniffi", uniffi(default = "en"))]
     pub language: String,
     /// The operator's kinds of vehicles, which give a line its mode.
@@ -213,7 +214,10 @@ fn request(network: &Network, method: &str, arguments: &Value) -> Result<HttpReq
             .ok_or_else(|| invalid(&format!("the HAFAS {name} is not a JSON object")))
     };
     let body = object([
-        ("lang", Some(json!(options.language))),
+        (
+            "lang",
+            Some(json!(network.asked_language().unwrap_or(&options.language))),
+        ),
         ("client", Some(object_from(&options.client, "client")?)),
         ("ext", options.ext.as_ref().map(|ext| json!(ext))),
         ("ver", Some(json!(options.version))),

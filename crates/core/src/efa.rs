@@ -12,12 +12,14 @@ use crate::{
 };
 
 /// Parameters of every request.
-fn common() -> Vec<(&'static str, &'static str)> {
-    vec![
+fn common(network: &Network) -> Vec<(&'static str, &str)> {
+    let mut parameters = vec![
         ("outputFormat", "rapidJSON"),
         // The default is a projected coordinate system.
         ("coordOutputFormat", "WGS84[dd.ddddd]"),
-    ]
+    ];
+    parameters.extend(network.language_as("language"));
+    parameters
 }
 
 pub(crate) fn locations_request(network: &Network, query: &LocationQuery) -> HttpRequest {
@@ -37,7 +39,7 @@ pub(crate) fn locations_request(network: &Network, query: &LocationQuery) -> Htt
             }
         })
         .to_string();
-    let mut parameters = common();
+    let mut parameters = common(network);
     parameters.extend([("type_sf", "any"), ("name_sf", query.text.as_str())]);
     if !query.kinds.is_empty() {
         parameters.push(("anyObjFilter_sf", &filter));
@@ -54,7 +56,7 @@ pub(crate) fn nearby_request(network: &Network, query: &NearbyQuery) -> Result<H
     );
     let radius = query.mercator_radius().to_string();
     let limit = query.limit.map(|limit| limit.to_string());
-    let mut parameters = common();
+    let mut parameters = common(network);
     parameters.extend([
         ("coord", center.as_str()),
         ("inclFilter", "1"),
@@ -113,7 +115,7 @@ pub(crate) fn departures_request(
         .map(|time| local_time(network, time))
         .transpose()?;
 
-    let mut parameters = common();
+    let mut parameters = common(network);
     parameters.extend([
         ("type_dm", "any"),
         ("name_dm", stop.as_str()),
@@ -154,7 +156,7 @@ pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<Htt
         })
         .transpose()?;
 
-    let mut parameters = common();
+    let mut parameters = common(network);
     parameters.extend([
         ("type_origin", from_type),
         ("name_origin", from.as_str()),
@@ -186,7 +188,7 @@ pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<Htt
 pub(crate) fn journey_request(network: &Network, id: &str) -> Result<HttpRequest, Error> {
     let (line, stop, trip_code, time): (String, String, String, i64) = journey_parts(id)?;
     let (date, time) = local_time(network, Timestamp { unix_seconds: time })?;
-    let mut parameters = common();
+    let mut parameters = common(network);
     parameters.extend([
         ("line", line.as_str()),
         ("stopID", stop.as_str()),

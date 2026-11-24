@@ -69,5 +69,6 @@ A server that wants a key in an HTTP header gets it through `headers`. A `geocod
 - Entur asks every client for its name in the header `ET-Client-Name`, as `company-application`, and limits clients without it. Add it to the `headers` of the bundled network.
 - An answer to a trips query from an OpenTripPlanner server can be empty at night and still have a `later` reference to follow.
 - A location that another network returned works in a query too: for a trip always if it has a coordinate, for departures where the asked network can name the stop, which EFA, TRIAS and OJP can for stops with a global ID.
+- The `language` of a network, such as `en`, asks for names and remarks in that language. How much changes depends on the server: MOTIS translates the names of stops and directions, HAFAS its remarks, Entur its disruptions, and the servers of VVO and VRR answered in German whatever was asked.
 - The limit of a query is a guide for the server and not a maximum.
 - The clients do not retry, limit their request rate or cache. They do not follow redirects either: a server that has moved is an error.";

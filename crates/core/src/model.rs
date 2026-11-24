@@ -588,9 +588,10 @@ pub struct Remark {
         serde(skip_serializing_if = "Option::is_none")
     )]
     pub title: Option<String>,
-    /// The message as plain text, in the language of the server. Paragraphs
-    /// are separated by line breaks, and a link is followed by its target
-    /// in brackets. At least one of `title` and `text` is set.
+    /// The message as plain text, in the language the server answers in,
+    /// see [`Network::language`](crate::Network::language). Paragraphs are
+    /// separated by line breaks, and a link is followed by its target in
+    /// brackets. At least one of `title` and `text` is set.
     #[cfg_attr(
         feature = "unstable-wasm",
         serde(skip_serializing_if = "Option::is_none")

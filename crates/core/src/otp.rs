@@ -29,7 +29,7 @@ const CALL: &str = "fragment call on EstimatedCall{date aimedArrivalTime expecte
 // Only the calls that become a departure or start a leg ask for remarks:
 // every call of a ride would repeat the same ones.
 const SITUATION: &str = "fragment situation on PtSituationElement{situationNumber \
-    summary{value} description{value} infoLinks{uri} validityPeriods{startTime endTime}}";
+    summary{value language} description{value language} infoLinks{uri} validityPeriods{startTime endTime}}";
 const CALLS: &str = "estimatedCalls(numberOfDepartures:$limit,startTime:$start,\
     includeCancelledTrips:true){...call situations{...situation} notices{text}}";
 const NEAREST: &str = "query($latitude:Float!,$longitude:Float!,$radius:Float!,$limit:Int){\
@@ -118,6 +118,7 @@ pub(crate) fn locations_request(
     if !layers.is_empty() {
         parameters.push(("layers", &layers));
     }
+    parameters.extend(network.language_as("lang"));
     Ok(HttpRequest::get(geocoder, "autocomplete", parameters))
 }
 
@@ -299,7 +300,7 @@ pub(crate) fn parse_journey(network: &Network, response: &HttpResponse) -> Resul
             })?,
         direction: calls.first().and_then(Call::direction),
         cancelled: !calls.is_empty() && calls.iter().all(|call| call.cancellation),
-        remarks: remarks(journey.situations, journey.notices),
+        remarks: remarks(network, journey.situations, journey.notices),
         stops: {
             let mut stops = calls
                 .into_iter()
@@ -366,6 +367,7 @@ pub(crate) fn parse_departures(
         .into_iter()
         .map(|mut call| {
             let remarks = remarks(
+                network,
                 std::mem::take(&mut call.situations),
                 std::mem::take(&mut call.notices),
             );
@@ -542,8 +544,7 @@ struct Call {
     situations: Vec<Situation>,
 }
 
-/// A message of the incident system. Each text comes once per language,
-/// and the first one is taken.
+/// A message of the incident system. Each text comes once per language.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Situation {
@@ -562,6 +563,7 @@ struct Situation {
 #[derive(Deserialize)]
 struct Translated {
     value: Option<String>,
+    language: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -584,9 +586,16 @@ struct Notice {
 
 /// The remarks of a call: its situations as disruptions and its notices as
 /// hints.
-fn remarks(situations: Vec<Situation>, notices: Vec<Notice>) -> Vec<Remark> {
-    let first =
-        |texts: Vec<Translated>| texts.into_iter().find_map(|text| plain_text(&text.value?));
+fn remarks(network: &Network, situations: Vec<Situation>, notices: Vec<Notice>) -> Vec<Remark> {
+    // The text in the language of the network, or else the first.
+    let first = |mut texts: Vec<Translated>| {
+        let asked = |text: &Translated| {
+            let language = text.language.as_deref().zip(network.asked_language());
+            language.is_some_and(|(text, asked)| text.eq_ignore_ascii_case(asked))
+        };
+        texts.sort_by_key(|text| !asked(text));
+        texts.into_iter().find_map(|text| plain_text(&text.value?))
+    };
     let disruptions = situations.into_iter().filter_map(|situation| {
         let period = situation.validity_periods.into_iter().next();
         Remark {
@@ -824,6 +833,7 @@ impl WireLeg {
             .as_mut()
             .map(|call| std::mem::take(&mut call.notices));
         let remarks = remarks(
+            network,
             std::mem::take(&mut self.situations),
             notices.unwrap_or_default(),
         );
