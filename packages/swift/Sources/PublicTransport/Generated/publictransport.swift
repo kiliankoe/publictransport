@@ -4009,6 +4009,8 @@ func FfiConverterTypeRemark_lower(_ value: Remark) -> RustBuffer {
 /**
  * A call at a stop: where it is and when the vehicle arrives and leaves.
  * The fields follow the same rules as those of a ``Departure``.
+ * ``Stopover/arrival`` and ``Stopover/departure`` give each side with
+ * the helpers that a departure has.
  */
 public struct Stopover: Equatable, Hashable, Codable {
     /**
@@ -4081,6 +4083,49 @@ public struct Stopover: Equatable, Hashable, Codable {
         self.cancelled = cancelled
     }
 
+    
+    /**
+     * The platform to show: the one the server knows now if there is one,
+     * otherwise the one of the timetable.
+     */
+public var platform: String? {
+    return try!  FfiConverterOptionString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_stopover_platform(
+            FfiConverterTypeStopover_lower(self),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * The vehicle arriving at this stop as an end of a leg, as
+     * ``Stopover/departure`` gives the one leaving. `nil` if the
+     * stopover has no scheduled arrival, as the first stop of a run.
+     */
+public var arrival: LegEnd? {
+    return try!  FfiConverterOptionTypeLegEnd.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_stopover_arrival(
+            FfiConverterTypeStopover_lower(self),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * The vehicle leaving this stop as an end of a leg, so that the
+     * helpers of a departure apply: the expected time, the local times
+     * and the delay. It has the stop, the platforms and the cancellation
+     * of the stopover. `nil` if the stopover has no scheduled departure,
+     * as the last stop of a run.
+     */
+public var departure: LegEnd? {
+    return try!  FfiConverterOptionTypeLegEnd.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_stopover_departure(
+            FfiConverterTypeStopover_lower(self),uniffiCallStatus
+    )
+})
+}
     
 
 }
@@ -6502,6 +6547,30 @@ fileprivate struct FfiConverterOptionTypeHafasOptions: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeHafasOptions.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeLegEnd: FfiConverterRustBuffer {
+    typealias SwiftType = LegEnd?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeLegEnd.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeLegEnd.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }

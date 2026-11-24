@@ -43,9 +43,10 @@ if let id = departures.compactMap(\.journeyId).first {
     let journey = try await client.journey(in: network, id: id)
     print("Stops of \(journey.line.name):")
     for stopover in journey.stops {
-        // The first stop has no arrival and the last no departure.
-        let time = (stopover.scheduledDeparture ?? stopover.scheduledArrival)
-            .map { localTime(at: stopover.stop, $0) }
+        // Each side of a stopover is an end of a leg, with the helpers of
+        // a departure. The last stop has no departure.
+        let time = (stopover.departure ?? stopover.arrival)
+            .map { localTime(at: $0.stop, $0.expectedTime) }
         print("  \(time ?? "??:??") \(stopover.stop.name)")
     }
 }

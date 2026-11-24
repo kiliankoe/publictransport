@@ -14,7 +14,8 @@
 use publictransport::{
     Arrival, BundledNetwork, Coordinate, Coverage, CoverageTier, CoveringNetwork, Departure,
     DeparturesQuery, Error, GlobalId, HttpRequest, HttpResponse, Journey, LegEnd, LocalTime,
-    Location, LocationQuery, NearbyQuery, Network, Place, Timestamp, Trip, Trips, TripsQuery,
+    Location, LocationQuery, NearbyQuery, Network, Place, Stopover, Timestamp, Trip, Trips,
+    TripsQuery,
 };
 use serde::{Serialize, de::DeserializeOwned};
 use tsify::{Ts, Tsify};
@@ -302,15 +303,38 @@ pub fn delay_seconds(
         .map(number))
 }
 
-/// The platform to show for a departure, an arrival or an end of a leg: the one the
-/// server knows now if there is one, otherwise the one of the timetable.
+/// The platform to show for a departure, an arrival, an end of a leg or a
+/// stopover: the one the server knows now if there is one, otherwise the
+/// one of the timetable.
 #[wasm_bindgen]
 pub fn platform(
-    #[wasm_bindgen(unchecked_param_type = "Departure | Arrival | LegEnd")] end: &Ts<LegEnd>,
+    // The other three have every field that a stopover must have, and
+    // the platforms with the same rules.
+    #[wasm_bindgen(unchecked_param_type = "Departure | Arrival | LegEnd | Stopover")] at: &Ts<
+        Stopover,
+    >,
 ) -> Result<Option<String>, JsValue> {
-    Ok(read("departure, arrival or end of a leg", end)?
+    Ok(read("departure, arrival, end of a leg or stopover", at)?
         .platform()
         .map(str::to_owned))
+}
+
+/// The vehicle leaving the stop of a stopover, as an end of a leg, which
+/// the functions for times and delays take. `undefined` if the stopover has
+/// no scheduled departure, as the last stop of a run.
+#[wasm_bindgen(js_name = stopoverDeparture)]
+pub fn stopover_departure(stopover: &Ts<Stopover>) -> Result<Option<Ts<LegEnd>>, JsValue> {
+    let end = read("stopover", stopover)?.departure();
+    end.as_ref().map(write).transpose()
+}
+
+/// The vehicle arriving at the stop of a stopover, as an end of a leg.
+/// `undefined` if the stopover has no scheduled arrival, as the first stop
+/// of a run.
+#[wasm_bindgen(js_name = stopoverArrival)]
+pub fn stopover_arrival(stopover: &Ts<Stopover>) -> Result<Option<Ts<LegEnd>>, JsValue> {
+    let end = read("stopover", stopover)?.arrival();
+    end.as_ref().map(write).transpose()
 }
 
 /// How long the trip takes, in seconds: from the expected time of its

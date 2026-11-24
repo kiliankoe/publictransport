@@ -40,14 +40,16 @@ for (const stop of await client.nearby(network, position, { radiusMeters: 500 })
 const arrivals = await client.arrivals(network, from, { limit: 10 });
 ```
 
-`journey` gives the run of one vehicle: every stop it calls at, with times and platforms. It takes the `journeyId` of a departure, an arrival or a leg of a trip. The ID only works on the network it came from, and for about a day.
+`journey` gives the run of one vehicle: every stop it calls at, with times and platforms. It takes the `journeyId` of a departure, an arrival or a leg of a trip. The ID only works on the network it came from, and for about a day. `stopoverDeparture` and `stopoverArrival` give each side of a stopover as an end of a leg, which the functions for the delay and the local time take, and `platform` takes a stopover as it takes a departure.
 
 ```ts
 const [departure] = await client.departures(network, from, { limit: 1 });
 if (departure?.journeyId) {
   const journey = await client.journey(network, departure.journeyId);
   for (const stopover of journey.stops) {
-    console.log(stopover.scheduledDeparture ?? stopover.scheduledArrival, stopover.stop.name);
+    // The last stop has no departure.
+    const end = stopoverDeparture(stopover) ?? stopoverArrival(stopover);
+    console.log(end && localExpectedTime(end), stopover.stop.name);
   }
 }
 ```

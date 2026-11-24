@@ -1,7 +1,15 @@
 // Lists the next departures at a stop on the HAFAS server of VBB, the
 // transport association of Berlin and Brandenburg.
 
-import { bundledNetwork, Client, delaySeconds, type Location } from "@kiliankoe/publictransport";
+import {
+  bundledNetwork,
+  Client,
+  delaySeconds,
+  expectedTime,
+  type Location,
+  stopoverArrival,
+  stopoverDeparture,
+} from "@kiliankoe/publictransport";
 
 // Servers want to know who asks: name your application and a way to reach you.
 const client = new Client(
@@ -51,8 +59,9 @@ if (id) {
   const journey = await client.journey(network, id);
   console.log(`Stops of ${journey.line.name}:`);
   for (const stopover of journey.stops) {
-    // The first stop has no arrival and the last no departure.
-    const time = stopover.scheduledDeparture ?? stopover.scheduledArrival;
-    console.log(`  ${clock(stopover.stop, time)} ${stopover.stop.name}`);
+    // Each side of a stopover is an end of a leg, which the functions for
+    // a departure take. The last stop has no departure.
+    const end = stopoverDeparture(stopover) ?? stopoverArrival(stopover);
+    console.log(`  ${clock(stopover.stop, end && expectedTime(end))} ${stopover.stop.name}`);
   }
 }

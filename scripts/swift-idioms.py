@@ -27,10 +27,10 @@ RENAMED = {
 PROPERTIES = {
     "expectedTime": 3,
     "delaySeconds": 3,
-    "platform": 3,
+    "platform": 4,
     "durationSeconds": 1,
-    "departure": 1,
-    "arrival": 1,
+    "departure": 2,
+    "arrival": 2,
     "transfers": 1,
     "stationIds": 1,
     "id": 1,

@@ -35,15 +35,16 @@ for stop in client.nearby(network, position, radius_meters=500):
 arrivals = client.arrivals(network, stops[0], limit=10)
 ```
 
-`journey` gives the run of one vehicle: every stop it calls at, with times and platforms. It takes the `journey_id` of a departure, an arrival or a leg of a trip. The ID only works on the network it came from, and for about a day.
+`journey` gives the run of one vehicle: every stop it calls at, with times and platforms. It takes the `journey_id` of a departure, an arrival or a leg of a trip. The ID only works on the network it came from, and for about a day. A stopover gives each of its sides with `departure()` and `arrival()` as an end of a leg, which has the delay and the local time, and `platform()` works on it as on a departure.
 
 ```python
 departure = client.departures(network, stops[0], limit=1)[0]
 if departure.journey_id:
     journey = client.journey(network, departure.journey_id)
     for stopover in journey.stops:
-        time = stopover.scheduled_departure or stopover.scheduled_arrival
-        print(time, stopover.stop.name)
+        # The last stop has no departure.
+        end = stopover.departure() or stopover.arrival()
+        print(end.local_expected_time() if end else None, stopover.stop.name)
 ```
 
 `AsyncClient` has the same methods as coroutines. The [documentation](https://kiliankoe.github.io/publictransport/python.html) has a program for each kind of request, which are also in [examples](https://github.com/kiliankoe/publictransport/tree/main/examples/python).

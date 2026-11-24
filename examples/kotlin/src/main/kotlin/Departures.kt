@@ -41,8 +41,9 @@ suspend fun main() {
     val journey = client.journey(network, id)
     println("Stops of ${journey.line.name}:")
     for (stopover in journey.stops) {
-        // The first stop has no arrival and the last no departure.
-        val time = (stopover.scheduledDeparture ?: stopover.scheduledArrival)?.let(stopover.stop::localTime)
+        // Each side of a stopover is an end of a leg, with the helpers of
+        // a departure. The last stop has no departure.
+        val time = (stopover.departure ?: stopover.arrival)?.localExpectedTime
         println("  ${time?.format(clock) ?: "??:??"} ${stopover.stop.name}")
     }
 }

@@ -45,6 +45,8 @@ export {
   sameStation,
   stationIds,
   stopId,
+  stopoverArrival,
+  stopoverDeparture,
   tierAt,
   transfers,
 } from "./generated/publictransport_wasm.js";

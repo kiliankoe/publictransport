@@ -44,13 +44,15 @@ for (stop in client.nearby(network, position, radiusMeters = 500)) {
 val arrivals = client.arrivals(network, from, limit = 10)
 ```
 
-`journey` gives the run of one vehicle: every stop it calls at, with times and platforms. It takes the `journeyId` of a departure, an arrival or a leg of a trip. The ID only works on the network it came from, and for about a day.
+`journey` gives the run of one vehicle: every stop it calls at, with times and platforms. It takes the `journeyId` of a departure, an arrival or a leg of a trip. The ID only works on the network it came from, and for about a day. A stopover gives each of its sides with `departure` and `arrival` as an end of a leg, which has the delay and the local time, and `platform` works on it as on a departure.
 
 ```kotlin
 val id = client.departures(network, from, limit = 10).firstNotNullOfOrNull { it.journeyId }
 if (id != null) {
     for (stopover in client.journey(network, id).stops) {
-        println("${stopover.scheduledDeparture ?: stopover.scheduledArrival} ${stopover.stop.name}")
+        // The last stop has no departure.
+        val end = stopover.departure ?: stopover.arrival
+        println("${end?.localExpectedTime} ${stopover.stop.name}")
     }
 }
 ```

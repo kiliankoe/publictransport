@@ -1497,7 +1497,37 @@ pub struct LegEnd {
     pub cancelled: bool,
 }
 
+#[cfg_attr(feature = "uniffi", uniffi::export)]
 impl Stopover {
+    /// The vehicle leaving this stop as an end of a leg, so that the
+    /// helpers of a departure apply: the expected time, the local times
+    /// and the delay. It has the stop, the platforms and the cancellation
+    /// of the stopover. `None` if the stopover has no scheduled departure,
+    /// as the last stop of a run.
+    #[must_use]
+    pub fn departure(&self) -> Option<LegEnd> {
+        self.clone().into_leg_start()
+    }
+
+    /// The vehicle arriving at this stop as an end of a leg, as
+    /// [`Stopover::departure`] gives the one leaving. `None` if the
+    /// stopover has no scheduled arrival, as the first stop of a run.
+    #[must_use]
+    pub fn arrival(&self) -> Option<LegEnd> {
+        self.clone().into_leg_end()
+    }
+}
+
+impl Stopover {
+    /// The platform to show: the one the server knows now if there is one,
+    /// otherwise the one of the timetable.
+    #[must_use]
+    pub fn platform(&self) -> Option<&str> {
+        self.realtime_platform
+            .as_deref()
+            .or(self.scheduled_platform.as_deref())
+    }
+
     /// The stopover as the start of a leg, if it has a departure time.
     pub(crate) fn into_leg_start(self) -> Option<LegEnd> {
         Some(LegEnd {
@@ -1534,6 +1564,8 @@ impl Stopover {
 
 /// A call at a stop: where it is and when the vehicle arrives and leaves.
 /// The fields follow the same rules as those of a [`Departure`].
+/// [`Stopover::arrival`] and [`Stopover::departure`] give each side with
+/// the helpers that a departure has.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]

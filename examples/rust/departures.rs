@@ -58,11 +58,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let journey = client.journey(&network, id).await?;
         println!("Stops of {}:", journey.line.name);
         for stopover in &journey.stops {
-            // The first stop has no arrival and the last no departure.
+            // Each side of a stopover is an end of a leg, with the helpers
+            // of a departure. The last stop has no departure.
             let time = stopover
-                .scheduled_departure
-                .or(stopover.scheduled_arrival)
-                .and_then(|time| stopover.stop.local_time(time))
+                .departure()
+                .or_else(|| stopover.arrival())
+                .and_then(|end| end.local_expected_time())
                 .map_or_else(|| "??:??".to_owned(), |time| time.to_string());
             println!("  {time} {}", stopover.stop.name);
         }

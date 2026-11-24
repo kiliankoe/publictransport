@@ -28,6 +28,8 @@ import {
   sameStation,
   stationIds,
   stopId,
+  stopoverArrival,
+  stopoverDeparture,
   type TripTime,
   tierAt,
   transfers,
@@ -142,6 +144,15 @@ test("derived values come from the core", () => {
   assert.equal(delaySeconds(start), 60);
   assert.equal(platform(start), "14");
   assert.equal(durationSeconds(trip), 840);
+  // A stopover gives its sides as ends of a leg, and has a platform too.
+  const call = {
+    ...start,
+    scheduledArrival: start.scheduledTime,
+    realtimeArrival: start.realtimeTime,
+  };
+  assert.deepEqual(stopoverArrival(call), start);
+  assert.equal(stopoverDeparture(call), undefined);
+  assert.equal(platform(call), "14");
   assert.throws(() => departure({ legs: [] }), TypeError);
   assert.deepEqual(stationIds(foreignStop), [{ scheme: "ifopt", value: "de:14612:28" }]);
   assert.ok(sameStation(foreignStop, start.stop));

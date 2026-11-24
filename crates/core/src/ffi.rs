@@ -5,7 +5,7 @@ use std::time::{Duration, SystemTime};
 
 use crate::{
     Arrival, BundledNetwork, Departure, Error, GlobalId, LegEnd, LocalTime, Location, Network,
-    Timestamp, Trip,
+    Stopover, Timestamp, Trip,
 };
 
 /// The name of [`Timestamp`] in the bindings. The Python generator of `UniFFI` uses
@@ -159,6 +159,16 @@ impl LegEnd {
 
 #[uniffi::export]
 impl Arrival {
+    /// The platform to show: the one the server knows now if there is one,
+    /// otherwise the one of the timetable.
+    #[uniffi::method(name = "platform")]
+    fn ffi_platform(&self) -> Option<String> {
+        self.platform().map(str::to_owned)
+    }
+}
+
+#[uniffi::export]
+impl Stopover {
     /// The platform to show: the one the server knows now if there is one,
     /// otherwise the one of the timetable.
     #[uniffi::method(name = "platform")]

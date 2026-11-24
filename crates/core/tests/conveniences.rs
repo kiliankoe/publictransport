@@ -1,10 +1,13 @@
-//! What every application computes from a departure or a trip.
+//! What every application computes from a departure, a trip or a stopover.
 
 use proptest::prelude::*;
-use publictransport::{Departure, HttpResponse, Leg, Network, Protocol, Timestamp, Trip};
+use publictransport::{
+    Departure, HttpResponse, Leg, LegEnd, Network, Protocol, Stopover, Timestamp, Trip,
+};
 
 const DEPARTURES: &[u8] = include_bytes!("fixtures/motis/transitous-stoptimes.json");
 const TRIPS: &[u8] = include_bytes!("fixtures/motis/transitous-plan.json");
+const JOURNEY: &[u8] = include_bytes!("fixtures/motis/transitous-journey.json");
 
 /// 2026-11-16T13:24:00Z.
 const TIME: Timestamp = Timestamp {
@@ -41,6 +44,14 @@ fn trip() -> Trip {
 
 fn leg() -> Leg {
     trip().legs.remove(0)
+}
+
+/// A stopover to assign fields to.
+fn stopover() -> Stopover {
+    let Ok(mut journey) = network().parse_journey(&response(JOURNEY)) else {
+        unreachable!("the fixture is a MOTIS response");
+    };
+    journey.stops.remove(0)
 }
 
 fn after(time: Timestamp, seconds: i64) -> Timestamp {
@@ -134,6 +145,75 @@ proptest! {
             trip.duration_seconds(),
             arrival + arrival_delay.unwrap_or(0) - departure - departure_delay.unwrap_or(0)
         );
+    }
+
+    #[test]
+    fn each_side_of_a_stopover_is_a_leg_end_from_the_fields_of_that_side(
+        scheduled_arrival in prop::option::of(0_i64..4_000_000_000),
+        realtime_arrival in prop::option::of(0_i64..4_000_000_000),
+        scheduled_departure in prop::option::of(0_i64..4_000_000_000),
+        realtime_departure in prop::option::of(0_i64..4_000_000_000),
+        cancelled in any::<bool>(),
+    ) {
+        let time = |unix_seconds| Timestamp { unix_seconds };
+        let mut stopover = stopover();
+        stopover.scheduled_arrival = scheduled_arrival.map(time);
+        stopover.realtime_arrival = realtime_arrival.map(time);
+        stopover.scheduled_departure = scheduled_departure.map(time);
+        stopover.realtime_departure = realtime_departure.map(time);
+        stopover.scheduled_platform = Some("2".to_owned());
+        stopover.realtime_platform = Some("3".to_owned());
+        stopover.cancelled = cancelled;
+
+        let fields = |end: Option<LegEnd>| {
+            end.map(|end| {
+                (
+                    end.stop,
+                    end.scheduled_time,
+                    end.realtime_time,
+                    end.scheduled_platform,
+                    end.realtime_platform,
+                    end.cancelled,
+                )
+            })
+        };
+        // A side without a scheduled time is no leg end, predicted or not.
+        let side = |scheduled: Option<i64>, realtime: Option<i64>| {
+            scheduled.map(|scheduled| {
+                (
+                    stopover.stop.clone(),
+                    time(scheduled),
+                    realtime.map(time),
+                    Some("2".to_owned()),
+                    Some("3".to_owned()),
+                    cancelled,
+                )
+            })
+        };
+        prop_assert_eq!(
+            fields(stopover.arrival()),
+            side(scheduled_arrival, realtime_arrival)
+        );
+        prop_assert_eq!(
+            fields(stopover.departure()),
+            side(scheduled_departure, realtime_departure)
+        );
+    }
+}
+
+#[test]
+fn platform_of_a_stopover_is_the_real_time_one_before_the_scheduled_one() {
+    let cases = [
+        (Some("2"), Some("3"), Some("3")),
+        (Some("2"), None, Some("2")),
+        (None, Some("3"), Some("3")),
+        (None, None, None),
+    ];
+    for (scheduled, realtime, shown) in cases {
+        let mut stopover = stopover();
+        stopover.scheduled_platform = scheduled.map(str::to_owned);
+        stopover.realtime_platform = realtime.map(str::to_owned);
+        assert_eq!(stopover.platform(), shown, "{scheduled:?}, {realtime:?}");
     }
 }
 

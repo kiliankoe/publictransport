@@ -43,13 +43,17 @@ for stop in client.nearby(&network, NearbyQuery::new(position).with_radius_meter
 let arrivals = client.arrivals(&network, DeparturesQuery::new(from).with_limit(10)).await?;
 ```
 
-`journey` gives the run of one vehicle: every stop it calls at, with times and platforms. It takes the `journey_id` of a departure, an arrival or a leg of a trip. The ID only works on the network it came from, and for about a day.
+`journey` gives the run of one vehicle: every stop it calls at, with times and platforms. It takes the `journey_id` of a departure, an arrival or a leg of a trip. The ID only works on the network it came from, and for about a day. A stopover gives each of its sides with `departure()` and `arrival()` as an end of a leg, which has the delay and the local time, and `platform()` works on it as on a departure.
 
 ```rust,ignore
 let departures = client.departures(&network, DeparturesQuery::new(from).with_limit(10)).await?;
 if let Some(id) = departures.iter().find_map(|departure| departure.journey_id.as_deref()) {
     for stopover in client.journey(&network, id).await?.stops {
-        println!("{:?} {}", stopover.scheduled_departure.or(stopover.scheduled_arrival), stopover.stop.name);
+        // The last stop has no departure.
+        let end = stopover.departure().or_else(|| stopover.arrival());
+        if let Some(time) = end.and_then(|end| end.local_expected_time()) {
+            println!("{time} {}", stopover.stop.name);
+        }
     }
 }
 ```

@@ -38,7 +38,8 @@ for departure in departures:
 if journey:
     print(f"Stops of {journey.line.name}:")
     for stopover in journey.stops:
-        # The first stop has no arrival and the last no departure.
-        at = stopover.scheduled_departure or stopover.scheduled_arrival
-        local = stopover.stop.local_time(at) if at else None
+        # Each side of a stopover is an end of a leg, with the helpers of
+        # a departure. The last stop has no departure.
+        end = stopover.departure() or stopover.arrival()
+        local = end.local_expected_time() if end else None
         print(f"  {local:%H:%M}" if local else "  ??:??", stopover.stop.name)
