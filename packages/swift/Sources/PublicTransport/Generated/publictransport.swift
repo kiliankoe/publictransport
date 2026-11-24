@@ -3296,8 +3296,9 @@ public struct Network: Equatable, Hashable {
     /**
      * HTTP headers that every request to the server carries, for servers
      * that want a key or the name of the client in one. A request to
-     * ``Network/geocoder`` carries them too, so do not name a geocoder of
-     * someone else next to a key for the server. A header here
+     * ``Network/geocoder`` carries them only if the geocoder has the
+     * scheme, host and port of ``Network/endpoint``, both written out
+     * and alike, so that a key does not reach someone else. A header here
      * takes the place of one with the same name that the protocol or the
      * HTTP client would set, such as `User-Agent`. The library does not
      * check names and values; the HTTP client rejects invalid ones. Debug
@@ -3378,8 +3379,9 @@ public struct Network: Equatable, Hashable {
         /**
          * HTTP headers that every request to the server carries, for servers
          * that want a key or the name of the client in one. A request to
-         * ``Network/geocoder`` carries them too, so do not name a geocoder of
-         * someone else next to a key for the server. A header here
+         * ``Network/geocoder`` carries them only if the geocoder has the
+         * scheme, host and port of ``Network/endpoint``, both written out
+         * and alike, so that a key does not reach someone else. A header here
          * takes the place of one with the same name that the protocol or the
          * HTTP client would set, such as `User-Agent`. The library does not
          * check names and values; the HTTP client rejects invalid ones. Debug

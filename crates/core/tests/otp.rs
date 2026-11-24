@@ -316,6 +316,35 @@ fn coordinate_off_the_globe_is_an_invalid_query() {
     }
 }
 
+/// A key for the server must not reach a geocoder of someone else.
+#[test]
+fn geocoder_gets_the_headers_of_the_network_only_on_the_host_of_the_server() {
+    let cases = [
+        (GEOCODER, true),
+        ("HTTPS://API.ENTUR.IO/geocoder/v1", true),
+        ("https://api.entur.io", true),
+        ("http://api.entur.io/geocoder/v1", false),
+        ("https://api.entur.io:8443/geocoder/v1", false),
+        ("https://api.entur.io.example.org/geocoder/v1", false),
+        ("https://example.org/api.entur.io/", false),
+        ("https://example.org?https://api.entur.io/", false),
+        ("//api.entur.io/geocoder/v1", false),
+    ];
+    for (geocoder, sent) in cases {
+        let network = entur()
+            .with_geocoder(geocoder)
+            .with_header("X-Api-Key", "secret");
+        let request = network
+            .locations_request(&LocationQuery::new("Oslo"))
+            .unwrap();
+        let carried = request
+            .headers
+            .iter()
+            .any(|header| header.name == "X-Api-Key");
+        assert_eq!(carried, sent, "{geocoder}");
+    }
+}
+
 #[test]
 fn locations_come_in_the_geocoders_order_with_their_kind() {
     let network = entur().with_timezone("Europe/Oslo");

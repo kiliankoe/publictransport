@@ -54,7 +54,7 @@ A network that is not bundled can be described in code or read from an entry in 
 | HAFAS mgate | `hafas` with the options of the server, and `timezone` |
 | OpenTripPlanner | `geocoder`, the server that searches for locations |
 
-A server that wants a key in an HTTP header gets it through `headers`.
+A server that wants a key in an HTTP header gets it through `headers`. A `geocoder` gets these headers only if it has the scheme, host and port of the endpoint, so that a key does not reach another party.
 
 ## Good to know
 

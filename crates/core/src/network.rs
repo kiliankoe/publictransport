@@ -4,6 +4,15 @@ use crate::{
     NearbyQuery, Operation, Place, Trips, TripsQuery, efa, hafas, model::Board, motis, otp, trias,
 };
 
+/// The scheme, host and port of a URL, as it writes them. `None` for a
+/// URL without a scheme or a host, which cannot be compared.
+fn origin(url: &str) -> Option<&str> {
+    let (scheme, rest) = url.split_once("://")?;
+    let host = rest.split(['/', '?', '#']).next()?;
+    let named = |text: &str| !text.is_empty() && !text.contains(char::is_whitespace);
+    (named(scheme) && named(host)).then(|| url.get(..scheme.len() + 3 + host.len()))?
+}
+
 /// One server that answers public transport queries.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
@@ -93,8 +102,9 @@ pub struct Network {
     pub terms: Option<String>,
     /// HTTP headers that every request to the server carries, for servers
     /// that want a key or the name of the client in one. A request to
-    /// [`Network::geocoder`] carries them too, so do not name a geocoder of
-    /// someone else next to a key for the server. A header here
+    /// [`Network::geocoder`] carries them only if the geocoder has the
+    /// scheme, host and port of [`Network::endpoint`], both written out
+    /// and alike, so that a key does not reach someone else. A header here
     /// takes the place of one with the same name that the protocol or the
     /// HTTP client would set, such as `User-Agent`. The crate does not
     /// check names and values; the HTTP client rejects invalid ones. Debug
@@ -367,7 +377,13 @@ impl Network {
             Protocol::HafasMgate => hafas::locations_request(self, query),
             Protocol::OtpTransmodel => otp::locations_request(self, query),
         }?;
-        Ok(self.sent(request))
+        // The headers may hold a key, which a geocoder of someone else
+        // must not get. Only this request can go to another server.
+        let foreign = self.protocol == Protocol::OtpTransmodel
+            && !origin(&request.url)
+                .zip(origin(&self.endpoint))
+                .is_some_and(|(geocoder, server)| geocoder.eq_ignore_ascii_case(server));
+        Ok(if foreign { request } else { self.sent(request) })
     }
 
     /// Parses the response to a [`Network::locations_request`]. The best
