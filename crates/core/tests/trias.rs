@@ -17,6 +17,7 @@ const OJP_LOCATIONS: &[u8] = include_bytes!("fixtures/ojp/vrr-locations.xml");
 const OJP_VRR: &[u8] = include_bytes!("fixtures/ojp/vrr-departures.xml");
 const OJP_NO_EVENT: &[u8] = include_bytes!("fixtures/ojp/vvo-departures.xml");
 const OJP_TRIP: &[u8] = include_bytes!("fixtures/ojp/vrr-trip.xml");
+const OJP_RUN: &[u8] = include_bytes!("fixtures/ojp/vrr-journey.xml");
 
 const PROTOCOLS: [Protocol; 2] = [Protocol::Trias, Protocol::Ojp1];
 
@@ -813,8 +814,8 @@ fn both_protocols_describe_the_same_departures_alike_and_order_them_by_expected_
         for departure in &departures {
             let stop = &departure.stop;
             assert_eq!(
-                (stop.kind, &stop.locality, stop.coordinate),
-                (LocationKind::Stop, &None, None),
+                (stop.kind, &stop.locality),
+                (LocationKind::Stop, &None),
                 "{protocol:?}"
             );
             assert_eq!(stop.global_ids, [ifopt(&stop.id)], "{protocol:?}");
@@ -825,6 +826,71 @@ fn both_protocols_describe_the_same_departures_alike_and_order_them_by_expected_
             );
             assert!(!departure.cancelled, "{protocol:?}");
         }
+    }
+}
+
+/// The calls of an answer carry no position. OJP lists the places of every
+/// answer apart from the results, the TRIAS servers only those of trips.
+#[test]
+fn stops_take_their_position_from_the_places_the_answer_lists() {
+    // The ends of a walk can be addresses, which no list names.
+    let located = |stops: Vec<Location>| {
+        let stops = stops.into_iter().filter(|stop| !stop.global_ids.is_empty());
+        stops.map(|stop| stop.coordinate.is_some()).collect()
+    };
+    let of_trips = |protocol, body| {
+        let found = network(protocol).parse_trips(&response(body)).unwrap();
+        let legs = found.trips.into_iter().flat_map(|trip| trip.legs);
+        let stops = legs.flat_map(|leg| {
+            let between = leg.intermediate_stops.into_iter().map(|call| call.stop);
+            [leg.departure.stop, leg.arrival.stop]
+                .into_iter()
+                .chain(between)
+        });
+        located(stops.collect())
+    };
+    let of_departures = |protocol, body| {
+        let departures = network(protocol).parse_departures(&response(body)).unwrap();
+        located(
+            departures
+                .into_iter()
+                .map(|departure| departure.stop)
+                .collect(),
+        )
+    };
+    let run = network(Protocol::Ojp1)
+        .parse_journey(&response(OJP_RUN))
+        .unwrap();
+    let first = run
+        .stops
+        .first()
+        .map(|call| (call.stop.id.as_str(), call.stop.coordinate));
+    let position = Coordinate {
+        latitude: 51.22025,
+        longitude: 6.793,
+    };
+    assert_eq!(first, Some(("de:05111:18235", Some(position))));
+
+    let cases: [(&str, Vec<bool>, bool); 4] = [
+        ("OJP trips", of_trips(Protocol::Ojp1, OJP_TRIP), true),
+        ("TRIAS trips", of_trips(Protocol::Trias, TRIAS_TRIP), true),
+        (
+            "OJP departures",
+            of_departures(Protocol::Ojp1, OJP_VRR),
+            true,
+        ),
+        (
+            "TRIAS departures",
+            of_departures(Protocol::Trias, TRIAS_VRR),
+            false,
+        ),
+    ];
+    for (case, located, expected) in cases {
+        assert!(!located.is_empty(), "{case}");
+        assert!(
+            located.iter().all(|found| *found == expected),
+            "{case}: {located:?}"
+        );
     }
 }
 

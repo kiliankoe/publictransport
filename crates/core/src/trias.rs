@@ -8,6 +8,8 @@
 //! element holds the current time, this crate has no clock, and the servers
 //! do not read it.
 
+use std::collections::HashMap;
+
 use quick_xml::escape::escape;
 use serde::Deserialize;
 
@@ -291,13 +293,13 @@ pub(crate) fn journey_request(network: &Network, id: &str) -> Result<HttpRequest
 pub(crate) fn parse_journey(network: &Network, response: &HttpResponse) -> Result<Journey, Error> {
     let (answers, failure) = answers(network, response)?;
     let answer = answer(answers.trip_info, &failure, response.status)?;
-    let situations = situations(response);
+    let context = Context::of(response);
     let mut result = answer
         .results(failure, response.status, &["NOJOURNEYFOUND"])?
         .into_iter()
         .next()
         .ok_or_else(Journey::unknown)?;
-    let remarks = result.service.remarks(&situations);
+    let remarks = result.service.remarks(&context.situations);
     let (line, direction, cancelled) = result.service.into_line(result.extension);
     Ok(Journey {
         line,
@@ -306,7 +308,7 @@ pub(crate) fn parse_journey(network: &Network, response: &HttpResponse) -> Resul
             .previous
             .into_iter()
             .chain(result.onward)
-            .map(|call| call.into_stopover(network))
+            .map(|call| call.into_stopover(network, &context))
             .collect(),
         cancelled,
         remarks,
@@ -373,15 +375,11 @@ pub(crate) fn parse_departures(
 ) -> Result<Vec<Departure>, Error> {
     let (answers, failure) = answers(network, response)?;
     let answer = answer(answers.stop_events, &failure, response.status)?;
-    let situations = situations(response);
+    let context = Context::of(response);
     let mut departures = answer
         .results(failure, response.status, &["NOEVENTFOUND"])?
         .into_iter()
-        .map(|result| {
-            result
-                .stop_event
-                .into_departure(network, &situations, board)
-        })
+        .map(|result| result.stop_event.into_departure(network, &context, board))
         .collect::<Result<Vec<_>, _>>()?;
     departures.sort_by_key(Departure::expected_time);
     Ok(departures)
@@ -390,7 +388,7 @@ pub(crate) fn parse_departures(
 pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<Trips, Error> {
     let (answers, failure) = answers(network, response)?;
     let answer = answer(answers.trips, &failure, response.status)?;
-    let situations = situations(response);
+    let context = Context::of(response);
     let results = answer.results(
         failure,
         response.status,
@@ -402,7 +400,7 @@ pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<
             .trip
             .legs
             .into_iter()
-            .filter_map(|leg| leg.into_leg(network, &situations).transpose())
+            .filter_map(|leg| leg.into_leg(network, &context).transpose())
             .collect::<Result<Vec<_>, _>>()?;
         trips.extend(Trip::new(legs));
     }
@@ -524,22 +522,76 @@ struct Answer<T> {
     error_condition: Option<ErrorCondition>,
 }
 
-/// The situations of an answer, which its results refer to. Each is read
-/// on its own and apart from the results, so that one of a shape no
-/// recorded response showed costs only itself.
-fn situations(response: &HttpResponse) -> Vec<Situation> {
+/// What an answer says once for all its results, which refer to it.
+struct Context {
+    situations: Vec<Situation>,
+    /// The positions of stops by their reference. The calls of the results
+    /// carry none. TRIAS servers only list the places of trips.
+    positions: HashMap<String, Coordinate>,
+}
+
+impl Context {
+    fn of(response: &HttpResponse) -> Self {
+        let mut positions = HashMap::new();
+        for place in each::<ContextPlace>(response, "Location") {
+            // VRR writes this for a place it cannot locate.
+            let Some(position) = place
+                .geo_position
+                .map(Coordinate::from)
+                .filter(|position| (position.latitude, position.longitude) != (0.0, 0.0))
+            else {
+                continue;
+            };
+            // A stop place can share its reference with one of its stop
+            // points, which is what a call names.
+            if let Some(point) = place.stop_point.and_then(|stop| stop.point) {
+                positions.insert(point.trim().to_owned(), position);
+            } else if let Some(place) = place.stop_place.and_then(|stop| stop.place) {
+                positions.entry(place.trim().to_owned()).or_insert(position);
+            }
+        }
+        Self {
+            situations: each(response, "PtSituation"),
+            positions,
+        }
+    }
+}
+
+/// A place in the list of an answer. Only stops are looked up.
+#[derive(Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct ContextPlace {
+    stop_point: Option<PlaceRef>,
+    stop_place: Option<PlaceRef>,
+    geo_position: Option<GeoPosition>,
+}
+
+#[derive(Deserialize)]
+struct PlaceRef {
+    #[serde(rename = "StopPointRef")]
+    point: Option<String>,
+    #[serde(rename = "StopPlaceRef")]
+    place: Option<String>,
+}
+
+/// Every element of the answer with this name that is not inside another
+/// one. Each is read on its own and apart from the results, so that one of
+/// a shape no recorded response showed costs only itself.
+fn each<T: serde::de::DeserializeOwned>(response: &HttpResponse, name: &str) -> Vec<T> {
     use quick_xml::events::Event;
     let mut found = Vec::new();
     let Ok(body) = std::str::from_utf8(&response.body) else {
         return found;
     };
-    if !body.contains("PtSituation>") {
+    // The reader skips a byte order mark, and its positions with it.
+    let body = body.trim_start_matches('\u{feff}');
+    if !body.contains(&format!("{name}>")) {
         return found;
     }
     let mut reader = quick_xml::Reader::from_str(body);
     loop {
         match reader.read_event() {
-            Ok(Event::Start(start)) if start.local_name().as_ref() == "PtSituation" => {
+            Ok(Event::Start(start)) if start.local_name().as_ref() == name => {
                 let Ok(span) = reader.read_to_end(start.name()) else {
                     return found;
                 };
@@ -548,8 +600,8 @@ fn situations(response: &HttpResponse) -> Vec<Situation> {
                     .zip(usize::try_from(span.end).ok())
                     .and_then(|(start, end)| body.get(start..end))
                     .unwrap_or_default();
-                let situation = format!("<PtSituation>{inner}</PtSituation>");
-                found.extend(quick_xml::de::from_str::<Situation>(&situation));
+                let element = format!("<{name}>{inner}</{name}>");
+                found.extend(quick_xml::de::from_str::<T>(&element));
             }
             Ok(Event::Eof) | Err(_) => return found,
             Ok(_) => {}
@@ -841,6 +893,15 @@ struct GeoPosition {
     latitude: f64,
 }
 
+impl From<GeoPosition> for Coordinate {
+    fn from(position: GeoPosition) -> Self {
+        Self {
+            latitude: position.latitude,
+            longitude: position.longitude,
+        }
+    }
+}
+
 impl WireLocation {
     /// `None` for a place of a kind this crate does not know.
     /// `full_name` says that the name of the location is the whole name
@@ -894,10 +955,7 @@ impl WireLocation {
             } else {
                 location_name
             },
-            coordinate: self.geo_position.map(|position| Coordinate {
-                latitude: position.latitude,
-                longitude: position.longitude,
-            }),
+            coordinate: self.geo_position.map(Coordinate::from),
             timezone: network.timezone.clone(),
             network: None,
         })
@@ -1028,14 +1086,14 @@ struct Extension {
 }
 
 impl Call {
-    fn into_stopover(self, network: &Network) -> Stopover {
+    fn into_stopover(self, network: &Network, context: &Context) -> Stopover {
         let (arrival, departure) = (self.service_arrival, self.service_departure);
         let scheduled_platform = text(self.planned_bay);
-        let coordinate = self.geo_position.map(|position| Coordinate {
-            latitude: position.latitude,
-            longitude: position.longitude,
-        });
         let stop = trimmed(self.stop_point_ref);
+        let coordinate = self.geo_position.map(Coordinate::from).or_else(|| {
+            let listed = context.positions.get(stop.as_deref()?)?;
+            Some(*listed)
+        });
         let other = trimmed(self.address_ref).or(trimmed(self.point_of_interest_ref));
         Stopover {
             scheduled_arrival: arrival.as_ref().map(|time| time.timetabled_time.0),
@@ -1154,14 +1212,14 @@ impl StopEvent {
     fn into_departure(
         mut self,
         network: &Network,
-        situations: &[Situation],
+        context: &Context,
         board: Board,
     ) -> Result<Departure, Error> {
-        let remarks = self.service.remarks(situations);
+        let remarks = self.service.remarks(&context.situations);
         let journey_id = self.service.journey_id();
         let origin = text(std::mem::take(&mut self.service.origin_text));
         let (line, direction, cancelled) = self.service.into_line(self.extension);
-        let stopover = self.this_call.call_at_stop.into_stopover(network);
+        let stopover = self.this_call.call_at_stop.into_stopover(network, context);
         let end = stopover.on(board).ok_or_else(|| Error::Parse {
             message: "a stop event has no scheduled time".to_owned(),
         })?;
@@ -1253,30 +1311,30 @@ struct IndividualService {
 
 impl TripLeg {
     /// `None` for a leg of a kind this crate does not know.
-    fn into_leg(self, network: &Network, situations: &[Situation]) -> Result<Option<Leg>, Error> {
+    fn into_leg(self, network: &Network, context: &Context) -> Result<Option<Leg>, Error> {
         let no_time = || Error::Parse {
             message: "a leg has no scheduled time at one of its ends".to_owned(),
         };
         if let Some(mut ride) = self.timed {
-            let remarks = ride.service.remarks(situations);
+            let remarks = ride.service.remarks(&context.situations);
             let journey_id = ride.service.journey_id();
             let (line, direction, cancelled) = ride.service.into_line(ride.extension);
             return Ok(Some(Leg {
                 kind: LegKind::Transit { line, direction },
                 departure: ride
                     .leg_board
-                    .into_stopover(network)
+                    .into_stopover(network, context)
                     .into_leg_start()
                     .ok_or_else(no_time)?,
                 arrival: ride
                     .leg_alight
-                    .into_stopover(network)
+                    .into_stopover(network, context)
                     .into_leg_end()
                     .ok_or_else(no_time)?,
                 intermediate_stops: ride
                     .intermediates
                     .into_iter()
-                    .map(|call| call.into_stopover(network))
+                    .map(|call| call.into_stopover(network, context))
                     .collect(),
                 cancelled,
                 remarks,
@@ -1296,7 +1354,7 @@ impl TripLeg {
             return Ok(None);
         };
         let end_at = |call: Call, time: WireTime| LegEnd {
-            stop: call.into_stopover(network).stop,
+            stop: call.into_stopover(network, context).stop,
             scheduled_time: time.0,
             realtime_time: None,
             scheduled_platform: None,
