@@ -1259,7 +1259,7 @@ dependencies = [
 
 [[package]]
 name = "publictransport"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "form_urlencoded",
  "jiff",
@@ -1280,7 +1280,7 @@ dependencies = [
 
 [[package]]
 name = "publictransport-client"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "publictransport",
  "reqwest",
@@ -1291,7 +1291,7 @@ dependencies = [
 
 [[package]]
 name = "publictransport-examples"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "publictransport-client",
  "tokio",
@@ -1299,7 +1299,7 @@ dependencies = [
 
 [[package]]
 name = "publictransport-uniffi"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "publictransport",
  "uniffi",
@@ -1307,7 +1307,7 @@ dependencies = [
 
 [[package]]
 name = "publictransport-wasm"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "js-sys",
  "publictransport",

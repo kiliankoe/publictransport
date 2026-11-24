@@ -4,7 +4,7 @@
 A Swift client for public transport APIs. One model for stops, departures and trips covers servers that speak EFA, MOTIS, TRIAS 1.2, OJP 1.0, HAFAS mgate or OpenTripPlanner 2, so an application queries every supported network the same way.
 
 ```swift
-.package(url: "https://github.com/kiliankoe/publictransport", from: "0.1.2")
+.package(url: "https://github.com/kiliankoe/publictransport", from: "0.2.0")
 ```
 
 It runs on iOS, macOS, tvOS, watchOS and visionOS from version 26, and on Linux. The package wraps the Rust library of the same name, which builds the requests and parses the answers, and `URLSession` sends them.

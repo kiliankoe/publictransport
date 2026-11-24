@@ -5,7 +5,7 @@ A Kotlin client for public transport APIs. One model for stops, departures and t
 
 ```kotlin
 dependencies {
-    implementation("io.github.kiliankoe:publictransport:0.1.2")
+    implementation("io.github.kiliankoe:publictransport:0.2.0")
 }
 ```
 
@@ -82,7 +82,7 @@ client.trips(network, home, Place.Id("de:14612:28"), arriveBy = tomorrowAtNine)
 
 ```kotlin
 dependencies {
-    implementation("io.github.kiliankoe:publictransport-android:0.1.2")
+    implementation("io.github.kiliankoe:publictransport-android:0.2.0")
 }
 ```
 

@@ -23,7 +23,7 @@ http2 = ["reqwest/http2"]
 system-proxy = ["reqwest/system-proxy"]
 
 [dependencies]
-publictransport = { path = "../core", version = "0.1.2" }
+publictransport = { path = "../core", version = "0.2.0" }
 reqwest = { version = "0.13.5", default-features = false }
 thiserror = "2.0.21"
 
