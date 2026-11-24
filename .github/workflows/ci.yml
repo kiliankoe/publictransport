@@ -72,6 +72,8 @@ jobs:
               - packages/kotlin/**
               - examples/kotlin/**
               - scripts/kotlin-idioms.py
+              - scripts/android-test.sh
+              - Justfile
             typescript:
               - *shared
               - bindings/wasm/**
@@ -201,6 +203,34 @@ jobs:
           for name in locations departures trips networks; do
             nix develop -c gradle --project-dir packages/kotlin --quiet :examples:$name
           done
+
+  # The Android library, and a shrunk app with it on an emulator.
+  android:
+    needs: changes
+    if: needs.changes.outputs.kotlin == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The network data of transport-apis.
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@v23
+      - uses: Swatinem/rust-cache@v2
+      # Builds the Rust library for the Android ABIs, lints the library and
+      # builds the app that tests it.
+      - run: nix develop .#android -c just android
+      # The emulator needs hardware virtualization.
+      - run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          # The oldest Android that the library supports.
+          api-level: 26
+          arch: x86_64
+          # Outside the shell, with the adb that started the emulator.
+          script: scripts/android-test.sh
 
   typescript:
     needs: changes

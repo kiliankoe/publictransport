@@ -30,7 +30,7 @@ perl -pi -e 's/^(  "version": )"[^"]*"/$1"'$version'"/' packages/typescript/pack
 # The version in the lines for a Swift manifest.
 perl -pi -e 's/(publictransport", from: )"[^"]*"/$1"'$version'"/' README.md packages/swift/README.md
 # The version in the lines for a Gradle build.
-perl -pi -e 's/(io\.github\.kiliankoe:publictransport:)[^"]*"/${1}'$version'"/' README.md packages/kotlin/README.md
+perl -pi -e 's/(io\.github\.kiliankoe:publictransport(-android)?:)[^"]*"/${1}'$version'"/' README.md packages/kotlin/README.md
 for file in Cargo.toml packages/python/pyproject.toml crates/client/Cargo.toml packages/typescript/package.json README.md packages/swift/README.md packages/kotlin/README.md; do
   if ! grep -q "\(version = \|\"version\": \|from: \|publictransport:\)\"\?$version\"" $file; then
     print -u2 "$file: found no version to set"

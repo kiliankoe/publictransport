@@ -9,7 +9,7 @@ dependencies {
 }
 ```
 
-It runs on the JVM from Java 11, on macOS and Linux (with glibc, so not Alpine) on x86-64 and ARM and on Windows on x86-64. An Android library is planned. The package wraps the Rust library of the same name, which builds the requests and parses the answers, and [OkHttp](https://square.github.io/okhttp/) sends them from suspend functions.
+It runs on the JVM from Java 11, on macOS and Linux (with glibc, so not Alpine) on x86-64 and ARM and on Windows on x86-64. An Android app takes `io.github.kiliankoe:publictransport-android` instead, which is the same code for Android 8.0 (API level 26) and later, see [Android](#android). The package wraps the Rust library of the same name, which builds the requests and parses the answers, and [OkHttp](https://square.github.io/okhttp/) sends them from suspend functions.
 
 ```kotlin
 import publictransport.BundledNetwork
@@ -77,6 +77,16 @@ val more = client.trips(network, from, to, limit = 5, page = found.later)
 val home = Coordinate(51.04, 13.73).asPlace()
 client.trips(network, home, Place.Id("de:14612:28"), arriveBy = tomorrowAtNine)
 ```
+
+## Android
+
+```kotlin
+dependencies {
+    implementation("io.github.kiliankoe:publictransport-android:0.1.2")
+}
+```
+
+The Android library has the same classes in the same package, with the Rust library for `arm64-v8a`, `armeabi-v7a` and `x86_64`. It brings the rules that R8 needs, and OkHttp brings the permission to use the internet. A call can be made from the main thread, for example in `viewModelScope`: it suspends, and the answer is read and parsed on a thread of OkHttp.
 
 ## Networks
 
@@ -174,4 +184,6 @@ gradle :examples:trips     # run an example
 
 `just kotlin` runs ktlint and the build from the root of the repository. The examples in `examples/kotlin` are a subproject of this build.
 
-A release publishes the package to Maven Central with the Rust library of every platform in the jar. The release workflow takes these libraries from the wheels of the Python package and passes their directory as `-PnativeLibraries`.
+The Android library in `android` is a part of this build in the shell that has the Android SDK, `nix develop .#android`. Entering that shell accepts the license of the SDK. There `just android` builds and lints the library and builds an app with it that R8 has shrunk and renamed, and `just android-test` runs the test of that app on a connected device or a running emulator. The test shows what the tests on the JVM cannot: that the app finds the Rust library and that it still works after R8.
+
+A release publishes the package to Maven Central with the Rust library of every platform in the jar, and the Android library next to it. The release workflow takes these libraries from the wheels of the Python package and passes their directory as `-PnativeLibraries`.

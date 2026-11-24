@@ -13,6 +13,8 @@ __pycache__/
 .gradle/
 .kotlin/
 /packages/kotlin/build/
+/packages/kotlin/android/build/
+/packages/kotlin/android/smoke/build/
 /examples/kotlin/build/
 # Installed by pnpm and built by packages/typescript/build.sh.
 node_modules/

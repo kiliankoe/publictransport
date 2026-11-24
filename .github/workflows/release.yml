@@ -174,12 +174,17 @@ jobs:
           path: ${{ runner.temp }}/wheels
           merge-multiple: true
       - run: scripts/kotlin-natives.sh "$RUNNER_TEMP/wheels" "$RUNNER_TEMP/natives"
-      - run: nix develop -c gradle --project-dir packages/kotlin build publishToMavenLocal -PnativeLibraries="$RUNNER_TEMP/natives"
-      - name: Check the jar
+      # In the shell with the Android SDK, so that the build covers the
+      # Android library too.
+      - run: nix develop .#android -c gradle --project-dir packages/kotlin build publishToMavenLocal -PnativeLibraries="$RUNNER_TEMP/natives"
+      - name: Check the jar and the Android library
         run: |
           jar=$(echo ~/.m2/repository/io/github/kiliankoe/publictransport/*/publictransport-*[0-9].jar)
           [ "$(unzip -Z1 "$jar" '*publictransport_uniffi.*' | wc -l)" -eq 5 ] ||
             { echo "::error::the jar does not hold five libraries"; exit 1; }
+          aar=$(echo ~/.m2/repository/io/github/kiliankoe/publictransport-android/*/publictransport-android-*[0-9].aar)
+          [ "$(unzip -Z1 "$aar" 'jni/*/libpublictransport_uniffi.so' | wc -l)" -eq 3 ] ||
+            { echo "::error::the Android library does not hold three libraries"; exit 1; }
 
   # The package for npm, as the tarball that gets published.
   npm-check:
@@ -352,9 +357,9 @@ jobs:
           fi
       # On its own, so that only the upload runs with the secrets.
       - if: steps.published.outputs.published != 'true'
-        run: nix develop -c gradle --project-dir packages/kotlin build -PnativeLibraries="$RUNNER_TEMP/natives"
+        run: nix develop .#android -c gradle --project-dir packages/kotlin build -PnativeLibraries="$RUNNER_TEMP/natives"
       - if: steps.published.outputs.published != 'true'
-        run: nix develop -c gradle --project-dir packages/kotlin publishAndReleaseToMavenCentral -PnativeLibraries="$RUNNER_TEMP/natives"
+        run: nix develop .#android -c gradle --project-dir packages/kotlin publishAndReleaseToMavenCentral -PnativeLibraries="$RUNNER_TEMP/natives"
         env:
           # Waits until the version can be downloaded, not only until
           # Maven Central has accepted it.

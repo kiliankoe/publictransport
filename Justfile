@@ -43,6 +43,14 @@ kotlin:
     ktlint 'packages/kotlin/**/*.kt' 'packages/kotlin/**/*.kts' 'examples/kotlin/**/*.kt' 'examples/kotlin/**/*.kts' '!**/build/**'
     gradle --project-dir packages/kotlin --quiet build
 
+# Build and lint the Android library and the app that tests it, in the shell of `nix develop .#android`
+android:
+    gradle --project-dir packages/kotlin --quiet :android:build :android:smoke:build :android:smoke:assembleAndroidTest
+
+# Run the test of the Android library on a connected device or a running emulator, after `just android`
+android-test:
+    scripts/android-test.sh
+
 # Lint, build, type-check and test the TypeScript package, with the Rust library built for it as WebAssembly
 typescript:
     cd packages/typescript && pnpm install --frozen-lockfile --silent

@@ -1,11 +1,15 @@
 import com.vanniktech.maven.publish.JavadocJar
 import com.vanniktech.maven.publish.KotlinJvm
 import com.vanniktech.maven.publish.SourcesJar
+import org.gradle.api.publish.maven.MavenPom
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.maven.publish)
+    // Loaded here for the Android library, so that it shares the Kotlin plugin.
+    alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.android.application) apply false
     `java-library`
 }
 
@@ -130,14 +134,10 @@ tasks.test {
     jvmArgs("--enable-native-access=ALL-UNNAMED")
 }
 
-// Signing is switched on by the release workflow, so that publishing to the
-// local Maven repository needs no key.
-mavenPublishing {
-    publishToMavenCentral()
-    coordinates(group.toString(), "publictransport", version.toString())
-    // The documentation is in the sources. Maven Central asks for the file.
-    configure(KotlinJvm(javadocJar = JavadocJar.Empty(), sourcesJar = SourcesJar.Sources()))
-    pom {
+// What Maven Central asks every artifact to say about itself. The Android
+// library takes it from here.
+val pom =
+    Action<MavenPom> {
         name = "publictransport"
         description = "A client for public transport APIs with one model for stops, departures and trips"
         url = "https://kiliankoe.github.io/publictransport/"
@@ -164,4 +164,14 @@ mavenPublishing {
             developerConnection = "scm:git:ssh://git@github.com/kiliankoe/publictransport.git"
         }
     }
+extra.set("pom", pom)
+
+// Signing is switched on by the release workflow, so that publishing to the
+// local Maven repository needs no key.
+mavenPublishing {
+    publishToMavenCentral()
+    coordinates(group.toString(), "publictransport", version.toString())
+    // The documentation is in the sources. Maven Central asks for the file.
+    configure(KotlinJvm(javadocJar = JavadocJar.Empty(), sourcesJar = SourcesJar.Sources()))
+    pom(pom)
 }

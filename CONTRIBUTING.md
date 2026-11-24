@@ -2,7 +2,7 @@
 
 ## Checks
 
-`nix develop` or direnv provides every tool, and `just` lists the commands of the project. CI runs the commands in `.github/workflows/ci.yml`; run the ones for the part you changed before you commit, for example with `just check`, `just python`, `just swift-test`, `just kotlin` or `just typescript`, and `just examples` after a change to what the library offers. The Python package has its own in `packages/python/README.md`.
+`nix develop` or direnv provides every tool, and `just` lists the commands of the project. CI runs the commands in `.github/workflows/ci.yml`; run the ones for the part you changed before you commit, for example with `just check`, `just python`, `just swift-test`, `just kotlin` or `just typescript`, and `just examples` after a change to what the library offers. The Android library has its commands in a shell of its own, see `packages/kotlin/README.md`. The Python package has its own in `packages/python/README.md`.
 
 ## Commit messages
 
