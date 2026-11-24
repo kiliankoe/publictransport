@@ -115,7 +115,7 @@ class Client(
     suspend fun locations(
         network: Network,
         query: LocationQuery,
-    ): List<Location> = network.parseLocations(send(network.locationsRequest(query)))
+    ): List<Location> = send(network.locationsRequest(query), network::parseLocations)
 
     /**
      * Finds the stops near a position. The nearest comes first, and
@@ -144,7 +144,7 @@ class Client(
     suspend fun nearby(
         network: Network,
         query: NearbyQuery,
-    ): List<Location> = network.parseNearby(send(network.nearbyRequest(query)))
+    ): List<Location> = send(network.nearbyRequest(query), network::parseNearby)
 
     /**
      * Lists the next departures at a stop, ordered by expected time.
@@ -182,7 +182,7 @@ class Client(
     suspend fun departures(
         network: Network,
         query: DeparturesQuery,
-    ): List<Departure> = network.parseDepartures(send(network.departuresRequest(query)))
+    ): List<Departure> = send(network.departuresRequest(query), network::parseDepartures)
 
     /**
      * Lists the next arrivals at a stop, ordered by expected time. The
@@ -215,7 +215,7 @@ class Client(
     suspend fun arrivals(
         network: Network,
         query: DeparturesQuery,
-    ): List<Arrival> = network.parseArrivals(send(network.arrivalsRequest(query)))
+    ): List<Arrival> = send(network.arrivalsRequest(query), network::parseArrivals)
 
     /**
      * Fetches the run of one vehicle: all its stops with times and
@@ -229,7 +229,7 @@ class Client(
     suspend fun journey(
         network: Network,
         id: String,
-    ): Journey = network.parseJourney(send(network.journeyRequest(id)))
+    ): Journey = send(network.journeyRequest(id), network::parseJourney)
 
     /**
      * Plans trips between two locations, in the order the server ranks
@@ -284,7 +284,7 @@ class Client(
     suspend fun trips(
         network: Network,
         query: TripsQuery,
-    ): Trips = network.parseTrips(send(network.tripsRequest(query)))
+    ): Trips = send(network.tripsRequest(query), network::parseTrips)
 
     /** A number of results as the core library takes it. */
     private fun count(limit: Int?): UInt? {
@@ -292,7 +292,15 @@ class Client(
         return limit?.toUInt()
     }
 
-    private suspend fun send(request: HttpRequest): HttpResponse {
+    /**
+     * Sends the request and gives what [parse] makes of the answer. The
+     * answer is read and parsed on OkHttp's thread, so that a caller on the
+     * main thread of an application is not held up by it.
+     */
+    private suspend fun <T> send(
+        request: HttpRequest,
+        parse: (HttpResponse) -> T,
+    ): T {
         val builder = Request.Builder().url(request.url).header("User-Agent", userAgent)
         // After the user agent, so that one from the network takes its place.
         request.headers.forEach { builder.header(it.name, it.value) }
@@ -309,11 +317,10 @@ class Client(
                         e: IOException,
                     ) = continuation.resumeWithException(e)
 
-                    // The body is read here, on OkHttp's thread, so that no thread of the caller waits for it.
                     override fun onResponse(
                         call: Call,
                         response: Response,
-                    ) = runCatching { response.use(::read) }.fold(continuation::resume, continuation::resumeWithException)
+                    ) = runCatching { parse(response.use(::read)) }.fold(continuation::resume, continuation::resumeWithException)
                 },
             )
         }
