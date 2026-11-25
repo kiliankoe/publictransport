@@ -89,9 +89,9 @@ examples-typescript:
     cd examples/typescript && pnpm install --frozen-lockfile --silent
     for name in locations departures trips networks; do node examples/typescript/$name.ts; done
 
-# Ask the live server of every bundled network for stops, departures and trips
-check-networks:
-    cargo run -p publictransport-client --example check
+# Ask the live servers of the bundled networks for stops, departures and trips: every one but Transitous, or the ones named
+check-networks *networks:
+    cargo run -p publictransport-client --example check -- {{networks}}
 
 # Build the documentation site into site/book. mdBook only warns about a file it cannot include and says nothing about a missing anchor, so both are checked here
 site:

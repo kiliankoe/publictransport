@@ -4,8 +4,11 @@
 //! have no departures or no trips between them it searches again, with up
 //! to five words.
 //!
+//! Without arguments it leaves out Transitous, a service run by
+//! volunteers, so that a scheduled run never asks it. Name it to check it.
+//!
 //! ```sh
-//! # every bundled network
+//! # every bundled network but Transitous
 //! cargo run --example check
 //! # some of them, or entries in the format of transport-apis
 //! cargo run --example check -- vvo-efa path/to/entry.json
@@ -68,6 +71,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if arguments.is_empty() {
         networks = BundledNetwork::ALL
             .iter()
+            .filter(|network| **network != BundledNetwork::Transitous)
             .map(|network| Network::bundled(*network))
             .collect();
     }

@@ -4,6 +4,8 @@
 
 `nix develop` or direnv provides every tool, and `just` lists the commands of the project. CI runs the commands in `.github/workflows/ci.yml`; run the ones for the part you changed before you commit, for example with `just check`, `just python`, `just swift-test`, `just kotlin` or `just typescript`, and `just examples` after a change to what the library offers. The Android library has its commands in a shell of its own, see `packages/kotlin/README.md`. The Python package has its own in `packages/python/README.md`.
 
+Once a week the workflow in `.github/workflows/networks.yml` runs `just check-networks`, which asks the live server of every bundled network but Transitous, a service run by volunteers. If a network fails, it opens an issue with the failing lines, or comments on the one that is still open. A single failure can be a hiccup of the server, so check the network again by hand with `just check-networks <id>` before you change it.
+
 ## Commit messages
 
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org), so that the history shows which part of the project a change belongs to and the changelog can be generated from it. CI checks the format with [committed](https://github.com/crate-ci/committed), configured in `committed.toml`.

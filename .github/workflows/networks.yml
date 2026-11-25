@@ -1,0 +1,70 @@
+name: Networks
+
+# Whether the servers of the bundled networks still answer, to see when one
+# moves or goes away. Once a week, so that the servers get little load.
+on:
+  schedule:
+    # Tuesday morning in Europe, when most networks have departures and
+    # BART still runs. Not on the hour, when GitHub queues the most runs.
+    - cron: "43 5 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Named like the job of CI, whose Rust cache it reads.
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # For the issue that reports the networks that failed.
+      issues: write
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The network data of transport-apis.
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@v23
+      # Writes none: GitHub drops a cache after a week without use, so the
+      # next run would not find it.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: false
+      # Without arguments the check leaves out Transitous, which no
+      # automation may ask. One run and no retries: a network that fails
+      # once may only have had a hiccup, which the owner can judge.
+      - id: check
+        run: |
+          set -o pipefail
+          nix develop -c just check-networks | tee "$RUNNER_TEMP/check.txt"
+      # The output holds text from the servers, so it only goes through
+      # files and never into a command line.
+      - if: failure() && steps.check.conclusion == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TITLE: Networks failed the weekly check
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # Without a FAILED line the check itself broke, as in a failed build.
+          # Cut and without the characters that end a code block or mention
+          # somebody: a server may send any text.
+          { grep FAILED "$RUNNER_TEMP/check.txt" || true; } | cut -c 1-300 | tr -d '`@' > "$RUNNER_TEMP/failed.txt"
+          [ -s "$RUNNER_TEMP/failed.txt" ] || echo "No network failed, the check itself broke." > "$RUNNER_TEMP/failed.txt"
+          {
+            printf 'These networks failed the [weekly check](%s). A single failure may only be a hiccup of the server.\n\n```\n' "$RUN"
+            cat "$RUNNER_TEMP/failed.txt"
+            printf '```\n'
+          } > "$RUNNER_TEMP/body.md"
+          # A failure in a later week goes to the issue that is still open.
+          number=$(gh issue list --state open --search "in:title $TITLE" --json number,title --jq '.[] | select(.title == env.TITLE) | .number' | head -n 1)
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh issue create --title "$TITLE" --body-file "$RUNNER_TEMP/body.md"
+          fi
