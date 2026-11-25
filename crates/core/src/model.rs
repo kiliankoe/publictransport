@@ -11,9 +11,10 @@
 pub struct LocationQuery {
     /// The text to search for, as a user typed it.
     pub text: String,
-    /// The largest number of results wanted. Servers may return fewer. EFA
-    /// has no limit that works for every search, so the request carries
-    /// none there and the server returns every match.
+    /// The largest number of results wanted. Servers may return fewer, and
+    /// [`Network::parse_locations`](crate::Network::parse_locations) cuts
+    /// the list to it. EFA has no limit that works for every search, so
+    /// the request carries none there and the server returns every match.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     #[cfg_attr(
         feature = "unstable-wasm",
@@ -21,7 +22,7 @@ pub struct LocationQuery {
     )]
     pub limit: Option<u32>,
     /// The kinds of location wanted. Empty asks for every kind. The request
-    /// asks the server to filter, so `limit` counts only wanted locations.
+    /// asks the server to filter, so `limit` counts what the server sends.
     /// MOTIS, HAFAS and the geocoder of an `OpenTripPlanner` network
     /// cannot ask for the kind [`LocationKind::Other`]: it is left out
     /// there, and a query for that kind alone is an
@@ -114,9 +115,11 @@ pub struct NearbyQuery {
         serde(skip_serializing_if = "Option::is_none")
     )]
     pub radius_meters: Option<u32>,
-    /// The largest number of stops wanted. Without it the server decides:
-    /// MOTIS returns 5 and `OpenTripPlanner` 20, EFA every stop in the
-    /// circle. MOTIS refuses a number above the maximum of the server.
+    /// The largest number of stops wanted. Servers may return fewer, and
+    /// [`Network::parse_nearby`](crate::Network::parse_nearby) cuts the
+    /// list to it. Without it the server decides: MOTIS returns 5 and
+    /// `OpenTripPlanner` 20, EFA every stop in the circle. MOTIS refuses a
+    /// number above the maximum of the server.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     #[cfg_attr(
         feature = "unstable-wasm",
@@ -459,16 +462,17 @@ pub struct DeparturesQuery {
     /// The stop: its [`Location::id`] on the network that is asked, or a
     /// location of any network. A position is not a stop.
     pub stop: Place,
-    /// The time from which on departures are wanted. `None` means now.
+    /// The time from which on departures are wanted. `None` means now, as
+    /// the server sees it. With a time, parsing leaves out the ones
+    /// expected before its minute; without one it leaves out nothing.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     #[cfg_attr(
         feature = "unstable-wasm",
         serde(skip_serializing_if = "Option::is_none")
     )]
     pub time: Option<Timestamp>,
-    /// How many departures are wanted. This is not a maximum: servers treat
-    /// it as a guide and may return more or fewer, so cut the list where a
-    /// fixed number matters. `None` leaves the number to the server.
+    /// The largest number of departures wanted. Servers may return fewer,
+    /// and parsing cuts the list to it. `None` leaves the number to the server.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     #[cfg_attr(
         feature = "unstable-wasm",
@@ -976,10 +980,10 @@ pub struct TripsQuery {
         serde(skip_serializing_if = "Option::is_none")
     )]
     pub time: Option<TripTime>,
-    /// How many trips are wanted. This is not a maximum: servers treat it
-    /// as a guide and may return more or fewer, so cut the list where a
-    /// fixed number matters. Only an answer of EFA, TRIAS or OJP is cut to
-    /// it, see [`Network::parse_trips`](crate::Network::parse_trips).
+    /// How many trips are wanted. An answer of EFA, TRIAS or OJP is cut to
+    /// it, see [`Network::parse_trips`](crate::Network::parse_trips). The
+    /// other servers treat it as a guide and may return more or fewer, so
+    /// cut the list where a fixed number matters.
     /// `None` leaves the number to the server.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     #[cfg_attr(

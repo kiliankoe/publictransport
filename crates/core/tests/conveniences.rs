@@ -28,7 +28,10 @@ fn network() -> Network {
 
 /// A departure to assign fields to; it cannot be built outside the crate.
 fn departure() -> Departure {
-    let Ok(mut departures) = network().parse_departures(&response(DEPARTURES)) else {
+    let Ok(mut departures) = network().parse_departures(
+        &publictransport::DeparturesQuery::new("stop"),
+        &response(DEPARTURES),
+    ) else {
         unreachable!("the fixture is a MOTIS response");
     };
     departures.remove(0)

@@ -29,7 +29,10 @@ fn response(body: &[u8]) -> HttpResponse {
 }
 
 fn parse(protocol: Protocol, body: &[u8]) -> Vec<Departure> {
-    let parsed = network(protocol).parse_departures(&response(body));
+    let parsed = network(protocol).parse_departures(
+        &publictransport::DeparturesQuery::new("stop"),
+        &response(body),
+    );
     assert!(parsed.is_ok(), "{parsed:?}");
     parsed.unwrap_or_default()
 }

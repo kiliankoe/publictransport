@@ -266,7 +266,9 @@ fn arrivals_have_the_arrival_time_and_the_origin_and_are_ordered_by_expected_tim
             headers: Vec::new(),
             body: body.to_vec(),
         };
-        let arrivals = network(protocol).parse_arrivals(&response).unwrap();
+        let arrivals = network(protocol)
+            .parse_arrivals(&publictransport::DeparturesQuery::new("stop"), &response)
+            .unwrap();
         let found: Vec<_> = arrivals
             .iter()
             .map(|a| (a.origin.as_deref(), a.scheduled_time, a.realtime_time))
@@ -291,7 +293,7 @@ fn hafas_reads_the_platforms_of_the_arrival() {
         body: HAFAS.to_vec(),
     };
     let arrivals = network(Protocol::HafasMgate)
-        .parse_arrivals(&response)
+        .parse_arrivals(&publictransport::DeparturesQuery::new("stop"), &response)
         .unwrap();
     let platforms = |origin: &str| {
         let arrival = arrivals
@@ -323,7 +325,7 @@ fn hafas_reads_the_platforms_of_the_arrival() {
         body: both.to_string().into_bytes(),
     };
     let arrivals = network(Protocol::HafasMgate)
-        .parse_arrivals(&response)
+        .parse_arrivals(&publictransport::DeparturesQuery::new("stop"), &response)
         .unwrap();
     let arrival = arrivals
         .iter()

@@ -157,7 +157,7 @@ An application with another HTTP stack skips the client. The network builds each
 
 ```kotlin
 val request = network.locationsRequest(query) // a LocationQuery
-val locations = network.parseLocations(response)
+val locations = network.parseLocations(query, response)
 ```
 
 The parse functions for nearby stops and trips also take the query that was sent, as in `network.parseTrips(query, response)`. With it they leave out stops outside the radius and, on EFA, TRIAS and OJP, trips that the page before already had.

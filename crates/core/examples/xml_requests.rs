@@ -30,11 +30,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         let network = Network::new(name, name, "https://example.org", protocol)
             .with_requestor_ref("OpenService")
             .with_language("en");
-        let departures = network.parse_departures(&HttpResponse {
-            status: 200,
-            headers: Vec::new(),
-            body: departure.to_vec(),
-        })?;
+        let departures = network.parse_departures(
+            &publictransport::DeparturesQuery::new("stop"),
+            &HttpResponse {
+                status: 200,
+                headers: Vec::new(),
+                body: departure.to_vec(),
+            },
+        )?;
         let run = departures
             .into_iter()
             .find_map(|departure| departure.journey_id)

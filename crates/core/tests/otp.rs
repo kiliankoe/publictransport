@@ -138,7 +138,10 @@ fn line(mode: &str, submode: &str) -> Value {
 fn parse_calls(network: &Network, calls: &Value) -> Vec<Departure> {
     let answer = json!({"data": {"quay": {"estimatedCalls": calls}}}).to_string();
     network
-        .parse_departures(&respond(answer))
+        .parse_departures(
+            &publictransport::DeparturesQuery::new("stop"),
+            &respond(answer),
+        )
         .unwrap_or_default()
 }
 
@@ -348,7 +351,12 @@ fn geocoder_gets_the_headers_of_the_network_only_on_the_host_of_the_server() {
 #[test]
 fn locations_come_in_the_geocoders_order_with_their_kind() {
     let network = entur().with_timezone("Europe/Oslo");
-    let locations = network.parse_locations(&respond(GEOCODE)).unwrap();
+    let locations = network
+        .parse_locations(
+            &publictransport::LocationQuery::new("text"),
+            &respond(GEOCODE),
+        )
+        .unwrap();
 
     let found: Vec<(&str, LocationKind)> = locations.iter().map(|l| (&*l.id, l.kind)).collect();
     assert_eq!(
@@ -398,7 +406,10 @@ fn place_of_the_address_layer_without_a_known_category_is_an_address() {
     ]});
 
     let locations = entur()
-        .parse_locations(&respond(answer.to_string()))
+        .parse_locations(
+            &publictransport::LocationQuery::new("text"),
+            &respond(answer.to_string()),
+        )
         .unwrap();
     let found: Vec<(&str, LocationKind)> = locations.iter().map(|l| (&*l.id, l.kind)).collect();
     assert_eq!(
@@ -410,7 +421,12 @@ fn place_of_the_address_layer_without_a_known_category_is_an_address() {
 
 #[test]
 fn departures_of_a_stop_place_have_platform_line_and_times() {
-    let departures = entur().parse_departures(&respond(DEPARTURES)).unwrap();
+    let departures = entur()
+        .parse_departures(
+            &publictransport::DeparturesQuery::new("stop"),
+            &respond(DEPARTURES),
+        )
+        .unwrap();
     assert_eq!(departures.len(), 10);
 
     let first = &departures[0];
@@ -708,7 +724,10 @@ fn answers_without_a_result_are_told_apart() {
     let network = entur();
 
     // Not the answer of a geocoder, as from a mistyped URL.
-    let result = network.parse_locations(&respond(r#"{"data": {}}"#));
+    let result = network.parse_locations(
+        &publictransport::LocationQuery::new("text"),
+        &respond(r#"{"data": {}}"#),
+    );
     assert!(matches!(result, Err(Error::Parse { .. })), "{result:?}");
 
     let failed = json!({
@@ -717,7 +736,12 @@ fn answers_without_a_result_are_told_apart() {
     })
     .to_string();
     for result in [
-        network.parse_departures(&respond(&failed)).map(|_| ()),
+        network
+            .parse_departures(
+                &publictransport::DeparturesQuery::new("stop"),
+                &respond(&failed),
+            )
+            .map(|_| ()),
         network
             .parse_trips(
                 &publictransport::TripsQuery::new("from", "to"),
@@ -732,7 +756,10 @@ fn answers_without_a_result_are_told_apart() {
     }
 
     for answer in [UNKNOWN_STOP, br#"{"data": {"quay": null}}"#.as_slice()] {
-        let result = network.parse_departures(&respond(answer));
+        let result = network.parse_departures(
+            &publictransport::DeparturesQuery::new("stop"),
+            &respond(answer),
+        );
         assert!(matches!(result, Err(Error::NotFound { .. })), "{result:?}");
     }
 
@@ -751,14 +778,20 @@ fn answers_without_a_result_are_told_apart() {
         "data": {"stopPlace": {"estimatedCalls": []}},
         "errors": [{"message": "Exception while fetching data"}]
     });
-    let result = network.parse_departures(&respond(partial.to_string()));
+    let result = network.parse_departures(
+        &publictransport::DeparturesQuery::new("stop"),
+        &respond(partial.to_string()),
+    );
     assert!(
         matches!(&result, Err(Error::Server { status: 200, message }) if message.contains("fetching")),
         "{result:?}"
     );
 
     for foreign in ["<html></html>", "{}"] {
-        let result = network.parse_departures(&respond(foreign));
+        let result = network.parse_departures(
+            &publictransport::DeparturesQuery::new("stop"),
+            &respond(foreign),
+        );
         assert!(
             matches!(result, Err(Error::Parse { .. })),
             "{foreign}: {result:?}"

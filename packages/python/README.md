@@ -135,7 +135,7 @@ An application with another HTTP stack skips the clients. The network builds eac
 
 ```python
 request = network.locations_request(query)  # a LocationQuery
-locations = network.parse_locations(response)
+locations = network.parse_locations(query, response)
 ```
 
 The parse functions for nearby stops and trips also take the query that was sent, as in `network.parse_trips(query, response)`. With it they leave out stops outside the radius and, on EFA, TRIAS and OJP, trips that the page before already had.

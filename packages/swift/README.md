@@ -63,8 +63,12 @@ for trip in found.trips {
 }
 
 // The same arguments again, with the reference to the trips after these.
-let more = try await client.trips(in: network, from: from, to: to, limit: 5, page: found.later)
+if let later = found.later {
+    let more = try await client.trips(in: network, from: from, to: to, limit: 5, page: later)
+}
 ```
+
+Some vehicles go on under another line while the travelers stay seated. The leg of the second line has `sameVehicle` set, and such a ride is not counted as a change.
 
 An end of a trip is a `Location`, the ID of a stop as a `String`, a `Coordinate` or a `CLLocationCoordinate2D`. `departingAt:` and `arrivingBy:` ask for another time than now.
 
@@ -123,6 +127,8 @@ At least one of `title` and `text` is set. `text` is plain text without HTML, in
 
 `Location` and `TransitNetwork` are `Identifiable`. A `Departure` and a `Trip` have no identifier from the server; they are `Hashable`, so a list can use `id: \.self`.
 
+Five types have another name than in the other languages, because Swift or one of Apple's frameworks has theirs: `TransitNetwork` (`Network`), `NetworkProtocol` (`Protocol`), `NetworkOperation` (`Operation`), `HttpMethod` (`Method`) and `PublicTransportError` (`Error`).
+
 What a query takes and what an answer holds is `Codable`. The stored form follows the model, so it can change with any minor version before 1.0: read stored values with `try?` and fetch them again when that fails. For what has to outlive an update, such as a favorite stop, store `network.id` and `location.id`. A `TransitNetwork` is not `Codable`, because it can hold credentials; find it again with `Registry.bundled().network(id:)`.
 
 ## Errors
@@ -136,6 +142,21 @@ do {
 ```
 
 What the server or the query cause is a `PublicTransportError`, such as `.notFound` or `.rateLimited(retryAfterSeconds:)`, which holds how long the server asks to wait, if it says so. A failed HTTP exchange is a `URLError`, a cancelled task throws `CancellationError`, and an answer above 16 MB is `ClientError.responseTooLarge`.
+
+## Your own HTTP client
+
+`Client(userAgent:session:)` builds on a `URLSession` of yours, for example to use a proxy.
+
+An application with another HTTP stack skips the client. The network builds each request and reads its answer, and the same pair exists for nearby stops, departures, arrivals and trips:
+
+```swift
+let request = try network.locationsRequest(query: query)  // a LocationQuery
+let locations = try network.parseLocations(query: query, response: response)
+```
+
+Every parse function except the one for a journey takes the query that was sent. Parsing cuts locations, stops, departures and arrivals to the limit of the query. It also leaves out stops outside the radius, departures and arrivals expected before the time and, on EFA, TRIAS and OJP, trips that the page before already had.
+
+An answer for trips can be an empty window of time: no trips, only a reference to where the search goes on, as an OpenTripPlanner server sends at night. `network.nextWindow(query: query, trips: trips)` then gives the query to send next, which the client sends by itself.
 
 ## Known limitations
 

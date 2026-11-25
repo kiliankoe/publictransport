@@ -27,8 +27,10 @@ fn response(body: &[u8]) -> HttpResponse {
 /// A location to assign fields to; it cannot be built outside the crate.
 fn location() -> Location {
     let body = br#"[{"type":"STOP","tokens":[[0,4]],"name":"Wien Hauptbahnhof","id":"x","lat":48.18,"lon":16.37,"areas":[],"score":-3.5}]"#;
-    let Ok(mut locations) = network("other", Protocol::Motis).parse_locations(&response(body))
-    else {
+    let Ok(mut locations) = network("other", Protocol::Motis).parse_locations(
+        &publictransport::LocationQuery::new("text"),
+        &response(body),
+    ) else {
         unreachable!("the body is a MOTIS response");
     };
     locations.remove(0)
@@ -79,10 +81,20 @@ fn every_parsed_location_names_the_network_that_returned_it() {
 
         check(
             "locations",
-            network.parse_locations(&response(locations)).unwrap(),
+            network
+                .parse_locations(
+                    &publictransport::LocationQuery::new("text"),
+                    &response(locations),
+                )
+                .unwrap(),
         );
 
-        let departures = network.parse_departures(&response(departures)).unwrap();
+        let departures = network
+            .parse_departures(
+                &publictransport::DeparturesQuery::new("stop"),
+                &response(departures),
+            )
+            .unwrap();
         check(
             "departures",
             departures.into_iter().map(|d| d.stop).collect(),
@@ -172,7 +184,10 @@ fn a_stop_number_of_the_server_is_no_global_id() {
     let body = String::from_utf8_lossy(include_bytes!("fixtures/trias/vvo-locations.xml"))
         .replace("de:14612:28", "8503000");
     let location = network("test", Protocol::Trias)
-        .parse_locations(&response(body.as_bytes()))
+        .parse_locations(
+            &publictransport::LocationQuery::new("text"),
+            &response(body.as_bytes()),
+        )
         .unwrap()
         .remove(0);
     assert_eq!(location.id, "8503000");

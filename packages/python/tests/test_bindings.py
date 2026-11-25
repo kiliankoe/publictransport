@@ -115,8 +115,9 @@ def answer(name: str) -> HttpResponse:
 def test_conveniences_of_departures_and_trips_cross_the_boundary() -> None:
     vvo = BundledNetwork.VVO_EFA.network()
 
-    departure = vvo.parse_departures(answer("vvo-departures.json"))[0]
     # The generated `Place.ID` is not typed as a `Place`.
+    stop = DeparturesQuery(stop=Place.ID("a"))  # pyright: ignore[reportArgumentType]
+    departure = vvo.parse_departures(stop, answer("vvo-departures.json"))[0]
     query = TripsQuery(
         origin=Place.ID("a"),  # pyright: ignore[reportArgumentType]
         destination=Place.ID("b"),  # pyright: ignore[reportArgumentType]
@@ -136,7 +137,8 @@ def test_conveniences_of_departures_and_trips_cross_the_boundary() -> None:
 
 def test_remarks_cross_the_boundary() -> None:
     departures = BundledNetwork.VRR_EFA.network().parse_departures(
-        answer("vrr-departures.json")
+        DeparturesQuery(stop=Place.ID("a")),  # pyright: ignore[reportArgumentType]
+        answer("vrr-departures.json"),
     )
 
     remarks = [remark for departure in departures for remark in departure.remarks]

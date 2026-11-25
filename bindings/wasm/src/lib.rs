@@ -77,13 +77,16 @@ pub fn locations_request(
     write(&request.map_err(thrown)?)
 }
 
-/// Reads the answer to a `locationsRequest`. The best match comes first.
+/// Reads the answer to the `locationsRequest` of `query`. The best match
+/// comes first, and the list is cut to the limit of the query.
 #[wasm_bindgen(js_name = parseLocations)]
 pub fn parse_locations(
     network: &Ts<Network>,
+    query: &Ts<LocationQuery>,
     response: &Ts<HttpResponse>,
 ) -> Result<Vec<Ts<Location>>, JsValue> {
-    let locations = read("network", network)?.parse_locations(&read("response", response)?);
+    let locations = read("network", network)?
+        .parse_locations(&read("query", query)?, &read("response", response)?);
     write_all(&locations.map_err(thrown)?)
 }
 
@@ -98,7 +101,8 @@ pub fn nearby_request(
 }
 
 /// Reads the answer to the `nearbyRequest` of `query`: the stops in its
-/// circle in the order of the server, which is the nearest first.
+/// circle in the order of the server, which is the nearest first, cut to
+/// the limit of the query.
 #[wasm_bindgen(js_name = parseNearby)]
 pub fn parse_nearby(
     network: &Ts<Network>,
@@ -127,14 +131,17 @@ pub fn departures_request(
     write(&request.map_err(thrown)?)
 }
 
-/// Reads the answer to a `departuresRequest`. The departures are ordered by
-/// expected time.
+/// Reads the answer to the `departuresRequest` of `query`. The departures
+/// are ordered by expected time. Those expected before the time of the
+/// query are left out, and the rest is cut to its limit.
 #[wasm_bindgen(js_name = parseDepartures)]
 pub fn parse_departures(
     network: &Ts<Network>,
+    query: &Ts<DeparturesQuery>,
     response: &Ts<HttpResponse>,
 ) -> Result<Vec<Ts<Departure>>, JsValue> {
-    let departures = read("network", network)?.parse_departures(&read("response", response)?);
+    let departures = read("network", network)?
+        .parse_departures(&read("query", query)?, &read("response", response)?);
     write_all(&departures.map_err(thrown)?)
 }
 
@@ -149,14 +156,17 @@ pub fn arrivals_request(
     write(&request.map_err(thrown)?)
 }
 
-/// Reads the answer to an `arrivalsRequest`. The arrivals are ordered by
-/// their expected time.
+/// Reads the answer to the `arrivalsRequest` of `query`. The arrivals are
+/// ordered by their expected time, and left out and cut as in
+/// `parseDepartures`.
 #[wasm_bindgen(js_name = parseArrivals)]
 pub fn parse_arrivals(
     network: &Ts<Network>,
+    query: &Ts<DeparturesQuery>,
     response: &Ts<HttpResponse>,
 ) -> Result<Vec<Ts<Arrival>>, JsValue> {
-    let arrivals = read("network", network)?.parse_arrivals(&read("response", response)?);
+    let arrivals = read("network", network)?
+        .parse_arrivals(&read("query", query)?, &read("response", response)?);
     write_all(&arrivals.map_err(thrown)?)
 }
 

@@ -64,11 +64,12 @@ LOCATIONS = LocationQuery(text="Hauptbahnhof")
 JOURNEY_ID = next(
     departure.journey_id
     for departure in EFA.parse_departures(
+        DeparturesQuery(stop=Place.ID("x")),  # pyright: ignore[reportArgumentType]
         HttpResponse(
             status=200,
             headers=[],
             body=(FIXTURES / "efa/vvo-journey-departure.json").read_bytes(),
-        )
+        ),
     )
     if departure.journey_id
 )
@@ -167,9 +168,8 @@ def test_sends_the_library_request_and_returns_the_parsed_answer(
     request = getattr(network, f"{operation}_request")(query)
     response = HttpResponse(status=200, headers=[], body=body)
     parse = getattr(network, f"parse_{operation}")
-    # Nearby stops and trips are parsed for the query that was sent.
-    with_query = operation in ("nearby", "trips")
-    expected = parse(query, response) if with_query else parse(response)
+    # All but a journey are parsed for the query that was sent.
+    expected = parse(response) if operation == "journey" else parse(query, response)
     # A trips answer holds its trips next to the paging references.
     assert getattr(expected, "trips", expected)
     sent: list[httpx.Request] = []

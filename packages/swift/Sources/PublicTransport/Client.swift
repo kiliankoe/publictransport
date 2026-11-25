@@ -181,8 +181,7 @@ public struct Client: Sendable {
     /// - Parameters:
     ///   - text: What to search for, as a user typed it.
     ///   - kinds: The kinds of location wanted. Empty asks for every kind.
-    ///   - limit: The largest number wanted. EFA servers get no limit and
-    ///     return every match.
+    ///   - limit: The largest number wanted.
     /// - Throws: ``PublicTransportError`` for what the server or the query
     ///   got wrong, `URLError` if the request got no answer, and
     ///   `CancellationError` if the task was cancelled.
@@ -199,7 +198,7 @@ public struct Client: Sendable {
     /// Searches for locations with a query of the core library.
     public func locations(in network: TransitNetwork, query: LocationQuery) async throws -> [Location] {
         let response = try await send(network.locationsRequest(query: query))
-        return try network.parseLocations(response: response)
+        return try network.parseLocations(query: query, response: response)
     }
 
     /// Finds the stops near a position. The nearest comes first, and
@@ -211,7 +210,7 @@ public struct Client: Sendable {
     ///     out. Stops farther away are not returned. MOTIS takes no radius
     ///     and returns only the nearest stops, so stops in the circle can
     ///     be missing there.
-    ///   - limit: The largest number wanted. Servers treat it as a guide.
+    ///   - limit: The largest number wanted.
     /// - Throws: ``PublicTransportError``, such as `invalidQuery` for a
     ///   position off the globe, and `URLError` if the request got no
     ///   answer.
@@ -244,9 +243,8 @@ public struct Client: Sendable {
     ///     that another network returned works where this network can name
     ///     it, which EFA, TRIAS and OJP can for stops with a global ID.
     ///   - time: The time from which on departures are wanted. Now if
-    ///     left out.
-    ///   - limit: How many departures are wanted. This is not a maximum:
-    ///     servers treat it as a guide and may return more or fewer.
+    ///     left out. Departures expected before a given time are left out.
+    ///   - limit: The largest number of departures wanted.
     /// - Throws: ``PublicTransportError``, such as `notFound` for a stop
     ///   the network does not know, and `URLError` if the request got no
     ///   answer.
@@ -263,7 +261,7 @@ public struct Client: Sendable {
     /// Lists departures with a query of the core library.
     public func departures(in network: TransitNetwork, query: DeparturesQuery) async throws -> [Departure] {
         let response = try await send(network.departuresRequest(query: query))
-        return try network.parseDepartures(response: response)
+        return try network.parseDepartures(query: query, response: response)
     }
 
     /// Lists the next arrivals at a stop, ordered by expected time. An
@@ -274,9 +272,8 @@ public struct Client: Sendable {
     ///   - stop: A location, or the ID of a stop on this network, as for
     ///     ``departures(in:at:after:limit:)``.
     ///   - time: The time from which on arrivals are wanted. Now if left
-    ///     out.
-    ///   - limit: How many arrivals are wanted. This is not a maximum:
-    ///     servers treat it as a guide and may return more or fewer.
+    ///     out. Arrivals expected before a given time are left out.
+    ///   - limit: The largest number of arrivals wanted.
     /// - Throws: ``PublicTransportError``, such as `notFound` for a stop
     ///   the network does not know, and `URLError` if the request got no
     ///   answer.
@@ -294,7 +291,7 @@ public struct Client: Sendable {
     /// departures.
     public func arrivals(in network: TransitNetwork, query: DeparturesQuery) async throws -> [Arrival] {
         let response = try await send(network.arrivalsRequest(query: query))
-        return try network.parseArrivals(response: response)
+        return try network.parseArrivals(query: query, response: response)
     }
 
     /// Fetches the run of one vehicle: all its stops with times and

@@ -202,7 +202,10 @@ fn carries(protocol: Protocol, request: &HttpRequest, expected: &[(&str, &str)])
 /// The ID of the run of the departure in the recorded answer for it.
 fn recorded_id(protocol: Protocol) -> Option<String> {
     let (_, departure, ..) = RUNS.into_iter().find(|run| run.0 == protocol)?;
-    let departures = network(protocol).parse_departures(&respond(200, departure));
+    let departures = network(protocol).parse_departures(
+        &publictransport::DeparturesQuery::new("stop"),
+        &respond(200, departure),
+    );
     departures.ok()?.into_iter().find_map(|d| d.journey_id)
 }
 
@@ -210,7 +213,12 @@ fn recorded_id(protocol: Protocol) -> Option<String> {
 fn id_of_a_departure_asks_for_its_run_and_the_run_holds_the_departure() {
     for (protocol, departure, run, identifiers, count) in RUNS {
         let network = network(protocol);
-        let departures = network.parse_departures(&respond(200, departure)).unwrap();
+        let departures = network
+            .parse_departures(
+                &publictransport::DeparturesQuery::new("stop"),
+                &respond(200, departure),
+            )
+            .unwrap();
         assert!(!departures.is_empty(), "{protocol:?}");
 
         // Two of the answers hold a second departure, of another run.
@@ -365,7 +373,12 @@ fn arrivals_name_a_run_that_can_be_asked_for() {
     // its recorded arrivals are older than the fields that name a run.
     for (protocol, body) in arrivals {
         let network = network(protocol);
-        let found = network.parse_arrivals(&respond(200, body)).unwrap();
+        let found = network
+            .parse_arrivals(
+                &publictransport::DeparturesQuery::new("stop"),
+                &respond(200, body),
+            )
+            .unwrap();
         assert!(!found.is_empty(), "{protocol:?}");
         for arrival in &found {
             let id = arrival.journey_id.as_deref();
@@ -481,7 +494,10 @@ fn departure_survives_a_name_of_its_run_in_another_shape() {
     let mut answer: Value = serde_json::from_slice(departure).unwrap();
     answer["stopEvents"][0]["transportation"]["id"] = serde_json::json!({"odd": true});
     let body = serde_json::to_vec(&answer).unwrap();
-    let departures = network(Protocol::Efa).parse_departures(&respond(200, &body));
+    let departures = network(Protocol::Efa).parse_departures(
+        &publictransport::DeparturesQuery::new("stop"),
+        &respond(200, &body),
+    );
     let ids: Vec<_> = departures
         .unwrap()
         .into_iter()

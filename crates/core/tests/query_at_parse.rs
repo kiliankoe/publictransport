@@ -1,10 +1,12 @@
-//! What parsing makes of an answer with the query that was sent: trips cut
-//! to the limit and paged without gaps or repeats, and stops within the
-//! radius.
+//! What parsing makes of an answer with the query that was sent: every list
+//! cut to the limit, trips paged without gaps or repeats, stops within the
+//! radius, and departures and arrivals from the asked time on.
+
+use std::fmt::Debug;
 
 use publictransport::{
-    Coordinate, HafasOptions, HttpResponse, Location, NearbyQuery, Network, Place, Protocol,
-    Timestamp, Trip, Trips, TripsQuery,
+    Arrival, Coordinate, Departure, DeparturesQuery, HafasOptions, HttpResponse, Location,
+    LocationQuery, NearbyQuery, Network, Place, Protocol, Timestamp, Trip, Trips, TripsQuery,
 };
 
 const VVO: &[u8] = include_bytes!("fixtures/efa/vvo-trip.json");
@@ -294,4 +296,251 @@ fn paging_through_a_minute_with_more_trips_than_a_page_shows_each_trip_once() {
         shown,
         parse(Protocol::Efa, &TripsQuery::new("a", "b"), VVO).trips
     );
+}
+
+/// Recorded departures and the number of them in each answer.
+const DEPARTURES: [(Protocol, &[u8], usize); 7] = [
+    (
+        Protocol::Efa,
+        include_bytes!("fixtures/efa/vvo-departures.json"),
+        10,
+    ),
+    (
+        Protocol::Efa,
+        include_bytes!("fixtures/efa/vrr-departures.json"),
+        10,
+    ),
+    (
+        Protocol::Motis,
+        include_bytes!("fixtures/motis/transitous-stoptimes.json"),
+        10,
+    ),
+    (
+        Protocol::Trias,
+        include_bytes!("fixtures/trias/vvo-departures.xml"),
+        10,
+    ),
+    (
+        Protocol::Ojp1,
+        include_bytes!("fixtures/ojp/vrr-departures.xml"),
+        10,
+    ),
+    (
+        Protocol::HafasMgate,
+        include_bytes!("fixtures/hafas/vbb-departures.json"),
+        12,
+    ),
+    (
+        Protocol::OtpTransmodel,
+        include_bytes!("fixtures/otp/entur-departures.json"),
+        10,
+    ),
+];
+
+/// Recorded arrivals and the number of them in each answer.
+const ARRIVALS: [(Protocol, &[u8], usize); 6] = [
+    (
+        Protocol::Efa,
+        include_bytes!("fixtures/efa/vvo-arrivals.json"),
+        10,
+    ),
+    (
+        Protocol::Motis,
+        include_bytes!("fixtures/motis/transitous-arrivals.json"),
+        13,
+    ),
+    (
+        Protocol::Trias,
+        include_bytes!("fixtures/trias/vvo-arrivals.xml"),
+        10,
+    ),
+    (
+        Protocol::Ojp1,
+        include_bytes!("fixtures/ojp/vrr-arrivals.xml"),
+        10,
+    ),
+    (
+        Protocol::HafasMgate,
+        include_bytes!("fixtures/hafas/vbb-arrivals.json"),
+        10,
+    ),
+    (
+        Protocol::OtpTransmodel,
+        include_bytes!("fixtures/otp/entur-arrivals.json"),
+        10,
+    ),
+];
+
+/// Asked from the time an entry is expected, half a minute or a minute
+/// later, the entries expected before the minute of that time are left
+/// out, a late one planned before it included. Servers count in minutes, so
+/// a vehicle that leaves in the minute of the asked time stays.
+/// Of the rest the limit keeps as many as it says, in the parser's order.
+/// Without a time and a limit every entry stays.
+#[test]
+fn departures_and_arrivals_start_at_the_asked_time_and_end_at_the_limit() {
+    let mut late_and_kept = false;
+    for (protocol, body, count) in DEPARTURES {
+        let case = format!("{protocol:?} departures");
+        late_and_kept |= starts_at_the_time_and_ends_at_the_limit(
+            &case,
+            count,
+            |departure: &Departure| (departure.scheduled_time, departure.expected_time()),
+            |query| {
+                network(protocol)
+                    .parse_departures(query, &respond(body))
+                    .expect(&case)
+            },
+        );
+    }
+    for (protocol, body, count) in ARRIVALS {
+        let case = format!("{protocol:?} arrivals");
+        late_and_kept |= starts_at_the_time_and_ends_at_the_limit(
+            &case,
+            count,
+            |arrival: &Arrival| (arrival.scheduled_time, arrival.expected_time()),
+            |query| {
+                network(protocol)
+                    .parse_arrivals(query, &respond(body))
+                    .expect(&case)
+            },
+        );
+    }
+    assert!(late_and_kept, "no answer holds a late entry the time keeps");
+}
+
+/// The test above for one answer, which `parse` reads with the query given
+/// to it. `times` gives the scheduled and the expected time of an entry.
+/// Tells whether a time kept an entry that was planned before it.
+fn starts_at_the_time_and_ends_at_the_limit<T: Clone + PartialEq + Debug>(
+    case: &str,
+    count: usize,
+    times: impl Fn(&T) -> (Timestamp, Timestamp),
+    parse: impl Fn(&DeparturesQuery) -> Vec<T>,
+) -> bool {
+    let all = parse(&DeparturesQuery::new("stop"));
+    assert_eq!(all.len(), count, "{case}");
+    let scheduled_at = |entry: &T| times(entry).0.unix_seconds;
+    let expected_at = |entry: &T| times(entry).1.unix_seconds;
+
+    // Every limit alone, and each time with the limit 1, which only a cut
+    // after leaving out the earlier entries gets right.
+    let froms = all
+        .iter()
+        .flat_map(|entry| [0, 30, 60].map(|delay| expected_at(entry) + delay));
+    let queries = (0..=count)
+        .map(|limit| (None, Some(limit)))
+        .chain(froms.flat_map(|from| [None, Some(1)].map(|limit| (Some(from), limit))));
+
+    let mut late_and_kept = false;
+    for (from, limit) in queries {
+        let kept: Vec<T> = all
+            .iter()
+            .filter(|entry| from.is_none_or(|from| expected_at(entry) >= from.div_euclid(60) * 60))
+            .take(limit.unwrap_or(count))
+            .cloned()
+            .collect();
+        late_and_kept |= from.is_some_and(|from| kept.iter().any(|e| scheduled_at(e) < from));
+        let mut query = DeparturesQuery::new("stop");
+        query.time = from.map(|unix_seconds| Timestamp { unix_seconds });
+        query.limit = limit.and_then(|n| u32::try_from(n).ok());
+        assert_eq!(parse(&query), kept, "{case}, {query:?}");
+    }
+    late_and_kept
+}
+
+/// Recorded locations and the number of them in each answer.
+const LOCATIONS: [(Protocol, &[u8], usize); 7] = [
+    (
+        Protocol::Efa,
+        include_bytes!("fixtures/efa/vvo-stopfinder.json"),
+        1,
+    ),
+    (
+        Protocol::Efa,
+        include_bytes!("fixtures/efa/vrr-stopfinder.json"),
+        4,
+    ),
+    (
+        Protocol::Motis,
+        include_bytes!("fixtures/motis/transitous-geocode.json"),
+        10,
+    ),
+    (
+        Protocol::Trias,
+        include_bytes!("fixtures/trias/vvo-locations.xml"),
+        1,
+    ),
+    (
+        Protocol::Ojp1,
+        include_bytes!("fixtures/ojp/vrr-locations.xml"),
+        4,
+    ),
+    (
+        Protocol::HafasMgate,
+        include_bytes!("fixtures/hafas/vbb-locations.json"),
+        5,
+    ),
+    (
+        Protocol::OtpTransmodel,
+        include_bytes!("fixtures/otp/entur-geocode.json"),
+        5,
+    ),
+];
+
+/// A limit keeps as many locations as it says, those the server put first,
+/// and without one every location stays.
+#[test]
+fn a_limit_keeps_the_first_locations() {
+    for (protocol, body, count) in LOCATIONS {
+        let parse = |query: &LocationQuery| {
+            network(protocol)
+                .parse_locations(query, &respond(body))
+                .unwrap()
+        };
+        let all = parse(&LocationQuery::new("Hauptbahnhof"));
+        assert_eq!(all.len(), count, "{protocol:?}");
+        for n in 0..=count {
+            let limit = u32::try_from(n).unwrap();
+            let found = parse(&LocationQuery::new("Hauptbahnhof").with_limit(limit));
+            assert_eq!(found, all[..n], "{protocol:?}, limit {limit}");
+        }
+    }
+}
+
+/// For every radius that reaches a stop, a limit keeps as many of the stops
+/// within the radius as it says, in the server's order.
+#[test]
+fn a_limit_keeps_the_first_stops_within_the_radius() {
+    for (protocol, body, position) in NEARBY {
+        let nearby = |query: NearbyQuery| -> Vec<Location> {
+            network(protocol)
+                .parse_nearby(&query, &respond(body))
+                .unwrap()
+        };
+        let all = nearby(NearbyQuery::new(position).with_radius_meters(100_000));
+        let distance = |stop: &Location| position.distance_meters(stop.coordinate.unwrap());
+        for stop in &all {
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let radius = distance(stop).ceil() as u32;
+            let within: Vec<Location> = all
+                .iter()
+                .filter(|other| distance(other) <= f64::from(radius))
+                .cloned()
+                .collect();
+            for n in 0..=within.len() {
+                let limit = u32::try_from(n).unwrap();
+                let found = nearby(
+                    NearbyQuery::new(position)
+                        .with_radius_meters(radius)
+                        .with_limit(limit),
+                );
+                assert_eq!(
+                    found,
+                    within[..n],
+                    "{protocol:?}, {radius} m, limit {limit}"
+                );
+            }
+        }
+    }
 }

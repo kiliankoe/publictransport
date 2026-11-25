@@ -100,8 +100,7 @@ class Client(
      *
      * @param text What to search for, as a user typed it.
      * @param kinds The kinds of location wanted. Empty asks for every kind.
-     * @param limit The largest number wanted. EFA servers get no limit and
-     *   return every match.
+     * @param limit The largest number wanted.
      * @throws IllegalArgumentException if the limit is negative.
      */
     suspend fun locations(
@@ -115,7 +114,7 @@ class Client(
     suspend fun locations(
         network: Network,
         query: LocationQuery,
-    ): List<Location> = send(network.locationsRequest(query), network::parseLocations)
+    ): List<Location> = send(network.locationsRequest(query)) { network.parseLocations(query, it) }
 
     /**
      * Finds the stops near a position. The nearest comes first, and
@@ -127,7 +126,7 @@ class Client(
      *   out. Stops farther away are not returned. MOTIS takes no radius
      *   and returns only the nearest stops, so stops in the circle can be
      *   missing there.
-     * @param limit The largest number wanted. Servers treat it as a guide.
+     * @param limit The largest number wanted.
      * @throws IllegalArgumentException if the radius or the limit is
      *   negative.
      */
@@ -155,9 +154,8 @@ class Client(
      *   which EFA, TRIAS and OJP can for stops with a global ID; otherwise
      *   the call throws [PublicTransportException.InvalidQuery].
      * @param time The time from which on departures are wanted. Now if left
-     *   out.
-     * @param limit How many departures are wanted. This is not a maximum:
-     *   servers treat it as a guide and may return more or fewer.
+     *   out. Departures expected before a given time are left out.
+     * @param limit The largest number of departures wanted.
      * @throws IllegalArgumentException if the limit is negative.
      */
     suspend fun departures(
@@ -183,7 +181,7 @@ class Client(
     suspend fun departures(
         network: Network,
         query: DeparturesQuery,
-    ): List<Departure> = send(network.departuresRequest(query), network::parseDepartures)
+    ): List<Departure> = send(network.departuresRequest(query)) { network.parseDepartures(query, it) }
 
     /**
      * Lists the next arrivals at a stop, ordered by expected time. The
@@ -216,7 +214,7 @@ class Client(
     suspend fun arrivals(
         network: Network,
         query: DeparturesQuery,
-    ): List<Arrival> = send(network.arrivalsRequest(query), network::parseArrivals)
+    ): List<Arrival> = send(network.arrivalsRequest(query)) { network.parseArrivals(query, it) }
 
     /**
      * Fetches the run of one vehicle: all its stops with times and

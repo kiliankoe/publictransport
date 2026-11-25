@@ -4,7 +4,9 @@
 //! This crate does no I/O. It builds HTTP requests and parses HTTP responses,
 //! so each platform can send them with its own HTTP stack. Every operation is
 //! a pair of methods on [`Network`]: one returns the [`HttpRequest`] to send,
-//! the other turns the [`HttpResponse`] into model types.
+//! the other turns the [`HttpResponse`] into model types. Every parse method
+//! except [`Network::parse_journey`] also takes the query that was sent,
+//! since parsing applies its limit, time and radius.
 //!
 //! ```
 //! use publictransport::{HttpResponse, LocationKind, LocationQuery, Network, Protocol};
@@ -22,7 +24,7 @@
 //! // Send `request` with an HTTP client and copy its answer into a response.
 //! # let body = br#"{"locations":[{"id":"de:14612:28","name":"Dresden, Hauptbahnhof","type":"stop"}]}"#.to_vec();
 //! let response = HttpResponse { status: 200, headers: Vec::new(), body };
-//! for location in network.parse_locations(&response)? {
+//! for location in network.parse_locations(&query, &response)? {
 //!     println!("{} ({})", location.name, location.id);
 //! }
 //! # Ok(())

@@ -13,6 +13,14 @@ fn origin(url: &str) -> Option<&str> {
     (named(scheme) && named(host)).then(|| url.get(..scheme.len() + 3 + host.len()))?
 }
 
+/// Cuts a list to the limit of a query. Servers treat a limit as a guide,
+/// and EFA is not sent the one of a location search.
+fn cut<T>(list: &mut Vec<T>, limit: Option<u32>) {
+    if let Some(limit) = limit.and_then(|limit| usize::try_from(limit).ok()) {
+        list.truncate(limit);
+    }
+}
+
 /// One server that answers public transport queries.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
@@ -198,8 +206,14 @@ impl Network {
         Ok(self.sent(request))
     }
 
-    /// The vehicles on one side of a stop, each read as a departure.
-    fn parse_board(&self, response: &HttpResponse, board: Board) -> Result<Vec<Departure>, Error> {
+    /// The vehicles on one side of a stop, each read as a departure, from
+    /// the time of the query on and cut to its limit.
+    fn parse_board(
+        &self,
+        query: &DeparturesQuery,
+        response: &HttpResponse,
+        board: Board,
+    ) -> Result<Vec<Departure>, Error> {
         let mut departures = match self.protocol {
             Protocol::Efa => efa::parse_departures(self, response, board),
             Protocol::Motis => motis::parse_departures(response, board),
@@ -210,6 +224,14 @@ impl Network {
         for departure in &mut departures {
             self.mark(&mut departure.stop);
         }
+        // Some EFA servers list vehicles that left an hour before the time.
+        // From the start of its minute: servers count in minutes, and a
+        // vehicle that leaves in the minute of "now" is still wanted.
+        if let Some(time) = query.time {
+            let minute = time.unix_seconds.div_euclid(60) * 60;
+            departures.retain(|departure| departure.expected_time().unix_seconds >= minute);
+        }
+        cut(&mut departures, query.limit);
         Ok(departures)
     }
 
@@ -425,14 +447,20 @@ impl Network {
         Ok(if foreign { request } else { self.sent(request) })
     }
 
-    /// Parses the response to a [`Network::locations_request`]. The best
-    /// match comes first. A search without matches gives an empty list.
+    /// Parses the response to the [`Network::locations_request`] of
+    /// `query`. The best match comes first. The list is cut to
+    /// [`LocationQuery::limit`]. A search without matches gives an empty
+    /// list.
     ///
     /// # Errors
     ///
     /// Returns an error if the status code reports a failure or if the body
     /// is not what the protocol defines.
-    pub fn parse_locations(&self, response: &HttpResponse) -> Result<Vec<Location>, Error> {
+    pub fn parse_locations(
+        &self,
+        query: &LocationQuery,
+        response: &HttpResponse,
+    ) -> Result<Vec<Location>, Error> {
         let mut locations = match self.protocol {
             Protocol::Efa => efa::parse_locations(response),
             Protocol::Motis => motis::parse_locations(response),
@@ -443,6 +471,7 @@ impl Network {
         for location in &mut locations {
             self.mark(location);
         }
+        cut(&mut locations, query.limit);
         Ok(locations)
     }
 
@@ -470,7 +499,8 @@ impl Network {
     /// Parses the response to the [`Network::nearby_request`] of `query`:
     /// the stops in its circle in the order of the server, which is the
     /// nearest first. A stop that the server sends from outside the circle
-    /// is left out, whatever way the server measures.
+    /// is left out, whatever way the server measures, and the rest is cut
+    /// to [`NearbyQuery::limit`].
     /// [`Coordinate::distance_meters`](crate::Coordinate::distance_meters)
     /// gives how far one is. None in the circle gives an empty list.
     ///
@@ -503,6 +533,7 @@ impl Network {
         for location in &mut locations {
             self.mark(location);
         }
+        cut(&mut locations, query.limit);
         Ok(locations)
     }
 
@@ -525,8 +556,13 @@ impl Network {
         self.board_request(query, Board::Departures)
     }
 
-    /// Parses the response to a [`Network::departures_request`]. The
-    /// departures are ordered by [`Departure::expected_time`].
+    /// Parses the response to the [`Network::departures_request`] of
+    /// `query`. The departures are ordered by [`Departure::expected_time`].
+    /// One expected before the minute of [`DeparturesQuery::time`] is left
+    /// out, since some servers list vehicles that have left, and the rest is
+    /// cut to [`DeparturesQuery::limit`]. A late vehicle planned before the
+    /// time stays. Without a time nothing is left out, as the crate has no
+    /// clock.
     ///
     /// # Errors
     ///
@@ -536,8 +572,12 @@ impl Network {
     /// built on EFA answer an unknown stop with an internal error, which is
     /// an [`Error::Server`]. A HAFAS answer needs the network's time zone
     /// and is an [`Error::InvalidNetwork`] without it.
-    pub fn parse_departures(&self, response: &HttpResponse) -> Result<Vec<Departure>, Error> {
-        self.parse_board(response, Board::Departures)
+    pub fn parse_departures(
+        &self,
+        query: &DeparturesQuery,
+        response: &HttpResponse,
+    ) -> Result<Vec<Departure>, Error> {
+        self.parse_board(query, response, Board::Departures)
     }
 
     /// Builds the request for the arrivals at a stop, from the query that
@@ -552,14 +592,19 @@ impl Network {
         self.board_request(query, Board::Arrivals)
     }
 
-    /// Parses the response to a [`Network::arrivals_request`]. The arrivals
-    /// are ordered by [`Arrival::expected_time`].
+    /// Parses the response to the [`Network::arrivals_request`] of `query`.
+    /// The arrivals are ordered by [`Arrival::expected_time`], and left out
+    /// and cut as in [`Network::parse_departures`].
     ///
     /// # Errors
     ///
     /// The same as [`Network::parse_departures`].
-    pub fn parse_arrivals(&self, response: &HttpResponse) -> Result<Vec<Arrival>, Error> {
-        let arrivals = self.parse_board(response, Board::Arrivals)?;
+    pub fn parse_arrivals(
+        &self,
+        query: &DeparturesQuery,
+        response: &HttpResponse,
+    ) -> Result<Vec<Arrival>, Error> {
+        let arrivals = self.parse_board(query, response, Board::Arrivals)?;
         Ok(arrivals
             .into_iter()
             .map(Arrival::read_as_departure)

@@ -40,6 +40,7 @@ import { fixture, foreignStop, ok, time } from "./support.ts";
 const vvo = bundledNetwork("vvo-efa");
 /** A query that keeps every trip of an answer. */
 const anyTrips = { origin: "a", destination: "b" };
+const anyStop = { stop: "a" };
 
 test("place is an ID, a coordinate or a location", () => {
   const position = { latitude: 51.04, longitude: 13.73 };
@@ -96,7 +97,7 @@ test("trip time is bound to the departure or to the arrival", () => {
 });
 
 test("times are dates and missing values are missing keys", () => {
-  const departures = parseDepartures(vvo, ok(fixture("efa/vvo-departures.json")));
+  const departures = parseDepartures(vvo, anyStop, ok(fixture("efa/vvo-departures.json")));
   const [first] = departures;
   assert.ok(first);
 
@@ -126,14 +127,14 @@ test("local time has the offset that holds at the location", () => {
 test("message of an error is the sentence of the core", () => {
   const tooMany = { status: 429, headers: [], body: new Uint8Array() };
 
-  assert.throws(() => parseDepartures(vvo, tooMany), {
+  assert.throws(() => parseDepartures(vvo, anyStop, tooMany), {
     constructor: RateLimitedError,
     message: "the server received too many requests",
   });
 });
 
 test("derived values come from the core", () => {
-  const [first] = parseDepartures(vvo, ok(fixture("efa/vvo-departures.json")));
+  const [first] = parseDepartures(vvo, anyStop, ok(fixture("efa/vvo-departures.json")));
   const [trip] = parseTrips(vvo, anyTrips, ok(fixture("efa/vvo-trip.json"))).trips;
   const start = trip?.legs[0]?.departure;
   assert.ok(first && trip && start);
@@ -165,6 +166,7 @@ test("derived values come from the core", () => {
 test("remarks cross the boundary", () => {
   const departures = parseDepartures(
     bundledNetwork("vrr-efa"),
+    anyStop,
     ok(fixture("efa/vrr-departures.json")),
   );
 

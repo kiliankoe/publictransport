@@ -74,7 +74,7 @@ private val later: String by lazy {
 private val journeyId: String by lazy {
     BundledNetwork.VVO_EFA
         .network()
-        .parseDepartures(ok(fixture("efa/vvo-journey-departure.json")))
+        .parseDepartures(DeparturesQuery(hbf), ok(fixture("efa/vvo-journey-departure.json")))
         .firstNotNullOf { it.journeyId }
 }
 
@@ -140,7 +140,7 @@ private fun locations(
     fixture: String = "efa/vvo-stopfinder.json",
     network: (MockWebServer) -> Network = ::efa,
     call: suspend Client.(Network) -> List<Location>,
-) = Case(name, fixture, network, { locationsRequest(query) }, { parseLocations(it) }, call)
+) = Case(name, fixture, network, { locationsRequest(query) }, { parseLocations(query, it) }, call)
 
 private fun nearby(
     name: String,
@@ -152,13 +152,13 @@ private fun departures(
     name: String,
     query: DeparturesQuery,
     call: suspend Client.(Network) -> List<Departure>,
-) = Case(name, "efa/vvo-departures.json", ::efa, { departuresRequest(query) }, { parseDepartures(it) }, call)
+) = Case(name, "efa/vvo-departures.json", ::efa, { departuresRequest(query) }, { parseDepartures(query, it) }, call)
 
 private fun arrivals(
     name: String,
     query: DeparturesQuery,
     call: suspend Client.(Network) -> List<Arrival>,
-) = Case(name, "efa/vvo-arrivals.json", ::efa, { arrivalsRequest(query) }, { parseArrivals(it) }, call)
+) = Case(name, "efa/vvo-arrivals.json", ::efa, { arrivalsRequest(query) }, { parseArrivals(query, it) }, call)
 
 private fun trips(
     name: String,
@@ -288,7 +288,10 @@ class ClientTest {
                     // Status and headers have to reach the core for the same error.
                     val expected =
                         assertFailsWith<PublicTransportException> {
-                            network.parseDepartures(HttpResponse(refused.status.toUShort(), refused.headers, ByteArray(0)))
+                            network.parseDepartures(
+                                DeparturesQuery(hbf),
+                                HttpResponse(refused.status.toUShort(), refused.headers, ByteArray(0)),
+                            )
                         }
                     assertEquals(refused.error, expected::class)
 

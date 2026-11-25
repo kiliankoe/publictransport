@@ -1717,13 +1717,14 @@ public struct DeparturesQuery: Equatable, Hashable, Codable {
      */
     public var stop: Place
     /**
-     * The time from which on departures are wanted. `nil` means now.
+     * The time from which on departures are wanted. `nil` means now, as
+     * the server sees it. With a time, parsing leaves out the ones
+     * expected before its minute; without one it leaves out nothing.
      */
     public var time: UtcTime?
     /**
-     * How many departures are wanted. This is not a maximum: servers treat
-     * it as a guide and may return more or fewer, so cut the list where a
-     * fixed number matters. `nil` leaves the number to the server.
+     * The largest number of departures wanted. Servers may return fewer,
+     * and parsing cuts the list to it. `nil` leaves the number to the server.
      */
     public var limit: UInt32?
 
@@ -1735,12 +1736,13 @@ public struct DeparturesQuery: Equatable, Hashable, Codable {
          * location of any network. A position is not a stop.
          */stop: Place, 
         /**
-         * The time from which on departures are wanted. `nil` means now.
+         * The time from which on departures are wanted. `nil` means now, as
+         * the server sees it. With a time, parsing leaves out the ones
+         * expected before its minute; without one it leaves out nothing.
          */time: UtcTime? = nil, 
         /**
-         * How many departures are wanted. This is not a maximum: servers treat
-         * it as a guide and may return more or fewer, so cut the list where a
-         * fixed number matters. `nil` leaves the number to the server.
+         * The largest number of departures wanted. Servers may return fewer,
+         * and parsing cuts the list to it. `nil` leaves the number to the server.
          */limit: UInt32? = nil) {
         self.stop = stop
         self.time = time
@@ -3073,14 +3075,15 @@ public struct LocationQuery: Equatable, Hashable, Codable {
      */
     public var text: String
     /**
-     * The largest number of results wanted. Servers may return fewer. EFA
-     * has no limit that works for every search, so the request carries
-     * none there and the server returns every match.
+     * The largest number of results wanted. Servers may return fewer, and
+     * ``TransitNetwork/parseLocations`` cuts
+     * the list to it. EFA has no limit that works for every search, so
+     * the request carries none there and the server returns every match.
      */
     public var limit: UInt32?
     /**
      * The kinds of location wanted. Empty asks for every kind. The request
-     * asks the server to filter, so `limit` counts only wanted locations.
+     * asks the server to filter, so `limit` counts what the server sends.
      * MOTIS, HAFAS and the geocoder of an `OpenTripPlanner` network
      * cannot ask for the kind ``LocationKind/other``: it is left out
      * there, and a query for that kind alone is an
@@ -3097,13 +3100,14 @@ public struct LocationQuery: Equatable, Hashable, Codable {
          * The text to search for, as a user typed it.
          */text: String, 
         /**
-         * The largest number of results wanted. Servers may return fewer. EFA
-         * has no limit that works for every search, so the request carries
-         * none there and the server returns every match.
+         * The largest number of results wanted. Servers may return fewer, and
+         * ``TransitNetwork/parseLocations`` cuts
+         * the list to it. EFA has no limit that works for every search, so
+         * the request carries none there and the server returns every match.
          */limit: UInt32? = nil, 
         /**
          * The kinds of location wanted. Empty asks for every kind. The request
-         * asks the server to filter, so `limit` counts only wanted locations.
+         * asks the server to filter, so `limit` counts what the server sends.
          * MOTIS, HAFAS and the geocoder of an `OpenTripPlanner` network
          * cannot ask for the kind ``LocationKind/other``: it is left out
          * there, and a query for that kind alone is an
@@ -3176,9 +3180,11 @@ public struct NearbyQuery: Equatable, Hashable, Codable {
      */
     public var radiusMeters: UInt32?
     /**
-     * The largest number of stops wanted. Without it the server decides:
-     * MOTIS returns 5 and `OpenTripPlanner` 20, EFA every stop in the
-     * circle. MOTIS refuses a number above the maximum of the server.
+     * The largest number of stops wanted. Servers may return fewer, and
+     * ``TransitNetwork/parseNearby`` cuts the
+     * list to it. Without it the server decides: MOTIS returns 5 and
+     * `OpenTripPlanner` 20, EFA every stop in the circle. MOTIS refuses a
+     * number above the maximum of the server.
      */
     public var limit: UInt32?
 
@@ -3195,9 +3201,11 @@ public struct NearbyQuery: Equatable, Hashable, Codable {
          * ``Coordinate/distanceMeters(to:)`` tells how far one is.
          */radiusMeters: UInt32? = nil, 
         /**
-         * The largest number of stops wanted. Without it the server decides:
-         * MOTIS returns 5 and `OpenTripPlanner` 20, EFA every stop in the
-         * circle. MOTIS refuses a number above the maximum of the server.
+         * The largest number of stops wanted. Servers may return fewer, and
+         * ``TransitNetwork/parseNearby`` cuts the
+         * list to it. Without it the server decides: MOTIS returns 5 and
+         * `OpenTripPlanner` 20, EFA every stop in the circle. MOTIS refuses a
+         * number above the maximum of the server.
          */limit: UInt32? = nil) {
         self.position = position
         self.radiusMeters = radiusMeters
@@ -3960,26 +3968,33 @@ public func nearbyRequest(query: NearbyQuery)throws  -> HttpRequest  {
 }
     
     /**
-     * Parses the response to a ``TransitNetwork/arrivalsRequest``. The arrivals
-     * are ordered by ``Arrival/expectedTime``.
+     * Parses the response to the ``TransitNetwork/arrivalsRequest`` of `query`.
+     * The arrivals are ordered by ``Arrival/expectedTime``, and left out
+     * and cut as in ``TransitNetwork/parseDepartures``.
      *
      * # Errors
      *
      * The same as ``TransitNetwork/parseDepartures``.
      */
-public func parseArrivals(response: HttpResponse)throws  -> [Arrival]  {
+public func parseArrivals(query: DeparturesQuery, response: HttpResponse)throws  -> [Arrival]  {
     return try  FfiConverterSequenceTypeArrival.lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
         uniffiCallStatus in
     uniffi_publictransport_fn_method_network_parse_arrivals(
             FfiConverterTypeTransitNetwork_lower(self),
+        FfiConverterTypeDeparturesQuery_lower(query),
         FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
     )
 })
 }
     
     /**
-     * Parses the response to a ``TransitNetwork/departuresRequest``. The
-     * departures are ordered by ``Departure/expectedTime``.
+     * Parses the response to the ``TransitNetwork/departuresRequest`` of
+     * `query`. The departures are ordered by ``Departure/expectedTime``.
+     * One expected before the minute of ``DeparturesQuery/time`` is left
+     * out, since some servers list vehicles that have left, and the rest is
+     * cut to ``DeparturesQuery/limit``. A late vehicle planned before the
+     * time stays. Without a time nothing is left out, as the library has no
+     * clock.
      *
      * # Errors
      *
@@ -3990,11 +4005,12 @@ public func parseArrivals(response: HttpResponse)throws  -> [Arrival]  {
      * an ``PublicTransportError/server``. A HAFAS answer needs the network's time zone
      * and is an ``PublicTransportError/invalidNetwork`` without it.
      */
-public func parseDepartures(response: HttpResponse)throws  -> [Departure]  {
+public func parseDepartures(query: DeparturesQuery, response: HttpResponse)throws  -> [Departure]  {
     return try  FfiConverterSequenceTypeDeparture.lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
         uniffiCallStatus in
     uniffi_publictransport_fn_method_network_parse_departures(
             FfiConverterTypeTransitNetwork_lower(self),
+        FfiConverterTypeDeparturesQuery_lower(query),
         FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
     )
 })
@@ -4021,19 +4037,22 @@ public func parseJourney(response: HttpResponse)throws  -> Journey  {
 }
     
     /**
-     * Parses the response to a ``TransitNetwork/locationsRequest``. The best
-     * match comes first. A search without matches gives an empty list.
+     * Parses the response to the ``TransitNetwork/locationsRequest`` of
+     * `query`. The best match comes first. The list is cut to
+     * ``LocationQuery/limit``. A search without matches gives an empty
+     * list.
      *
      * # Errors
      *
      * Returns an error if the status code reports a failure or if the body
      * is not what the protocol defines.
      */
-public func parseLocations(response: HttpResponse)throws  -> [Location]  {
+public func parseLocations(query: LocationQuery, response: HttpResponse)throws  -> [Location]  {
     return try  FfiConverterSequenceTypeLocation.lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
         uniffiCallStatus in
     uniffi_publictransport_fn_method_network_parse_locations(
             FfiConverterTypeTransitNetwork_lower(self),
+        FfiConverterTypeLocationQuery_lower(query),
         FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
     )
 })
@@ -4043,7 +4062,8 @@ public func parseLocations(response: HttpResponse)throws  -> [Location]  {
      * Parses the response to the ``TransitNetwork/nearbyRequest`` of `query`:
      * the stops in its circle in the order of the server, which is the
      * nearest first. A stop that the server sends from outside the circle
-     * is left out, whatever way the server measures.
+     * is left out, whatever way the server measures, and the rest is cut
+     * to ``NearbyQuery/limit``.
      * ``Coordinate/distanceMeters(to:)``
      * gives how far one is. None in the circle gives an empty list.
      *
@@ -4460,10 +4480,10 @@ public struct TripsQuery: Equatable, Hashable, Codable {
      */
     public var time: TripTime?
     /**
-     * How many trips are wanted. This is not a maximum: servers treat it
-     * as a guide and may return more or fewer, so cut the list where a
-     * fixed number matters. Only an answer of EFA, TRIAS or OJP is cut to
-     * it, see ``TransitNetwork/parseTrips``.
+     * How many trips are wanted. An answer of EFA, TRIAS or OJP is cut to
+     * it, see ``TransitNetwork/parseTrips``. The
+     * other servers treat it as a guide and may return more or fewer, so
+     * cut the list where a fixed number matters.
      * `nil` leaves the number to the server.
      */
     public var limit: UInt32?
@@ -4490,10 +4510,10 @@ public struct TripsQuery: Equatable, Hashable, Codable {
          * When to leave or arrive. `nil` means leaving now.
          */time: TripTime? = nil, 
         /**
-         * How many trips are wanted. This is not a maximum: servers treat it
-         * as a guide and may return more or fewer, so cut the list where a
-         * fixed number matters. Only an answer of EFA, TRIAS or OJP is cut to
-         * it, see ``TransitNetwork/parseTrips``.
+         * How many trips are wanted. An answer of EFA, TRIAS or OJP is cut to
+         * it, see ``TransitNetwork/parseTrips``. The
+         * other servers treat it as a guide and may return more or fewer, so
+         * cut the list where a fixed number matters.
          * `nil` leaves the number to the server.
          */limit: UInt32? = nil, 
         /**

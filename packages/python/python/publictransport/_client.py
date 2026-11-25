@@ -216,12 +216,12 @@ class Client:
         """Search for locations by name. The best match comes first.
 
         `query` is the text to search for. `kinds` narrows the search to
-        kinds of location and `limit` is the largest number wanted, which
-        is not sent to EFA servers: they return every match. A
+        kinds of location and `limit` is the largest number wanted. A
         `LocationQuery` carries the same and takes the place of all three.
         """
-        request = network.locations_request(_location_query(query, kinds, limit))
-        return network.parse_locations(self._send(request))
+        location_query = _location_query(query, kinds, limit)
+        request = network.locations_request(location_query)
+        return network.parse_locations(location_query, self._send(request))
 
     def nearby(
         self,
@@ -236,9 +236,8 @@ class Client:
         `radius_meters` is how far from the position to look, 1000 m if
         left out. Stops farther away are not returned. MOTIS takes no radius
         and returns only the nearest stops, so stops in the circle can be
-        missing there. `limit` is the largest number wanted, which servers
-        treat as a guide. A `NearbyQuery` carries the same and takes the
-        place of all three.
+        missing there. `limit` is the largest number wanted. A `NearbyQuery`
+        carries the same and takes the place of all three.
 
         `Coordinate.distance_meters` gives how far a stop is. A position
         off the globe raises `Error.InvalidQuery`.
@@ -260,14 +259,13 @@ class Client:
         that another network returned works where this network can name it,
         which EFA, TRIAS and OJP can for stops with a global ID; otherwise
         the call raises `Error.InvalidQuery`. `time` is when the list starts,
-        now if left out, and `limit` how many departures are wanted. A
-        `DeparturesQuery` carries the same and takes the place of all three.
-
-        `limit` is not a maximum: servers treat it as a guide and may return
-        more or fewer.
+        now if left out, and departures expected before a given time are left out.
+        `limit` is the largest number wanted. A `DeparturesQuery` carries the
+        same and takes the place of all three.
         """
-        request = network.departures_request(_departures_query(stop, time, limit))
-        return network.parse_departures(self._send(request))
+        query = _departures_query(stop, time, limit)
+        request = network.departures_request(query)
+        return network.parse_departures(query, self._send(request))
 
     def arrivals(
         self,
@@ -283,8 +281,9 @@ class Client:
         where the vehicle comes from, in place of the direction. It is
         `None` where the server does not say, as with OpenTripPlanner.
         """
-        request = network.arrivals_request(_departures_query(stop, time, limit))
-        return network.parse_arrivals(self._send(request))
+        query = _departures_query(stop, time, limit)
+        request = network.arrivals_request(query)
+        return network.parse_arrivals(query, self._send(request))
 
     def journey(self, network: Network, journey_id: str) -> Journey:
         """Fetch the run of one vehicle: all its stops with times and platforms.
@@ -395,12 +394,12 @@ class AsyncClient:
         """Search for locations by name. The best match comes first.
 
         `query` is the text to search for. `kinds` narrows the search to
-        kinds of location and `limit` is the largest number wanted, which
-        is not sent to EFA servers: they return every match. A
+        kinds of location and `limit` is the largest number wanted. A
         `LocationQuery` carries the same and takes the place of all three.
         """
-        request = network.locations_request(_location_query(query, kinds, limit))
-        return network.parse_locations(await self._send(request))
+        location_query = _location_query(query, kinds, limit)
+        request = network.locations_request(location_query)
+        return network.parse_locations(location_query, await self._send(request))
 
     async def nearby(
         self,
@@ -415,9 +414,8 @@ class AsyncClient:
         `radius_meters` is how far from the position to look, 1000 m if
         left out. Stops farther away are not returned. MOTIS takes no radius
         and returns only the nearest stops, so stops in the circle can be
-        missing there. `limit` is the largest number wanted, which servers
-        treat as a guide. A `NearbyQuery` carries the same and takes the
-        place of all three.
+        missing there. `limit` is the largest number wanted. A `NearbyQuery`
+        carries the same and takes the place of all three.
 
         `Coordinate.distance_meters` gives how far a stop is. A position
         off the globe raises `Error.InvalidQuery`.
@@ -440,14 +438,13 @@ class AsyncClient:
         that another network returned works where this network can name it,
         which EFA, TRIAS and OJP can for stops with a global ID; otherwise
         the call raises `Error.InvalidQuery`. `time` is when the list starts,
-        now if left out, and `limit` how many departures are wanted. A
-        `DeparturesQuery` carries the same and takes the place of all three.
-
-        `limit` is not a maximum: servers treat it as a guide and may return
-        more or fewer.
+        now if left out, and departures expected before a given time are left out.
+        `limit` is the largest number wanted. A `DeparturesQuery` carries the
+        same and takes the place of all three.
         """
-        request = network.departures_request(_departures_query(stop, time, limit))
-        return network.parse_departures(await self._send(request))
+        query = _departures_query(stop, time, limit)
+        request = network.departures_request(query)
+        return network.parse_departures(query, await self._send(request))
 
     async def arrivals(
         self,
@@ -463,8 +460,9 @@ class AsyncClient:
         where the vehicle comes from, in place of the direction. It is
         `None` where the server does not say, as with OpenTripPlanner.
         """
-        request = network.arrivals_request(_departures_query(stop, time, limit))
-        return network.parse_arrivals(await self._send(request))
+        query = _departures_query(stop, time, limit)
+        request = network.arrivals_request(query)
+        return network.parse_arrivals(query, await self._send(request))
 
     async def journey(self, network: Network, journey_id: str) -> Journey:
         """Fetch the run of one vehicle: all its stops with times and platforms.

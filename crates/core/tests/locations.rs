@@ -18,11 +18,14 @@ fn network(protocol: Protocol, endpoint: &str) -> Network {
 }
 
 fn parse(protocol: Protocol, status: u16, body: &[u8]) -> Result<Vec<Location>, Error> {
-    network(protocol, "https://example.org/base").parse_locations(&HttpResponse {
-        status,
-        headers: Vec::new(),
-        body: body.to_vec(),
-    })
+    network(protocol, "https://example.org/base").parse_locations(
+        &publictransport::LocationQuery::new("text"),
+        &HttpResponse {
+            status,
+            headers: Vec::new(),
+            body: body.to_vec(),
+        },
+    )
 }
 
 fn ifopt(value: &str) -> GlobalId {
@@ -209,11 +212,14 @@ fn a_location_has_no_empty_locality_and_falls_back_to_the_time_zone_of_the_netwo
     for (protocol, body) in [(Protocol::Efa, &efa[..]), (Protocol::Motis, &motis[..])] {
         let network = network(protocol, "https://example.org/base").with_timezone("Europe/Berlin");
         let locations = network
-            .parse_locations(&HttpResponse {
-                status: 200,
-                headers: Vec::new(),
-                body: body.to_vec(),
-            })
+            .parse_locations(
+                &publictransport::LocationQuery::new("text"),
+                &HttpResponse {
+                    status: 200,
+                    headers: Vec::new(),
+                    body: body.to_vec(),
+                },
+            )
             .unwrap();
         assert_eq!(locations[0].locality, None, "{protocol:?}");
         assert_eq!(
@@ -475,7 +481,7 @@ fn rate_limit_reports_how_long_the_server_asks_to_wait() {
         };
         assert_eq!(
             network(Protocol::Efa, "https://example.org/base")
-                .parse_locations(&response)
+                .parse_locations(&publictransport::LocationQuery::new("text"), &response)
                 .unwrap_err(),
             Error::RateLimited {
                 retry_after_seconds
@@ -503,7 +509,8 @@ fn redirect_reports_the_new_location_whatever_the_header_case() {
             body: body.to_vec(),
         };
         assert_eq!(
-            network(protocol, "https://example.org/base").parse_locations(&response),
+            network(protocol, "https://example.org/base")
+                .parse_locations(&publictransport::LocationQuery::new("text"), &response),
             Err(Error::Moved {
                 location: Some("https://example.org/new".into())
             })

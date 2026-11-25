@@ -77,6 +77,7 @@ assert.ok(later);
 /** The run of a departure in the answer that was recorded with the run. */
 const journeyId = parseDepartures(
   efa("http://localhost"),
+  { stop: hbf },
   ok(fixture("efa/vvo-journey-departure.json")),
 ).find((each) => each.journeyId)?.journeyId;
 assert.ok(journeyId);
@@ -102,7 +103,7 @@ function locations(
     name,
     fixture: "efa/vvo-stopfinder.json",
     request,
-    parse: parseLocations,
+    parse: (network: Network, response: HttpResponse) => parseLocations(network, query, response),
     call,
     ...rest,
   };
@@ -116,12 +117,16 @@ function nearby(name: string, query: NearbyQuery, call: Case["call"]): Case {
 
 function departures(name: string, query: DeparturesQuery, call: Case["call"]): Case {
   const request = (network: Network) => departuresRequest(network, query);
-  return { name, fixture: "efa/vvo-departures.json", request, parse: parseDepartures, call };
+  const parse = (network: Network, response: HttpResponse) =>
+    parseDepartures(network, query, response);
+  return { name, fixture: "efa/vvo-departures.json", request, parse, call };
 }
 
 function arrivals(name: string, query: DeparturesQuery, call: Case["call"]): Case {
   const request = (network: Network) => arrivalsRequest(network, query);
-  return { name, fixture: "efa/vvo-arrivals.json", request, parse: parseArrivals, call };
+  const parse = (network: Network, response: HttpResponse) =>
+    parseArrivals(network, query, response);
+  return { name, fixture: "efa/vvo-arrivals.json", request, parse, call };
 }
 
 function trips(name: string, query: TripsQuery, call: Case["call"]): Case {
@@ -241,7 +246,7 @@ for (const [name, status] of [
       // Status and headers have to reach the core for the same error.
       let expected: unknown;
       try {
-        parseDepartures(network, { status, headers: moved, body: new Uint8Array() });
+        parseDepartures(network, { stop: hbf }, { status, headers: moved, body: new Uint8Array() });
       } catch (error) {
         expected = error;
       }
@@ -260,7 +265,7 @@ test("each error of the core is thrown as its class, with its details", () => {
   const network = efa("http://localhost");
   const body = new TextEncoder().encode("teapot");
   const answer = (status: number) => () =>
-    parseDepartures(network, { status, headers: moved, body });
+    parseDepartures(network, { stop: hbf }, { status, headers: moved, body });
   const unknownStop = ok(fixture("efa/vvo-departures-unknown-stop.json"));
 
   assert.throws(answer(302), (thrown) => {
@@ -278,12 +283,12 @@ test("each error of the core is thrown as its class, with its details", () => {
   assert.throws(answer(401), UnauthorizedError);
   assert.throws(answer(403), BlockedError);
   assert.throws(
-    () => parseDepartures(network, { status: 429, headers: retryAfter, body }),
+    () => parseDepartures(network, { stop: hbf }, { status: 429, headers: retryAfter, body }),
     (thrown) => thrown instanceof RateLimitedError && thrown.retryAfterSeconds === 120,
   );
   assert.throws(answer(503), UnavailableError);
-  assert.throws(() => parseDepartures(network, unknownStop), NotFoundError);
-  assert.throws(() => parseDepartures(network, ok(new Uint8Array())), ParseError);
+  assert.throws(() => parseDepartures(network, { stop: hbf }, unknownStop), NotFoundError);
+  assert.throws(() => parseDepartures(network, { stop: hbf }, ok(new Uint8Array())), ParseError);
   assert.throws(() => departuresRequest(network, { stop: coordinate }), InvalidQueryError);
   assert.throws(
     () => locationsRequest({ ...network, protocol: "trias" }, { text: "Hauptbahnhof" }),

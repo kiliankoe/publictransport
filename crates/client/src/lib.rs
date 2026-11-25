@@ -140,9 +140,10 @@ impl Client {
         network: &Network,
         query: impl Into<LocationQuery>,
     ) -> Result<Vec<Location>, Error> {
-        let request = network.locations_request(&query.into())?;
+        let query = query.into();
+        let request = network.locations_request(&query)?;
         let response = self.send(request).await?;
-        Ok(network.parse_locations(&response)?)
+        Ok(network.parse_locations(&query, &response)?)
     }
 
     /// Finds the stops near a position. The query is the position as a
@@ -179,9 +180,10 @@ impl Client {
         network: &Network,
         query: impl Into<DeparturesQuery>,
     ) -> Result<Vec<Departure>, Error> {
-        let request = network.departures_request(&query.into())?;
+        let query = query.into();
+        let request = network.departures_request(&query)?;
         let response = self.send(request).await?;
-        Ok(network.parse_departures(&response)?)
+        Ok(network.parse_departures(&query, &response)?)
     }
 
     /// Lists the next arrivals at a stop, from the same query as
@@ -197,9 +199,10 @@ impl Client {
         network: &Network,
         query: impl Into<DeparturesQuery>,
     ) -> Result<Vec<Arrival>, Error> {
-        let request = network.arrivals_request(&query.into())?;
+        let query = query.into();
+        let request = network.arrivals_request(&query)?;
         let response = self.send(request).await?;
-        Ok(network.parse_arrivals(&response)?)
+        Ok(network.parse_arrivals(&query, &response)?)
     }
 
     /// Fetches the run of one vehicle: all its stops with times and

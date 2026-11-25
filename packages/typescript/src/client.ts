@@ -121,11 +121,9 @@ export class Client {
     query: string | LocationQuery,
     { signal, ...rest }: Omit<LocationQuery, "text"> & RequestOptions = {},
   ): Promise<Location[]> {
-    const request = locationsRequest(
-      network,
-      typeof query === "string" ? { ...rest, text: query } : query,
-    );
-    return parseLocations(network, await this.#send(request, signal));
+    const locations = typeof query === "string" ? { ...rest, text: query } : query;
+    const request = locationsRequest(network, locations);
+    return parseLocations(network, locations, await this.#send(request, signal));
   }
 
   /** Finds the stops near a position with a query. */
@@ -138,8 +136,7 @@ export class Client {
    *   {@link InvalidQueryError}.
    * @param options The other fields of a {@link NearbyQuery}: how far to
    *   look as `radiusMeters`, 1000 m if left out, and the largest number
-   *   wanted as `limit`, which servers treat as a guide. Stops farther
-   *   away are not returned. MOTIS takes no radius and returns only the
+   *   wanted as `limit`. Stops farther away are not returned. MOTIS takes no radius and returns only the
    *   nearest stops, so stops in the circle can be missing there.
    */
   nearby(
@@ -172,9 +169,9 @@ export class Client {
    *   with a global ID; otherwise the call rejects with an
    *   {@link InvalidQueryError}.
    * @param options The other fields of a {@link DeparturesQuery}: the `time`
-   *   from which on departures are wanted, now if left out, and how many
-   *   are wanted as `limit`. That is not a maximum: servers treat it as a
-   *   guide and may return more or fewer.
+   *   from which on departures are wanted, now if left out, and the
+   *   largest number wanted as `limit`. Departures expected before the
+   *   time are left out.
    */
   departures(
     network: Network,
@@ -186,8 +183,9 @@ export class Client {
     query: Place | DeparturesQuery,
     { signal, ...rest }: Omit<DeparturesQuery, "stop"> & RequestOptions = {},
   ): Promise<Departure[]> {
-    const request = departuresRequest(network, departuresQuery(query, rest));
-    return parseDepartures(network, await this.#send(request, signal));
+    const departures = departuresQuery(query, rest);
+    const request = departuresRequest(network, departures);
+    return parseDepartures(network, departures, await this.#send(request, signal));
   }
 
   /** Lists arrivals with a query, the one of departures. */
@@ -200,9 +198,9 @@ export class Client {
    * @param stop A location or the ID of a stop on this network, as for
    *   {@link Client.departures}.
    * @param options The other fields of a {@link DeparturesQuery}: the `time`
-   *   from which on arrivals are wanted, now if left out, and how many are
-   *   wanted as `limit`. That is not a maximum: servers treat it as a guide
-   *   and may return more or fewer.
+   *   from which on arrivals are wanted, now if left out, and the largest
+   *   number wanted as `limit`. Arrivals expected before the time are left
+   *   out.
    */
   arrivals(
     network: Network,
@@ -214,8 +212,9 @@ export class Client {
     query: Place | DeparturesQuery,
     { signal, ...rest }: Omit<DeparturesQuery, "stop"> & RequestOptions = {},
   ): Promise<Arrival[]> {
-    const request = arrivalsRequest(network, departuresQuery(query, rest));
-    return parseArrivals(network, await this.#send(request, signal));
+    const arrivals = departuresQuery(query, rest);
+    const request = arrivalsRequest(network, arrivals);
+    return parseArrivals(network, arrivals, await this.#send(request, signal));
   }
 
   /**

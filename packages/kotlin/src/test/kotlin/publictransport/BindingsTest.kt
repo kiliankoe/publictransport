@@ -26,7 +26,7 @@ class BindingsTest {
 
         val thrown =
             assertFailsWith<PublicTransportException.RateLimited> {
-                BundledNetwork.VVO_EFA.network().parseDepartures(tooMany)
+                BundledNetwork.VVO_EFA.network().parseDepartures(DeparturesQuery(Place.Id("a")), tooMany)
             }
 
         assertEquals("the server received too many requests", thrown.message)
@@ -38,7 +38,7 @@ class BindingsTest {
     @Test
     fun `derived values are properties`() {
         val network = BundledNetwork.VVO_EFA.network()
-        val departure = network.parseDepartures(ok(fixture("efa/vvo-departures.json"))).first()
+        val departure = network.parseDepartures(DeparturesQuery(Place.Id("a")), ok(fixture("efa/vvo-departures.json"))).first()
         val trip = network.parseTrips(TripsQuery(Place.Id("a"), Place.Id("b")), ok(fixture("efa/vvo-trip.json"))).trips.first()
         val start = trip.legs.first().departure
 
@@ -63,7 +63,10 @@ class BindingsTest {
 
     @Test
     fun `remarks cross the boundary`() {
-        val departures = BundledNetwork.VRR_EFA.network().parseDepartures(ok(fixture("efa/vrr-departures.json")))
+        val departures =
+            BundledNetwork.VRR_EFA
+                .network()
+                .parseDepartures(DeparturesQuery(Place.Id("a")), ok(fixture("efa/vrr-departures.json")))
 
         val remark = departures.flatMap { it.remarks }.first { it.id == "314433" }
         assertEquals(RemarkKind.DISRUPTION, remark.kind)

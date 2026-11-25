@@ -75,7 +75,7 @@ struct Call: Sendable, CustomTestStringConvertible {
         Call(
             testDescription: name, network: network, fixture: fixture,
             request: { try $0.locationsRequest(query: query) },
-            check: { try #expect(await call($0, $1) == $1.parseLocations(response: $2)) }
+            check: { try #expect(await call($0, $1) == $1.parseLocations(query: query, response: $2)) }
         )
     }
 
@@ -98,7 +98,7 @@ struct Call: Sendable, CustomTestStringConvertible {
         Call(
             testDescription: name, network: network, fixture: fixture,
             request: { try $0.departuresRequest(query: query) },
-            check: { try #expect(await call($0, $1) == $1.parseDepartures(response: $2)) }
+            check: { try #expect(await call($0, $1) == $1.parseDepartures(query: query, response: $2)) }
         )
     }
 
@@ -109,7 +109,7 @@ struct Call: Sendable, CustomTestStringConvertible {
         Call(
             testDescription: name, fixture: "efa/vvo-arrivals.json",
             request: { try $0.arrivalsRequest(query: query) },
-            check: { try #expect(await call($0, $1) == $1.parseArrivals(response: $2)) }
+            check: { try #expect(await call($0, $1) == $1.parseArrivals(query: query, response: $2)) }
         )
     }
 
@@ -118,6 +118,7 @@ struct Call: Sendable, CustomTestStringConvertible {
     static let journey: Call = {
         let id: @Sendable (TransitNetwork) throws -> String = {
             let departures = try $0.parseDepartures(
+                query: DeparturesQuery(stop: .id("de:14612:28")),
                 response: ok(PublicTransportTests.fixture("efa/vvo-journey-departure.json")))
             return try #require(departures.compactMap(\.journeyId).first)
         }
@@ -285,6 +286,7 @@ func errorOfTheCoreComesOutUnchanged(answer: Refused) async throws {
     // Status, headers and body all have to reach the core for the same error.
     let expected = #expect(throws: PublicTransportError.self) {
         try network.parseDepartures(
+            query: DeparturesQuery(stop: .id("de:14612:28")),
             response: HttpResponse(
                 status: UInt16(answer.status),
                 headers: answer.headers.map { Header(name: $0.key, value: $0.value) },

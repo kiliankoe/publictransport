@@ -19,11 +19,14 @@ fn network(protocol: Protocol) -> Network {
 }
 
 fn parse(protocol: Protocol, body: &[u8]) -> Result<Vec<Departure>, Error> {
-    network(protocol).parse_departures(&HttpResponse {
-        status: 200,
-        headers: Vec::new(),
-        body: body.to_vec(),
-    })
+    network(protocol).parse_departures(
+        &publictransport::DeparturesQuery::new("stop"),
+        &HttpResponse {
+            status: 200,
+            headers: Vec::new(),
+            body: body.to_vec(),
+        },
+    )
 }
 
 fn ifopt(value: &str) -> GlobalId {
@@ -60,7 +63,7 @@ proptest! {
         ],
     ) {
         for protocol in PROTOCOLS {
-            let _ = network(protocol).parse_departures(&HttpResponse {
+            let _ = network(protocol).parse_departures(&publictransport::DeparturesQuery::new("stop"), &HttpResponse {
                 status,
                 headers: Vec::new(),
                 body: body.clone(),
@@ -201,7 +204,7 @@ fn efa_names_a_platform_after_its_station() {
     };
     let departures = network(Protocol::Efa)
         .with_timezone("Europe/Berlin")
-        .parse_departures(&response)
+        .parse_departures(&publictransport::DeparturesQuery::new("stop"), &response)
         .unwrap();
     assert_eq!(departures.len(), 10);
     // EFA sends no time zone, so the stop gets the one of the network.
@@ -442,7 +445,7 @@ fn a_station_is_its_own_station_and_each_global_id_names_one() {
         body: body.to_vec(),
     };
     let mut station = network(Protocol::Efa)
-        .parse_locations(&response)
+        .parse_locations(&publictransport::LocationQuery::new("text"), &response)
         .unwrap()
         .remove(0);
     assert_eq!(station.station_ids(), [ifopt("de:14612:28")]);
@@ -506,7 +509,8 @@ fn unknown_stop_is_not_found() {
         headers: Vec::new(),
         body: br#"{"error":"no radius: stop_found=false, center_parsed=false"}"#.to_vec(),
     };
-    let result = network(Protocol::Motis).parse_departures(&response);
+    let result = network(Protocol::Motis)
+        .parse_departures(&publictransport::DeparturesQuery::new("stop"), &response);
     assert!(matches!(result, Err(Error::NotFound { .. })), "{result:?}");
 }
 

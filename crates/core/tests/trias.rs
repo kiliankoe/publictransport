@@ -80,8 +80,12 @@ fn count(protocol: Protocol, kind: &str, body: &[u8]) -> Result<usize, Error> {
     let network = network(protocol);
     let response = response(body);
     match kind {
-        "LocationInformation" => network.parse_locations(&response).map(|list| list.len()),
-        "StopEvent" => network.parse_departures(&response).map(|list| list.len()),
+        "LocationInformation" => network
+            .parse_locations(&publictransport::LocationQuery::new("text"), &response)
+            .map(|list| list.len()),
+        "StopEvent" => network
+            .parse_departures(&publictransport::DeparturesQuery::new("stop"), &response)
+            .map(|list| list.len()),
         _ => network
             .parse_trips(&publictransport::TripsQuery::new("from", "to"), &response)
             .map(|found| found.trips.len()),
@@ -653,7 +657,10 @@ fn locations_have_a_locality_and_the_time_zone_of_the_network() {
     let parse = |protocol, body| {
         network(protocol)
             .with_timezone("Europe/Berlin")
-            .parse_locations(&response(body))
+            .parse_locations(
+                &publictransport::LocationQuery::new("text"),
+                &response(body),
+            )
             .unwrap()
     };
 
@@ -713,7 +720,10 @@ fn locations_have_a_locality_and_the_time_zone_of_the_network() {
     for location in stop.iter().chain(&pois).chain(&ojp) {
         assert_eq!(location.timezone.as_deref(), Some("Europe/Berlin"));
     }
-    let without_timezone = network(Protocol::Trias).parse_locations(&response(TRIAS_LOCATIONS));
+    let without_timezone = network(Protocol::Trias).parse_locations(
+        &publictransport::LocationQuery::new("text"),
+        &response(TRIAS_LOCATIONS),
+    );
     assert_eq!(without_timezone.unwrap()[0].timezone, None);
 }
 
@@ -725,7 +735,10 @@ fn locations_are_told_apart_by_their_element_and_ordered_by_probability() {
     ] {
         let parse = |body: &str| {
             network(protocol)
-                .parse_locations(&response(body.as_bytes()))
+                .parse_locations(
+                    &publictransport::LocationQuery::new("text"),
+                    &response(body.as_bytes()),
+                )
                 .unwrap()
         };
         let recorded = parse(&text(fixture));
@@ -796,7 +809,12 @@ fn both_protocols_describe_the_same_departures_alike_and_order_them_by_expected_
         "22:21:00 22:57:00 de:05111:18235:90:4 4/10 Düsseldorf Hbf RegionalTrain Aachen, Hbf",
     ];
     for (protocol, body) in [(Protocol::Trias, TRIAS_VRR), (Protocol::Ojp1, OJP_VRR)] {
-        let departures = network(protocol).parse_departures(&response(body)).unwrap();
+        let departures = network(protocol)
+            .parse_departures(
+                &publictransport::DeparturesQuery::new("stop"),
+                &response(body),
+            )
+            .unwrap();
         assert!(
             departures.is_sorted_by_key(Departure::expected_time),
             "{protocol:?}"
@@ -855,7 +873,12 @@ fn stops_take_their_position_from_the_places_the_answer_lists() {
         located(stops.collect())
     };
     let of_departures = |protocol, body| {
-        let departures = network(protocol).parse_departures(&response(body)).unwrap();
+        let departures = network(protocol)
+            .parse_departures(
+                &publictransport::DeparturesQuery::new("stop"),
+                &response(body),
+            )
+            .unwrap();
         located(
             departures
                 .into_iter()
@@ -921,7 +944,12 @@ fn ojp_names_trains_without_a_line_by_category_and_number_and_knows_the_operator
         ),
     ];
     let line = |protocol, body, scheduled| {
-        let departures = network(protocol).parse_departures(&response(body)).unwrap();
+        let departures = network(protocol)
+            .parse_departures(
+                &publictransport::DeparturesQuery::new("stop"),
+                &response(body),
+            )
+            .unwrap();
         let departure = departures
             .iter()
             .find(|departure| departure.scheduled_time == scheduled)
@@ -988,7 +1016,10 @@ fn mode_follows_the_pt_mode_and_for_trains_the_submode() {
             );
             let body = text(fixture).replacen(&recorded, &replaced, 1);
             let departures = network(protocol)
-                .parse_departures(&response(body.as_bytes()))
+                .parse_departures(
+                    &publictransport::DeparturesQuery::new("stop"),
+                    &response(body.as_bytes()),
+                )
                 .unwrap();
             let ice = departures
                 .iter()
@@ -1012,7 +1043,10 @@ fn cancelled_service_is_a_cancelled_departure() {
         assert!(text(fixture).contains(&deviation));
         let body = text(fixture).replacen(&deviation, &cancelled, 1);
         let departures = network(protocol)
-            .parse_departures(&response(body.as_bytes()))
+            .parse_departures(
+                &publictransport::DeparturesQuery::new("stop"),
+                &response(body.as_bytes()),
+            )
             .unwrap();
         assert_eq!(
             departures
@@ -1394,7 +1428,10 @@ fn repeated_names_whitespace_and_a_skipped_stop_are_read() {
         name("DestinationText", "Pennrich (en)"),
     ));
     let departures = network(Protocol::Trias)
-        .parse_departures(&response(body.as_bytes()))
+        .parse_departures(
+            &publictransport::DeparturesQuery::new("stop"),
+            &response(body.as_bytes()),
+        )
         .unwrap();
     let departure = &departures[0];
     assert_eq!(departure.stop.id, "de:14612:28");
@@ -1418,7 +1455,10 @@ fn ojp_locality_is_the_last_parenthesized_part_of_the_name() {
              </ojp:OJPLocationInformationDelivery>"
         ));
         network(Protocol::Ojp1)
-            .parse_locations(&response(body.as_bytes()))
+            .parse_locations(
+                &publictransport::LocationQuery::new("text"),
+                &response(body.as_bytes()),
+            )
             .unwrap()
             .swap_remove(0)
             .locality

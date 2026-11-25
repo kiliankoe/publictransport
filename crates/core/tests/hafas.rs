@@ -341,7 +341,7 @@ proptest! {
         }
         let answer = departure_answer(8, &date, &time).to_string();
 
-        let departures = vbb().parse_departures(&respond(answer)).unwrap();
+        let departures = vbb().parse_departures(&publictransport::DeparturesQuery::new("stop"), &respond(answer)).unwrap();
         prop_assert_eq!(departures.len(), 1);
         prop_assert_eq!(
             departures[0].scheduled_time,
@@ -358,7 +358,7 @@ proptest! {
             .map_or(Mode::Other, |(_, _, mode)| *mode);
         let answer = departure_answer(cls, "20261117", "201800").to_string();
 
-        let departures = vbb().parse_departures(&respond(answer)).unwrap();
+        let departures = vbb().parse_departures(&publictransport::DeparturesQuery::new("stop"), &respond(answer)).unwrap();
         prop_assert_eq!(departures[0].line.mode, expected);
     }
 }
@@ -372,7 +372,12 @@ fn mode_of(id: &str) -> Option<Mode> {
     };
     let network = bare(options().with_products([product])).with_timezone("Europe/Berlin");
     let answer = departure_answer(8, "20261117", "201800").to_string();
-    let departures = network.parse_departures(&respond(answer)).ok()?;
+    let departures = network
+        .parse_departures(
+            &publictransport::DeparturesQuery::new("stop"),
+            &respond(answer),
+        )
+        .ok()?;
     departures.first().map(|departure| departure.line.mode)
 }
 
@@ -406,7 +411,12 @@ fn product_ids_of_other_networks_have_a_mode() {
 
 #[test]
 fn locations_come_in_the_servers_order_with_their_ifopt_id() {
-    let locations = vbb().parse_locations(&respond(LOCATIONS)).unwrap();
+    let locations = vbb()
+        .parse_locations(
+            &publictransport::LocationQuery::new("text"),
+            &respond(LOCATIONS),
+        )
+        .unwrap();
 
     let ids: Vec<&str> = locations.iter().map(|l| l.id.as_str()).collect();
     assert_eq!(
@@ -449,7 +459,12 @@ fn location_without_a_short_id_keeps_its_identifier() {
         ]}
     }}]});
 
-    let locations = vbb().parse_locations(&respond(answer.to_string())).unwrap();
+    let locations = vbb()
+        .parse_locations(
+            &publictransport::LocationQuery::new("text"),
+            &respond(answer.to_string()),
+        )
+        .unwrap();
     let found: Vec<(&str, LocationKind)> = locations.iter().map(|l| (&*l.id, l.kind)).collect();
     assert_eq!(
         found,
@@ -464,7 +479,12 @@ fn location_without_a_short_id_keeps_its_identifier() {
 
 #[test]
 fn departures_resolve_stop_line_and_operator_from_the_shared_lists() {
-    let departures = vbb().parse_departures(&respond(DEPARTURES)).unwrap();
+    let departures = vbb()
+        .parse_departures(
+            &publictransport::DeparturesQuery::new("stop"),
+            &respond(DEPARTURES),
+        )
+        .unwrap();
     assert_eq!(departures.len(), 12);
     assert!(
         departures.is_sorted_by_key(publictransport::Departure::expected_time),
@@ -608,7 +628,12 @@ fn about_the_ride(remarks: &[Remark]) -> Vec<(&RemarkKind, &str)> {
 
 #[test]
 fn remarks_are_realtime_messages_and_attributes_but_not_the_operator_or_the_occupancy() {
-    let departures = vbb().parse_departures(&respond(DEPARTURES)).unwrap();
+    let departures = vbb()
+        .parse_departures(
+            &publictransport::DeparturesQuery::new("stop"),
+            &respond(DEPARTURES),
+        )
+        .unwrap();
     // The bus has the operator and the expected occupancy, nothing else.
     let bus = departures
         .iter()
@@ -718,16 +743,25 @@ fn errors_inside_a_successful_response_are_told_apart() {
     };
     let network = vbb();
 
-    let result = network.parse_departures(&respond(r#"{"err": "AUTH", "errTxt": "denied"}"#));
+    let result = network.parse_departures(
+        &publictransport::DeparturesQuery::new("stop"),
+        &respond(r#"{"err": "AUTH", "errTxt": "denied"}"#),
+    );
     assert_eq!(result, Err(Error::Unauthorized));
     for answer in [r#"{"err": "PARSE"}"#.to_owned(), service("PARSE")] {
-        let result = network.parse_departures(&respond(&answer));
+        let result = network.parse_departures(
+            &publictransport::DeparturesQuery::new("stop"),
+            &respond(&answer),
+        );
         assert!(
             matches!(&result, Err(Error::Server { status: 200, message }) if message.contains("PARSE")),
             "{answer}: {result:?}"
         );
     }
-    let result = network.parse_departures(&respond(UNKNOWN_STOP));
+    let result = network.parse_departures(
+        &publictransport::DeparturesQuery::new("stop"),
+        &respond(UNKNOWN_STOP),
+    );
     assert!(matches!(result, Err(Error::NotFound { .. })), "{result:?}");
     // A place of a trip search that the server cannot route from.
     let result = network.parse_trips(
@@ -735,7 +769,10 @@ fn errors_inside_a_successful_response_are_told_apart() {
         &respond(service("H9220")),
     );
     assert!(matches!(result, Err(Error::NotFound { .. })), "{result:?}");
-    let result = network.parse_departures(&respond("<html></html>"));
+    let result = network.parse_departures(
+        &publictransport::DeparturesQuery::new("stop"),
+        &respond("<html></html>"),
+    );
     assert!(matches!(result, Err(Error::Parse { .. })), "{result:?}");
 
     let found = network
@@ -747,7 +784,10 @@ fn errors_inside_a_successful_response_are_told_apart() {
     assert_eq!(found.trips, []);
     assert_eq!((found.earlier, found.later), (None, None));
     assert_eq!(
-        network.parse_locations(&respond(service("NO_MATCH"))),
+        network.parse_locations(
+            &publictransport::LocationQuery::new("text"),
+            &respond(service("NO_MATCH"))
+        ),
         Ok(Vec::new())
     );
 }
@@ -774,7 +814,10 @@ fn other_versions_of_the_interface_spell_fields_differently() {
     stop["dTimeR"] = json!("031000");
 
     let departures = vbb()
-        .parse_departures(&respond(answer.to_string()))
+        .parse_departures(
+            &publictransport::DeparturesQuery::new("stop"),
+            &respond(answer.to_string()),
+        )
         .unwrap();
     let departure = &departures[0];
     assert_eq!(departure.stop.global_ids, [ifopt("de:11000:900100003")]);
@@ -793,7 +836,10 @@ fn other_versions_of_the_interface_spell_fields_differently() {
 
 #[test]
 fn answer_with_times_needs_the_time_zone() {
-    let result = bare(options()).parse_departures(&respond(DEPARTURES));
+    let result = bare(options()).parse_departures(
+        &publictransport::DeparturesQuery::new("stop"),
+        &respond(DEPARTURES),
+    );
     assert!(
         matches!(result, Err(Error::InvalidNetwork { .. })),
         "{result:?}"
@@ -810,7 +856,10 @@ fn reference_to_a_missing_entry_of_a_shared_list_is_a_parse_error() {
         } else {
             journey[field] = json!(index);
         }
-        let result = vbb().parse_departures(&respond(answer.to_string()));
+        let result = vbb().parse_departures(
+            &publictransport::DeparturesQuery::new("stop"),
+            &respond(answer.to_string()),
+        );
         assert!(matches!(result, Err(Error::Parse { .. })), "{result:?}");
     }
 }
@@ -820,7 +869,10 @@ fn reference_to_a_missing_entry_of_a_shared_list_is_a_parse_error() {
 #[test]
 fn remark_of_an_unknown_shape_costs_only_itself() {
     let complete = vbb()
-        .parse_departures(&respond(DEPARTURES))
+        .parse_departures(
+            &publictransport::DeparturesQuery::new("stop"),
+            &respond(DEPARTURES),
+        )
         .map(|found| found.len());
     let mut answer: Value = serde_json::from_slice(DEPARTURES).unwrap_or_default();
     let result = &mut answer["svcResL"][0]["res"];
@@ -830,7 +882,10 @@ fn remark_of_an_unknown_shape_costs_only_itself() {
     result["jnyL"][1]["msgL"] = json!([null, {"type": 3}, {"type": "REM", "remX": "1"}]);
 
     let odd = vbb()
-        .parse_departures(&respond(answer.to_string()))
+        .parse_departures(
+            &publictransport::DeparturesQuery::new("stop"),
+            &respond(answer.to_string()),
+        )
         .map(|found| found.len());
 
     assert!(complete.is_ok(), "{complete:?}");

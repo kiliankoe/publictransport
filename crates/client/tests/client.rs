@@ -83,13 +83,17 @@ async fn each_operation_sends_the_cores_request_and_returns_what_the_core_parses
         };
 
         let locations_query = LocationQuery::new("Dresden Hbf &=#/ä").with_limit(5);
-        let expected = network.parse_locations(&ok(locations.1)).unwrap();
+        let expected = network
+            .parse_locations(&locations_query, &ok(locations.1))
+            .unwrap();
         assert_ne!(expected, [], "the fixture has results");
         let found = client.locations(&network, &locations_query).await.unwrap();
         assert_eq!(found, expected);
 
         let departures_query = DeparturesQuery::new(stops[0]).with_time(TIME);
-        let expected = network.parse_departures(&ok(departures.1)).unwrap();
+        let expected = network
+            .parse_departures(&departures_query, &ok(departures.1))
+            .unwrap();
         assert_ne!(expected, [], "the fixture has results");
         let found = client
             .departures(&network, &departures_query)
@@ -99,12 +103,7 @@ async fn each_operation_sends_the_cores_request_and_returns_what_the_core_parses
 
         let [from, to] = stops.map(|stop| Place::Id(stop.to_owned()));
         let trips_query = TripsQuery::new(from, to).with_departure(TIME);
-        let expected = network
-            .parse_trips(
-                &publictransport::TripsQuery::new("from", "to"),
-                &ok(trips.1),
-            )
-            .unwrap();
+        let expected = network.parse_trips(&trips_query, &ok(trips.1)).unwrap();
         assert_ne!(expected.trips, [], "the fixture has results");
         let found = client.trips(&network, &trips_query).await.unwrap();
         assert_eq!(found, expected);

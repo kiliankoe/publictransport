@@ -184,7 +184,7 @@ An application with another HTTP stack skips the client. A pair of functions bui
 
 ```ts
 const request = locationsRequest(network, query); // a LocationQuery
-const locations = parseLocations(network, response);
+const locations = parseLocations(network, query, response);
 ```
 
 The parse functions for nearby stops and trips also take the query that was sent, as in `parseTrips(network, query, response)`. With it they leave out stops outside the radius and, on EFA, TRIAS and OJP, trips that the page before already had.

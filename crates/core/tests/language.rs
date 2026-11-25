@@ -78,7 +78,10 @@ fn requests(
     departure: &[u8],
 ) -> Vec<(&'static str, Result<HttpRequest, Error>)> {
     let stop = || Place::Id("de:14612:28".into());
-    let departures = network.parse_departures(&respond(departure));
+    let departures = network.parse_departures(
+        &publictransport::DeparturesQuery::new("stop"),
+        &respond(departure),
+    );
     let mut runs = departures
         .into_iter()
         .flatten()
@@ -285,7 +288,12 @@ fn otp_remark_takes_the_text_in_the_language_of_the_network_or_else_the_first_on
     for (language, texts, expected) in cases {
         let mut network = network(Protocol::OtpTransmodel);
         network.language = language.map(str::to_owned);
-        let departures = network.parse_departures(&disrupted(texts)).unwrap();
+        let departures = network
+            .parse_departures(
+                &publictransport::DeparturesQuery::new("stop"),
+                &disrupted(texts),
+            )
+            .unwrap();
         let remarks: Vec<_> = departures
             .iter()
             .flat_map(|departure| &departure.remarks)

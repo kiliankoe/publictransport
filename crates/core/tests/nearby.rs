@@ -372,7 +372,14 @@ fn stop_is_the_location_the_search_by_name_returns_for_it() {
                 .parse_nearby(&anywhere(), &respond(200, nearby))
                 .unwrap(),
         );
-        let named = pick(network.parse_locations(&respond(200, search)).unwrap());
+        let named = pick(
+            network
+                .parse_locations(
+                    &publictransport::LocationQuery::new("text"),
+                    &respond(200, search),
+                )
+                .unwrap(),
+        );
         assert!(near.is_some(), "{protocol:?}");
         assert_eq!(near, named, "{protocol:?}");
     }

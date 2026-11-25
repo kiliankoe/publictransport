@@ -26,7 +26,10 @@ import {
  */
 export const locationsRequest = throwing(locationsRequestOrThrown);
 
-/** Reads the answer to a {@link locationsRequest}. The best match comes first. */
+/**
+ * Reads the answer to the {@link locationsRequest} of a query. The best match
+ * comes first, and the list is cut to the limit of the query.
+ */
 export const parseLocations = throwing(parseLocationsOrThrown);
 
 /** Builds the request for the stops near a position. */
@@ -34,20 +37,29 @@ export const nearbyRequest = throwing(nearbyRequestOrThrown);
 
 /**
  * Reads the answer to the {@link nearbyRequest} of a query. The nearest stop
- * comes first. A stop outside the circle of the query is left out.
+ * comes first. A stop outside the circle of the query is left out, and the
+ * rest is cut to the limit of the query.
  */
 export const parseNearby = throwing(parseNearbyOrThrown);
 
 /** Builds the request for the next departures at a stop. */
 export const departuresRequest = throwing(departuresRequestOrThrown);
 
-/** Reads the answer to a {@link departuresRequest}. The departures are ordered by expected time. */
+/**
+ * Reads the answer to the {@link departuresRequest} of a query. The
+ * departures are ordered by expected time. Those expected before the time of
+ * the query are left out, and the rest is cut to its limit.
+ */
 export const parseDepartures = throwing(parseDeparturesOrThrown);
 
 /** Builds the request for the next arrivals at a stop, from the query that {@link departuresRequest} takes. */
 export const arrivalsRequest = throwing(arrivalsRequestOrThrown);
 
-/** Reads the answer to an {@link arrivalsRequest}. The arrivals are ordered by expected time. */
+/**
+ * Reads the answer to the {@link arrivalsRequest} of a query. The arrivals
+ * are ordered by expected time, and left out and cut as in
+ * {@link parseDepartures}.
+ */
 export const parseArrivals = throwing(parseArrivalsOrThrown);
 
 /**

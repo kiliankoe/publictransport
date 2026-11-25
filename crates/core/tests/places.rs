@@ -34,7 +34,7 @@ fn location() -> Location {
         body: body.to_vec(),
     };
     let Ok(mut locations) = Network::new("other", "Other", "https://example.org", Protocol::Motis)
-        .parse_locations(&response)
+        .parse_locations(&publictransport::LocationQuery::new("text"), &response)
     else {
         unreachable!("the body is a MOTIS response");
     };

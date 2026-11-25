@@ -10,6 +10,8 @@ private let dresden = Coordinate(latitude: 51.04, longitude: 13.73)
 private let secret = Header(name: "X-Api-Key", value: "hunter2")
 /// A query that keeps every trip of an answer.
 private let anyTrips = TripsQuery(origin: .id("a"), destination: .id("b"))
+private let anyStop = DeparturesQuery(stop: .id("a"))
+private let anyText = LocationQuery(text: "a")
 
 private func file(_ path: String, file: String = #filePath) throws -> Data {
     var root = URL(fileURLWithPath: file)
@@ -31,7 +33,7 @@ private func stop(_ ifopt: String, timezone: String? = nil) -> Location {
 
 @Test func derivedValuesOfDeparturesAndTripsAreProperties() throws {
     let vvo = TransitNetwork.bundled(.vvoEfa)
-    let departures = try vvo.parseDepartures(response: answer("efa/vvo-departures.json"))
+    let departures = try vvo.parseDepartures(query: anyStop, response: answer("efa/vvo-departures.json"))
     let trips = try vvo.parseTrips(query: anyTrips, response: answer("efa/vvo-trip.json")).trips
     try #require(!departures.isEmpty && !trips.isEmpty)
 
@@ -54,7 +56,7 @@ private func stop(_ ifopt: String, timezone: String? = nil) -> Location {
 
 @Test func remarksCrossTheBoundary() throws {
     let departures = try TransitNetwork.bundled(.vrrEfa).parseDepartures(
-        response: answer("efa/vrr-departures.json"))
+        query: anyStop, response: answer("efa/vrr-departures.json"))
 
     let remark = try #require(departures.flatMap(\.remarks).first { $0.id == "314433" })
     #expect(remark.kind == .disruption)
@@ -125,7 +127,7 @@ private func stop(_ ifopt: String, timezone: String? = nil) -> Location {
     let wait = [Header(name: "Retry-After", value: "120")]
     let thrown = #expect(throws: PublicTransportError.self) {
         try TransitNetwork.bundled(.vvoEfa)
-            .parseDepartures(response: HttpResponse(status: 429, headers: wait, body: Data()))
+            .parseDepartures(query: anyStop, response: HttpResponse(status: 429, headers: wait, body: Data()))
     }
     #expect(thrown == .rateLimited(retryAfterSeconds: 120))
     #expect(thrown?.localizedDescription == "the server received too many requests")
@@ -135,7 +137,7 @@ private func stop(_ ifopt: String, timezone: String? = nil) -> Location {
     #expect(String(describing: LocationKind.stop) == "stop")
 
     let locations = try TransitNetwork.bundled(.vvoEfa).parseLocations(
-        response: answer("efa/vvo-stopfinder.json"))
+        query: anyText, response: answer("efa/vvo-stopfinder.json"))
     let location = try #require(locations.first)
     #expect(String(describing: location).contains("globalIds"))
     #expect(!String(describing: location).contains("global_ids"))
@@ -195,8 +197,8 @@ private func storedText(_ values: [some Encodable]) throws -> [String] {
 
 @Test func storedAnswersAreReadBackEqual() throws {
     let vvo = TransitNetwork.bundled(.vvoEfa)
-    let locations = try vvo.parseLocations(response: answer("efa/vvo-stopfinder.json"))
-    let departures = try vvo.parseDepartures(response: answer("efa/vvo-departures.json"))
+    let locations = try vvo.parseLocations(query: anyText, response: answer("efa/vvo-stopfinder.json"))
+    let departures = try vvo.parseDepartures(query: anyStop, response: answer("efa/vvo-departures.json"))
     let trips = try vvo.parseTrips(query: anyTrips, response: answer("efa/vvo-trip.json"))
     try #require(!locations.isEmpty && !departures.isEmpty && !trips.trips.isEmpty)
 
