@@ -248,6 +248,36 @@ fn efa_keeps_the_order_separates_paragraphs_and_titles_a_message_by_its_link_tex
     assert_eq!(paragraphs, ["Eins & zwei", "drei"]);
 }
 
+/// Munich's server titles a message in `subtitle` alone, and several servers
+/// send a link that nobody can open: no host, a made-up host, a path.
+#[test]
+fn efa_titles_a_message_by_its_subtitle_and_drops_a_link_that_cannot_open() {
+    let info = |url: &str| {
+        format!(
+            r#"{{"infoLinks":[{{"title":null,"subtitle":"S2: Ersatzverkehr (bis 30.11.)","urlText":"S2","url":"{url}","content":null}}]}}"#
+        )
+    };
+    let urls = [
+        "http://",
+        "http://nohost",
+        "http://localhost:8080/ics",
+        "/27d3d5c8",
+        "https://www.vgn.de/27d3d5c8",
+    ];
+    let body = format!(
+        r#"{{"version":"11.0.6.72","stopEvents":[{{"location":{{"id":"de:09162:6","name":"Hbf","type":"stop"}},"departureTimePlanned":"2026-11-16T13:24:00Z","transportation":{{"number":"S2","product":{{"class":1,"name":"S-Bahn"}}}},"infos":[{}]}}]}}"#,
+        urls.map(info).join(",")
+    );
+    let departures = parse(Protocol::Efa, body.as_bytes());
+    let remarks = &departures[0].remarks;
+    assert_eq!(
+        remarks[0].title.as_deref(),
+        Some("S2: Ersatzverkehr (bis 30.11.)")
+    );
+    let kept: Vec<_> = remarks.iter().filter_map(|r| r.url.as_deref()).collect();
+    assert_eq!(kept, ["https://www.vgn.de/27d3d5c8"]);
+}
+
 /// Both fixtures have the RE 1 from Essen with the broken elevator there.
 /// EFA sends its validity on Berlin's clocks and a page, OJP sends it in UTC.
 #[test]

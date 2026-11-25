@@ -267,19 +267,21 @@ fn efa_tells_the_planned_platform_from_the_current_one() {
     assert_eq!(stop.locality.as_deref(), Some("Düsseldorf"));
 }
 
-/// VVO files every train under class 0. These two are from a live response.
+/// Some servers file every train under class 0. These are from live
+/// responses of VVO and of South Tyrol.
 #[test]
-fn efa_tells_long_distance_trains_in_the_generic_train_class_by_their_category() {
+fn efa_tells_trains_in_the_generic_train_class_apart_by_their_category() {
     let event = |number: &str, train_type: &str, line_display: &str| {
         format!(
             r#"{{"location":{{"id":"de:14612:28","isGlobalId":true,"name":"Dresden Hauptbahnhof","type":"stop"}},"departureTimePlanned":"2026-11-17T07:00:00Z","transportation":{{"number":"{number}","product":{{"class":0,"name":"Zug"}},"properties":{{"trainType":"{train_type}","lineDisplay":"{line_display}"}}}}}}"#
         )
     };
     let body = format!(
-        r#"{{"version":"11.0.6.72","stopEvents":[{},{},{}]}}"#,
+        r#"{{"version":"11.0.6.72","stopEvents":[{},{},{},{}]}}"#,
         event("2608", "IC", "TRAIN"),
         event("171", "RJ", "TRAIN"),
         event("RE50", "NRE", "LINE"),
+        event("22429", "R", "TRAIN"),
     );
     let departures = parse(Protocol::Efa, body.as_bytes()).unwrap();
     let lines: Vec<_> = departures
@@ -292,6 +294,7 @@ fn efa_tells_long_distance_trains_in_the_generic_train_class_by_their_category()
             ("IC 2608", Mode::LongDistanceTrain),
             ("RJ 171", Mode::HighSpeedTrain),
             ("RE50", Mode::RegionalTrain),
+            ("R 22429", Mode::RegionalTrain),
         ]
     );
 }

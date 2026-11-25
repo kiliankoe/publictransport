@@ -200,6 +200,30 @@ fn efa_splits_the_locality_from_the_name() {
     );
 }
 
+/// Bavaria's server sends a locality without a name for some stops, and
+/// neither MOTIS server of a single operator names a time zone.
+#[test]
+fn a_location_has_no_empty_locality_and_falls_back_to_the_time_zone_of_the_network() {
+    let efa = br#"{"version":"11.0.6.72","locations":[{"id":"de:09162:6","isGlobalId":true,"name":"M\u00fcnchen Hbf","type":"stop","parent":{"name":"","type":"locality"}}]}"#;
+    let motis = br#"[{"type":"STOP","name":"Mannheim Hauptbahnhof","id":"rnv_2417","lat":49.48,"lon":8.47,"areas":[],"tz":null}]"#;
+    for (protocol, body) in [(Protocol::Efa, &efa[..]), (Protocol::Motis, &motis[..])] {
+        let network = network(protocol, "https://example.org/base").with_timezone("Europe/Berlin");
+        let locations = network
+            .parse_locations(&HttpResponse {
+                status: 200,
+                headers: Vec::new(),
+                body: body.to_vec(),
+            })
+            .unwrap();
+        assert_eq!(locations[0].locality, None, "{protocol:?}");
+        assert_eq!(
+            locations[0].timezone.as_deref(),
+            Some("Europe/Berlin"),
+            "{protocol:?}"
+        );
+    }
+}
+
 /// The VRR response reports an ambiguous search as an error system message.
 #[test]
 fn efa_ambiguous_search_lists_every_match_best_first() {

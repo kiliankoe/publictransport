@@ -307,9 +307,13 @@ impl Network {
         language.filter(|language| !language.is_empty())
     }
 
-    /// Records this network as the origin of a parsed location.
+    /// Records this network as the origin of a parsed location, and gives
+    /// the location the time zone of the network if the server sent none.
     fn mark(&self, location: &mut Location) {
         location.network = Some(self.id.clone());
+        if location.timezone.is_none() {
+            location.timezone.clone_from(&self.timezone);
+        }
     }
 
     /// Whether this network returned the location.

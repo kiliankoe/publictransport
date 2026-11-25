@@ -484,18 +484,16 @@ fn remarks(network: &Network, infos: Vec<Info>, hints: Vec<Hint>) -> Vec<Remark>
             .and_then(|properties| properties.incident_date_time)
             .and_then(|period| validity(network, &period))
             .unzip();
-        let subtitle = plain(link.subtitle);
-        let title = match plain(link.title) {
-            Some(title) => match subtitle {
-                Some(subtitle) if subtitle != title => Some(format!("{title} {subtitle}")),
-                _ => Some(title),
-            },
-            None => plain(link.url_text),
+        let title = match (plain(link.title), plain(link.subtitle)) {
+            (Some(title), Some(subtitle)) if subtitle != title => {
+                Some(format!("{title} {subtitle}"))
+            }
+            (title, subtitle) => title.or(subtitle).or_else(|| plain(link.url_text)),
         };
         Remark {
             title,
             text: plain(link.content),
-            url: non_empty(link.url).filter(|url| !is_internal(url)),
+            url: link.url.filter(|url| opens(url)),
             id: non_empty(info.id),
             valid_from: from,
             valid_until: until,
@@ -527,15 +525,21 @@ fn validity(network: &Network, period: &str) -> Option<(Timestamp, Timestamp)> {
     Some((time(from)?, time(until)?))
 }
 
-/// Whether the URL names a host by an address of a private network, which
-/// some servers send from inside the operator's network and nobody outside
-/// can open.
-fn is_internal(url: &str) -> bool {
-    let host = url.split_once("://").map_or(url, |(_, rest)| rest);
-    let host = host.split(['/', ':', '?']).next().unwrap_or_default();
-    host.parse::<std::net::Ipv4Addr>().is_ok_and(|address| {
-        address.is_private() || address.is_loopback() || address.is_link_local()
-    })
+/// Whether somebody outside the operator's network can open the URL. Some
+/// servers send a path, no host, a made-up one such as `nohost`, or an
+/// address of a private network.
+fn opens(url: &str) -> bool {
+    let Some(rest) = ["https://", "http://"]
+        .iter()
+        .find_map(|scheme| url.strip_prefix(scheme))
+    else {
+        return false;
+    };
+    let host = rest.split(['/', ':', '?']).next().unwrap_or_default();
+    match host.parse::<std::net::Ipv4Addr>() {
+        Ok(address) => !(address.is_private() || address.is_loopback() || address.is_link_local()),
+        Err(_) => host.contains('.'),
+    }
 }
 
 /// A walk that belongs to a leg.
@@ -668,7 +672,7 @@ impl WireLocation {
         let wire = self;
         let locality = wire
             .ancestor("locality")
-            .and_then(|locality| locality.name.clone());
+            .and_then(|locality| non_empty(locality.name.clone()));
         let (kind, name) = match wire.kind.as_str() {
             // A platform's own name is only its number.
             "platform" => (
@@ -903,6 +907,8 @@ fn mode(class: Option<u32>, has_line: bool, train_type: Option<&str>) -> Mode {
         Some(0) if !has_line => match train_type {
             Some("ICE" | "RJ" | "RJX" | "TGV") => Mode::HighSpeedTrain,
             Some("EN" | "NJ") => Mode::NightTrain,
+            // South Tyrol's regional trains have a number and no line.
+            Some("R" | "RV" | "REG") => Mode::RegionalTrain,
             _ => Mode::LongDistanceTrain,
         },
         Some(0 | 13) => Mode::RegionalTrain,
