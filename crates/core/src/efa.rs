@@ -253,6 +253,7 @@ fn walk_between(previous: &Leg, next: &Leg, seconds: i64) -> Option<Leg> {
         cancelled: false,
     };
     Some(Leg {
+        same_vehicle: false,
         kind: LegKind::Walk,
         departure: end(&previous.arrival.stop, start),
         arrival: end(&next.departure.stop, arrival),
@@ -313,10 +314,21 @@ pub(crate) fn parse_trips(
         // of the ride before it on. Without a ride that has real-time data,
         // these are the planned times again and no prediction.
         let trip_is_live = journey.legs.iter().any(|leg| leg.is_realtime_controlled);
+        // Whether the server has said that the vehicle of the ride before
+        // goes on as the next ride.
+        let mut same_vehicle = false;
         for wire in journey.legs {
+            if wire.transportation.stays_seated() {
+                same_vehicle = true;
+                continue;
+            }
             let next_transfer = wire.transfer_after();
-            let leg = wire.into_leg(network, trip_is_live)?;
+            let mut leg = wire.into_leg(network, trip_is_live)?;
+            let is_ride = |leg: &Leg| matches!(leg.kind, LegKind::Transit { .. });
+            leg.same_vehicle = same_vehicle && is_ride(&leg) && legs.last().is_some_and(is_ride);
+            same_vehicle = false;
             if let (Some(seconds), Some(previous)) = (transfer, legs.last())
+                && !leg.same_vehicle
                 && let Some(walk) = walk_between(previous, &leg, seconds)
             {
                 legs.push(walk);
@@ -753,10 +765,16 @@ fn run_id(vehicle: &Transportation, place: &WireLocation, planned: Timestamp) ->
 }
 
 impl Transportation {
+    /// Whether this stands for no leg at all: the server puts a leg of the
+    /// class 97, "nicht umsteigen", between two rides in the same vehicle.
+    fn stays_seated(&self) -> bool {
+        self.product.as_ref().and_then(|product| product.class) == Some(97)
+    }
+
     /// How a leg with this transportation is traveled, if not by public
     /// transport. Classes 99 and 100 are footpaths. The other classes from
-    /// 97 on stand for bikes, cars and the like according to other clients;
-    /// no recorded response contains one.
+    /// 98 on are no rides according to other clients; no recorded response
+    /// contains one.
     fn street_kind(&self) -> Option<LegKind> {
         match self.product.as_ref().and_then(|product| product.class) {
             Some(99 | 100) => Some(LegKind::Walk),
@@ -884,6 +902,7 @@ impl WireLeg {
         }
         let between = self.stop_sequence.len().saturating_sub(2);
         Ok(Leg {
+            same_vehicle: false,
             kind,
             departure,
             arrival,

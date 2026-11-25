@@ -1473,12 +1473,14 @@ impl Trip {
     }
 
     /// How often the traveler changes vehicles: the number of rides minus
-    /// one, and zero for a trip without a ride. Walks are not rides.
+    /// one, and zero for a trip without a ride. Walks are not rides, and a
+    /// ride in the vehicle of the one before, see [`Leg::same_vehicle`],
+    /// is no change.
     #[must_use]
     pub fn transfers(&self) -> usize {
         self.legs
             .iter()
-            .filter(|leg| matches!(leg.kind, LegKind::Transit { .. }))
+            .filter(|leg| matches!(leg.kind, LegKind::Transit { .. }) && !leg.same_vehicle)
             .count()
             .saturating_sub(1)
     }
@@ -1581,6 +1583,11 @@ pub struct Leg {
     /// Whether the ride does not take place, or does not call at the stop
     /// where the leg starts or ends.
     pub cancelled: bool,
+    /// Whether the traveler stays in the vehicle of the ride before: the
+    /// vehicle goes on under another line or another number of the run.
+    /// [`Trip::transfers`] does not count such a ride. HAFAS and MOTIS
+    /// answer with one leg for both parts instead, under the first line.
+    pub same_vehicle: bool,
     /// What the server says about it: disruptions and hints. Empty if it
     /// says nothing.
     #[cfg_attr(

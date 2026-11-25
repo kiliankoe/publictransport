@@ -780,6 +780,7 @@ impl<'a> Reader<'a> {
         let calls = journey.map_or(&[][..], |journey| &journey.stop_l);
         let between = calls.get(1..calls.len().saturating_sub(1)).unwrap_or(&[]);
         Ok(Leg {
+            same_vehicle: false,
             kind,
             departure: self.leg_end(date, &section.dep, Board::Departures)?,
             arrival: self.leg_end(date, &section.arr, Board::Arrivals)?,

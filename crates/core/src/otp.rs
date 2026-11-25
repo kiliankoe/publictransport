@@ -42,7 +42,7 @@ const TRIPS: &str = "query($from:Location!,$to:Location!,$time:DateTime,$arriveB
     $limit:Int,$page:String){trip(from:$from,to:$to,dateTime:$time,arriveBy:$arriveBy,\
     numTripPatterns:$limit,pageCursor:$page){previousPageCursor nextPageCursor routingErrors{code} \
     tripPatterns{legs{mode aimedStartTime expectedStartTime aimedEndTime expectedEndTime \
-    realtime fromPlace{...place} toPlace{...place} line{...line} \
+    realtime interchangeFrom{staySeated} fromPlace{...place} toPlace{...place} line{...line} \
     situations{...situation} fromEstimatedCall{...call notices{text}} \
     toEstimatedCall{...call} \
     intermediateEstimatedCalls{...call}}}}} \
@@ -815,6 +815,7 @@ struct WireLeg {
     expected_end_time: Option<WireTime>,
     #[serde(default)]
     realtime: bool,
+    interchange_from: Option<Interchange>,
     from_place: WirePlace,
     to_place: WirePlace,
     line: Option<WireLine>,
@@ -824,6 +825,13 @@ struct WireLeg {
     to_estimated_call: Option<Call>,
     #[serde(default)]
     intermediate_estimated_calls: Vec<Call>,
+}
+
+/// How the traveler gets from the ride before to this one.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Interchange {
+    stay_seated: Option<bool>,
 }
 
 impl WireLeg {
@@ -856,6 +864,7 @@ impl WireLeg {
                 }
             };
         Ok(Leg {
+            same_vehicle: self.interchange_from.and_then(|from| from.stay_seated) == Some(true),
             cancelled: cancelled(&self.from_estimated_call),
             departure: end(
                 self.from_place,

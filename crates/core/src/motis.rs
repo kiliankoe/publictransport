@@ -496,6 +496,7 @@ impl WireLeg {
             .or(wire.scheduled_end_time.map(|time| time.0));
         let arrival = to.into_leg_end().ok_or_else(no_time)?;
         Ok(Leg {
+            same_vehicle: false,
             cancelled: wire.vehicle.cancelled || departure.cancelled || arrival.cancelled,
             departure,
             arrival,

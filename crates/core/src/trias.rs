@@ -418,12 +418,24 @@ pub(crate) fn parse_trips(
     )?;
     let mut trips = Vec::new();
     for result in results {
-        let legs = result
-            .trip
-            .legs
-            .into_iter()
-            .filter_map(|leg| leg.into_leg(network, &context).transpose())
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut legs = Vec::new();
+        // Whether the server has said that the vehicle of the ride before
+        // goes on as the next ride.
+        let mut same_vehicle = false;
+        for leg in result.trip.legs {
+            if leg.stays_seated() {
+                same_vehicle = true;
+                continue;
+            }
+            let leg = leg.into_leg(network, &context)?;
+            if let Some(mut leg) = leg {
+                let is_ride = |leg: &Leg| matches!(leg.kind, LegKind::Transit { .. });
+                leg.same_vehicle =
+                    same_vehicle && is_ride(&leg) && legs.last().is_some_and(is_ride);
+                legs.push(leg);
+            }
+            same_vehicle = false;
+        }
         trips.extend(Trip::new(legs));
     }
     Trips::paged_by_time(trips, query)
@@ -1332,6 +1344,13 @@ struct IndividualService {
 }
 
 impl TripLeg {
+    /// Whether this stands for no leg at all: between two rides in the same
+    /// vehicle the server puts an interchange with this mode.
+    fn stays_seated(&self) -> bool {
+        let interchange = self.interchange.as_ref();
+        interchange.and_then(|leg| leg.interchange_mode.as_deref()) == Some("remainInVehicle")
+    }
+
     /// `None` for a leg of a kind this crate does not know.
     fn into_leg(self, network: &Network, context: &Context) -> Result<Option<Leg>, Error> {
         let no_time = || Error::Parse {
@@ -1342,6 +1361,7 @@ impl TripLeg {
             let journey_id = ride.service.journey_id();
             let (line, direction, cancelled) = ride.service.into_line(ride.extension);
             return Ok(Some(Leg {
+                same_vehicle: false,
                 kind: LegKind::Transit { line, direction },
                 departure: ride
                     .leg_board
@@ -1384,6 +1404,7 @@ impl TripLeg {
             cancelled: false,
         };
         Ok(Some(Leg {
+            same_vehicle: false,
             kind: if mode.as_deref() == Some("walk") {
                 LegKind::Walk
             } else {

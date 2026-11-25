@@ -2474,6 +2474,13 @@ public struct Leg: Equatable, Hashable, Codable {
      */
     public var cancelled: Bool
     /**
+     * Whether the traveler stays in the vehicle of the ride before: the
+     * vehicle goes on under another line or another number of the run.
+     * ``Trip/transfers`` does not count such a ride. HAFAS and MOTIS
+     * answer with one leg for both parts instead, under the first line.
+     */
+    public var sameVehicle: Bool
+    /**
      * What the server says about it: disruptions and hints. Empty if it
      * says nothing.
      */
@@ -2507,6 +2514,12 @@ public struct Leg: Equatable, Hashable, Codable {
          * where the leg starts or ends.
          */cancelled: Bool, 
         /**
+         * Whether the traveler stays in the vehicle of the ride before: the
+         * vehicle goes on under another line or another number of the run.
+         * ``Trip/transfers`` does not count such a ride. HAFAS and MOTIS
+         * answer with one leg for both parts instead, under the first line.
+         */sameVehicle: Bool, 
+        /**
          * What the server says about it: disruptions and hints. Empty if it
          * says nothing.
          */remarks: [Remark], 
@@ -2522,6 +2535,7 @@ public struct Leg: Equatable, Hashable, Codable {
         self.arrival = arrival
         self.intermediateStops = intermediateStops
         self.cancelled = cancelled
+        self.sameVehicle = sameVehicle
         self.remarks = remarks
         self.journeyId = journeyId
     }
@@ -2546,6 +2560,7 @@ struct FfiConverterTypeLeg: FfiConverterRustBuffer {
                 arrival: FfiConverterTypeLegEnd.read(from: &buf), 
                 intermediateStops: FfiConverterSequenceTypeStopover.read(from: &buf), 
                 cancelled: FfiConverterBool.read(from: &buf), 
+                sameVehicle: FfiConverterBool.read(from: &buf), 
                 remarks: FfiConverterSequenceTypeRemark.read(from: &buf), 
                 journeyId: FfiConverterOptionString.read(from: &buf)
         )
@@ -2557,6 +2572,7 @@ struct FfiConverterTypeLeg: FfiConverterRustBuffer {
         FfiConverterTypeLegEnd.write(value.arrival, into: &buf)
         FfiConverterSequenceTypeStopover.write(value.intermediateStops, into: &buf)
         FfiConverterBool.write(value.cancelled, into: &buf)
+        FfiConverterBool.write(value.sameVehicle, into: &buf)
         FfiConverterSequenceTypeRemark.write(value.remarks, into: &buf)
         FfiConverterOptionString.write(value.journeyId, into: &buf)
     }
