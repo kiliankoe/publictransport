@@ -32,7 +32,7 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@v23
       - run: |
           printf '%s (#%s)\n\n%s\n' "$TITLE" "${{ github.event.pull_request.number }}" "$DESCRIPTION" > "$RUNNER_TEMP/message"
-          nix develop -c committed --commit-file "$RUNNER_TEMP/message"
+          nix shell --inputs-from . nixpkgs#committed -c committed --commit-file "$RUNNER_TEMP/message"
 
   api:
     runs-on: ubuntu-latest

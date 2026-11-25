@@ -90,7 +90,11 @@ jobs:
           # The network data of transport-apis.
           submodules: true
       - uses: DeterminateSystems/nix-installer-action@v23
+      # A pull request reads the cache of main and writes none of its own,
+      # which would push the caches of main out of the repository's quota.
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: nix fmt -- --check flake.nix
       - run: nix develop -c cargo fmt --all --check
       - run: nix develop -c cargo clippy --workspace --all-targets --all-features -- -D warnings
@@ -126,7 +130,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: DeterminateSystems/nix-installer-action@v23
       # Every commit after the first, in the format CONTRIBUTING.md describes.
-      - run: nix develop -c committed "$(git rev-list --max-parents=0 HEAD)..HEAD"
+      - run: nix shell --inputs-from . nixpkgs#committed -c committed "$(git rev-list --max-parents=0 HEAD)..HEAD"
 
   python:
     needs: changes
@@ -142,6 +146,8 @@ jobs:
           submodules: true
       - uses: DeterminateSystems/nix-installer-action@v23
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       # Builds the Rust library and installs the package into .venv.
       - run: nix develop -c uv sync --locked
       - run: nix develop -c ruff check .
@@ -174,6 +180,8 @@ jobs:
           submodules: true
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       # The static library alone: the Swift package links it.
       - run: cargo rustc -p publictransport-uniffi --lib --release --crate-type staticlib
       # The hand-written code; the generated file has its own style.
@@ -192,6 +200,13 @@ jobs:
           submodules: true
       - uses: DeterminateSystems/nix-installer-action@v23
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      # Keeps what Gradle downloads between runs, with the open-source cache
+      # of the action.
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
       # The hand-written code; the generated file is under build.
       - run: nix develop -c ktlint 'packages/kotlin/**/*.kt' 'packages/kotlin/**/*.kts' 'examples/kotlin/**/*.kt' 'examples/kotlin/**/*.kts' '!**/build/**'
       # Builds the Rust library, generates the model from it, runs the
@@ -216,6 +231,11 @@ jobs:
           submodules: true
       - uses: DeterminateSystems/nix-installer-action@v23
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
       # Builds the Rust library for the Android ABIs, lints the library and
       # builds the app that tests it.
       - run: nix develop .#android -c just android
@@ -243,6 +263,8 @@ jobs:
           submodules: true
       - uses: DeterminateSystems/nix-installer-action@v23
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: nix develop -c pnpm --dir packages/typescript install --frozen-lockfile
       # The examples use the package of the checkout through a link.
       - run: nix develop -c pnpm --dir examples/typescript install --frozen-lockfile
@@ -273,6 +295,8 @@ jobs:
           submodules: true
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: scripts/build-swift.sh xcframework macos
       - run: swift test
         env:
