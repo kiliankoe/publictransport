@@ -22,9 +22,11 @@ func printTrip(_ trip: Trip) {
         "  \(localTime(trip.departure)) to \(localTime(trip.arrival)),"
             + " \(trip.durationSeconds / 60) min, \(trip.transfers) change(s)")
     for leg in trip.legs {
+        // The vehicle of the ride before goes on under this line.
+        let seated = leg.sameVehicle ? ", stay seated" : ""
         let how =
             switch leg.kind {
-            case .transit(let line, let direction): "\(line.name) to \(direction ?? "?")"
+            case .transit(let line, let direction): "\(line.name) to \(direction ?? "?")\(seated)"
             case .walk: "walk"
             default: "other"
             }

@@ -36,7 +36,9 @@ def print_trip(trip: Trip) -> None:
     print(f"  {times}, {int(duration / 60)} min, {trip.transfers()} change(s)")
     for leg in trip.legs:
         if isinstance(leg.kind, LegKind.TRANSIT):
-            how = f"{leg.kind.line.name} to {leg.kind.direction or '?'}"
+            # The vehicle of the ride before goes on under this line.
+            seated = ", stay seated" if leg.same_vehicle else ""
+            how = f"{leg.kind.line.name} to {leg.kind.direction or '?'}{seated}"
         elif isinstance(leg.kind, LegKind.WALK):
             how = "walk"
         else:

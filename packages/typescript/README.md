@@ -67,8 +67,12 @@ for (const trip of found.trips) {
 }
 
 // The same arguments again, with the reference to the trips after these.
-const more = await client.trips(network, from, to, { limit: 5, page: found.later });
+if (found.later) {
+  const more = await client.trips(network, from, to, { limit: 5, page: found.later });
+}
 ```
+
+Some vehicles go on under another line while the travelers stay seated. The leg of the second line has `sameVehicle` set, and such a ride is not counted as a change.
 
 An end of a trip is a `Location`, the ID of a stop as a string or a coordinate. `departAt` and `arriveBy` ask for another time than now.
 

@@ -68,8 +68,10 @@ for (trip in found.trips) {
 }
 
 // The same arguments again, with the reference to the trips after these.
-val more = client.trips(network, from, to, limit = 5, page = found.later)
+val more = found.later?.let { client.trips(network, from, to, limit = 5, page = it) }
 ```
+
+Some vehicles go on under another line while the travelers stay seated. The leg of the second line has `sameVehicle` set, and such a ride is not counted as a change.
 
 `trips` takes two locations, or two `Place` values for other ends: `asPlace()` makes one from a location or a `Coordinate`, and `Place.Id` names a stop by its ID. `departAt` and `arriveBy` ask for another time than now.
 

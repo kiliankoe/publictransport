@@ -59,7 +59,14 @@ fn print_trip(trip: &Trip) {
     for leg in &trip.legs {
         let how = match &leg.kind {
             LegKind::Transit { line, direction } => {
-                format!("{} to {}", line.name, direction.as_deref().unwrap_or("?"))
+                let to = direction.as_deref().unwrap_or("?");
+                // The vehicle of the ride before goes on under this line.
+                let seated = if leg.same_vehicle {
+                    ", stay seated"
+                } else {
+                    ""
+                };
+                format!("{} to {to}{seated}", line.name)
             }
             LegKind::Walk => "walk".to_owned(),
             _ => "other".to_owned(),

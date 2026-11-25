@@ -73,6 +73,8 @@ if let Some(later) = found.later {
 }
 ```
 
+Some vehicles go on under another line while the travelers stay seated. The leg of the second line has `same_vehicle` set, and such a ride is not counted as a change.
+
 An end of a trip is a `Location`, the ID of a stop as text or a `Coordinate`. `with_departure` and `with_arrival` ask for another time than now.
 
 ```rust,ignore

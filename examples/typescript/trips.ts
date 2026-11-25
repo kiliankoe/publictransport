@@ -29,9 +29,11 @@ function printTrip(trip: Trip) {
   const minutes = Math.trunc(durationSeconds(trip) / 60);
   console.log(`  ${clock(start)} to ${clock(end)}, ${minutes} min, ${transfers(trip)} change(s)`);
   for (const leg of trip.legs) {
+    // The vehicle of the ride before goes on under this line.
+    const seated = leg.sameVehicle ? ", stay seated" : "";
     const how =
       leg.kind.type === "transit"
-        ? `${leg.kind.line.name} to ${leg.kind.direction ?? "?"}`
+        ? `${leg.kind.line.name} to ${leg.kind.direction ?? "?"}${seated}`
         : leg.kind.type;
     console.log(
       `    ${clock(leg.departure)} ${leg.departure.stop.name}` +

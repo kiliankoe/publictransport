@@ -23,9 +23,11 @@ private fun printTrip(trip: Trip) {
             " ${trip.durationSeconds / 60} min, ${trip.transfers} change(s)",
     )
     for (leg in trip.legs) {
+        // The vehicle of the ride before goes on under this line.
+        val seated = if (leg.sameVehicle) ", stay seated" else ""
         val how =
             when (val kind = leg.kind) {
-                is LegKind.Transit -> "${kind.line.name} to ${kind.direction ?: "?"}"
+                is LegKind.Transit -> "${kind.line.name} to ${kind.direction ?: "?"}$seated"
                 is LegKind.Walk -> "walk"
                 else -> "other"
             }

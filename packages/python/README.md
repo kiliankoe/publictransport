@@ -57,8 +57,11 @@ for trip in found.trips:
     print(trip.duration_seconds(), "seconds,", trip.transfers(), "changes")
 
 # The same arguments again, with the reference to the trips after these.
-more = client.trips(network, stops[0], stops[1], limit=5, page=found.later)
+if found.later:
+    more = client.trips(network, stops[0], stops[1], limit=5, page=found.later)
 ```
+
+Some vehicles go on under another line while the travelers stay seated. The leg of the second line has `same_vehicle` set, and such a ride is not counted as a change.
 
 An end of a trip is a `Location`, the ID of a stop as text or a `Coordinate`. `depart_at=` and `arrive_by=` ask for another time than now, as a timezone-aware `datetime`.
 
