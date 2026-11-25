@@ -510,7 +510,12 @@ fn departures_resolve_stop_line_and_operator_from_the_shared_lists() {
 
 #[test]
 fn trips_have_rides_with_their_stops_and_references_for_more() {
-    let found = vbb().parse_trips(&respond(TRIP)).unwrap();
+    let found = vbb()
+        .parse_trips(
+            &publictransport::TripsQuery::new("from", "to"),
+            &respond(TRIP),
+        )
+        .unwrap();
     assert!(
         found
             .earlier
@@ -630,7 +635,12 @@ fn remarks_are_realtime_messages_and_attributes_but_not_the_operator_or_the_occu
 
     // The same train as a leg: an attribute for each end, a hint of the type
     // `H` and the message.
-    let found = vbb().parse_trips(&respond(TRIP)).unwrap();
+    let found = vbb()
+        .parse_trips(
+            &publictransport::TripsQuery::new("from", "to"),
+            &respond(TRIP),
+        )
+        .unwrap();
     assert_eq!(
         about_the_ride(&found.trips[0].legs[0].remarks),
         [
@@ -675,7 +685,12 @@ fn sections_that_are_no_rides_become_walks_and_other_legs() {
         }]
     }}]});
 
-    let found = vbb().parse_trips(&respond(answer.to_string())).unwrap();
+    let found = vbb()
+        .parse_trips(
+            &publictransport::TripsQuery::new("from", "to"),
+            &respond(answer.to_string()),
+        )
+        .unwrap();
     assert_eq!((found.earlier, found.later), (None, None));
     let [trip] = found.trips.as_slice() else {
         unreachable!("one trip: {:?}", found.trips)
@@ -715,12 +730,20 @@ fn errors_inside_a_successful_response_are_told_apart() {
     let result = network.parse_departures(&respond(UNKNOWN_STOP));
     assert!(matches!(result, Err(Error::NotFound { .. })), "{result:?}");
     // A place of a trip search that the server cannot route from.
-    let result = network.parse_trips(&respond(service("H9220")));
+    let result = network.parse_trips(
+        &publictransport::TripsQuery::new("from", "to"),
+        &respond(service("H9220")),
+    );
     assert!(matches!(result, Err(Error::NotFound { .. })), "{result:?}");
     let result = network.parse_departures(&respond("<html></html>"));
     assert!(matches!(result, Err(Error::Parse { .. })), "{result:?}");
 
-    let found = network.parse_trips(&respond(service("H890"))).unwrap();
+    let found = network
+        .parse_trips(
+            &publictransport::TripsQuery::new("from", "to"),
+            &respond(service("H890")),
+        )
+        .unwrap();
     assert_eq!(found.trips, []);
     assert_eq!((found.earlier, found.later), (None, None));
     assert_eq!(

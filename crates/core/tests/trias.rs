@@ -83,7 +83,7 @@ fn count(protocol: Protocol, kind: &str, body: &[u8]) -> Result<usize, Error> {
         "LocationInformation" => network.parse_locations(&response).map(|list| list.len()),
         "StopEvent" => network.parse_departures(&response).map(|list| list.len()),
         _ => network
-            .parse_trips(&response)
+            .parse_trips(&publictransport::TripsQuery::new("from", "to"), &response)
             .map(|found| found.trips.len()),
     }
 }
@@ -839,7 +839,12 @@ fn stops_take_their_position_from_the_places_the_answer_lists() {
         stops.map(|stop| stop.coordinate.is_some()).collect()
     };
     let of_trips = |protocol, body| {
-        let found = network(protocol).parse_trips(&response(body)).unwrap();
+        let found = network(protocol)
+            .parse_trips(
+                &publictransport::TripsQuery::new("from", "to"),
+                &response(body),
+            )
+            .unwrap();
         let legs = found.trips.into_iter().flat_map(|trip| trip.legs);
         let stops = legs.flat_map(|leg| {
             let between = leg.intermediate_stops.into_iter().map(|call| call.stop);
@@ -1077,7 +1082,10 @@ fn error_without_results_is_an_empty_list_not_found_or_a_server_error() {
 #[test]
 fn trias_reads_rides_with_their_calls_and_the_walk_between_stops() {
     let trips = network(Protocol::Trias)
-        .parse_trips(&response(TRIAS_TRIP))
+        .parse_trips(
+            &publictransport::TripsQuery::new("from", "to"),
+            &response(TRIAS_TRIP),
+        )
         .unwrap()
         .trips;
     let legs: Vec<Vec<_>> = trips
@@ -1146,7 +1154,10 @@ fn trias_reads_rides_with_their_calls_and_the_walk_between_stops() {
 #[test]
 fn ojp_reads_rides_with_their_calls_operator_and_missing_platforms() {
     let trips = network(Protocol::Ojp1)
-        .parse_trips(&response(OJP_TRIP))
+        .parse_trips(
+            &publictransport::TripsQuery::new("from", "to"),
+            &response(OJP_TRIP),
+        )
         .unwrap()
         .trips;
     let legs: Vec<Vec<_>> = trips
@@ -1222,7 +1233,10 @@ fn leg_without_a_vehicle_is_a_walk_only_if_its_mode_says_so() {
             for (value, kind) in [("walk", LegKind::Walk), (other, LegKind::Other)] {
                 let body = trips_with_leg(protocol, leg, mode, value);
                 let trips = network(protocol)
-                    .parse_trips(&response(body.as_bytes()))
+                    .parse_trips(
+                        &publictransport::TripsQuery::new("from", "to"),
+                        &response(body.as_bytes()),
+                    )
                     .unwrap()
                     .trips;
                 let added = trips.last().unwrap().legs.last().unwrap();

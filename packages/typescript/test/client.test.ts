@@ -67,7 +67,11 @@ function trias(url: string): Network {
 }
 
 /** The reference to the trips after those of the trips fixture. */
-const later = parseTrips(efa("http://localhost"), ok(fixture("efa/vvo-trip.json"))).later;
+const later = parseTrips(
+  efa("http://localhost"),
+  { origin: "de:14612:28", destination: "de:14612:13" },
+  ok(fixture("efa/vvo-trip.json")),
+).later;
 assert.ok(later);
 
 /** The run of a departure in the answer that was recorded with the run. */
@@ -106,7 +110,8 @@ function locations(
 
 function nearby(name: string, query: NearbyQuery, call: Case["call"]): Case {
   const request = (network: Network) => nearbyRequest(network, query);
-  return { name, fixture: "efa/vvo-nearby.json", request, parse: parseNearby, call };
+  const parse = (network: Network, response: HttpResponse) => parseNearby(network, query, response);
+  return { name, fixture: "efa/vvo-nearby.json", request, parse, call };
 }
 
 function departures(name: string, query: DeparturesQuery, call: Case["call"]): Case {
@@ -121,7 +126,8 @@ function arrivals(name: string, query: DeparturesQuery, call: Case["call"]): Cas
 
 function trips(name: string, query: TripsQuery, call: Case["call"]): Case {
   const request = (network: Network) => tripsRequest(network, query);
-  return { name, fixture: "efa/vvo-trip.json", request, parse: parseTrips, call };
+  const parse = (network: Network, response: HttpResponse) => parseTrips(network, query, response);
+  return { name, fixture: "efa/vvo-trip.json", request, parse, call };
 }
 
 const calls: Case[] = [

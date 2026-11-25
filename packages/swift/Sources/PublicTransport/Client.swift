@@ -208,8 +208,9 @@ public struct Client: Sendable {
     /// - Parameters:
     ///   - position: Where to look.
     ///   - radiusMeters: How far from the position to look. 1000 m if left
-    ///     out. MOTIS has no radius and returns the nearest stops however
-    ///     far they are.
+    ///     out. Stops farther away are not returned. MOTIS takes no radius
+    ///     and returns only the nearest stops, so stops in the circle can
+    ///     be missing there.
     ///   - limit: The largest number wanted. Servers treat it as a guide.
     /// - Throws: ``PublicTransportError``, such as `invalidQuery` for a
     ///   position off the globe, and `URLError` if the request got no
@@ -233,7 +234,7 @@ public struct Client: Sendable {
     /// Finds the stops near a position with a query of the core library.
     public func nearby(in network: Network, query: NearbyQuery) async throws -> [Location] {
         let response = try await send(network.nearbyRequest(query: query))
-        return try network.parseNearby(response: response)
+        return try network.parseNearby(query: query, response: response)
     }
 
     /// Lists the next departures at a stop, ordered by expected time.
@@ -362,7 +363,7 @@ public struct Client: Sendable {
     /// Plans trips with a query of the core library.
     public func trips(in network: Network, query: TripsQuery) async throws -> Trips {
         let response = try await send(network.tripsRequest(query: query))
-        return try network.parseTrips(response: response)
+        return try network.parseTrips(query: query, response: response)
     }
 
     /// A number of results as the core library takes it.

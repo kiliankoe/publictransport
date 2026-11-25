@@ -158,9 +158,9 @@ impl Client {
         network: &Network,
         query: impl Into<NearbyQuery>,
     ) -> Result<Vec<Location>, Error> {
-        let request = network.nearby_request(&query.into())?;
-        let response = self.send(request).await?;
-        Ok(network.parse_nearby(&response)?)
+        let query = query.into();
+        let response = self.send(network.nearby_request(&query)?).await?;
+        Ok(network.parse_nearby(&query, &response)?)
     }
 
     /// Lists the next departures at a stop. The query is the stop, as a
@@ -244,9 +244,9 @@ impl Client {
         network: &Network,
         query: impl Into<TripsQuery>,
     ) -> Result<Trips, Error> {
-        let request = network.trips_request(&query.into())?;
-        let response = self.send(request).await?;
-        Ok(network.parse_trips(&response)?)
+        let query = query.into();
+        let response = self.send(network.trips_request(&query)?).await?;
+        Ok(network.parse_trips(&query, &response)?)
     }
 
     async fn send(&self, request: HttpRequest) -> Result<HttpResponse, Error> {

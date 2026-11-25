@@ -138,8 +138,9 @@ export class Client {
    *   {@link InvalidQueryError}.
    * @param options The other fields of a {@link NearbyQuery}: how far to
    *   look as `radiusMeters`, 1000 m if left out, and the largest number
-   *   wanted as `limit`, which servers treat as a guide. MOTIS has no
-   *   radius and returns the nearest stops however far they are.
+   *   wanted as `limit`, which servers treat as a guide. Stops farther
+   *   away are not returned. MOTIS takes no radius and returns only the
+   *   nearest stops, so stops in the circle can be missing there.
    */
   nearby(
     network: Network,
@@ -151,11 +152,9 @@ export class Client {
     query: Coordinate | NearbyQuery,
     { signal, ...rest }: Omit<NearbyQuery, "position"> & RequestOptions = {},
   ): Promise<Location[]> {
-    const request = nearbyRequest(
-      network,
-      "position" in query ? query : { ...rest, position: query },
-    );
-    return parseNearby(network, await this.#send(request, signal));
+    const nearby = "position" in query ? query : { ...rest, position: query };
+    const request = nearbyRequest(network, nearby);
+    return parseNearby(network, nearby, await this.#send(request, signal));
   }
 
   /** Lists departures with a query. */
@@ -274,7 +273,7 @@ export class Client {
       query = { ...rest, origin, destination: destination as Place, time };
       signal = given;
     }
-    return parseTrips(network, await this.#send(tripsRequest(network, query), signal));
+    return parseTrips(network, query, await this.#send(tripsRequest(network, query), signal));
   }
 
   async #send(request: HttpRequest, signal?: AbortSignal): Promise<HttpResponse> {

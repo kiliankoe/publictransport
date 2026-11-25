@@ -309,7 +309,12 @@ fn ride_legs_name_a_run_that_can_be_asked_for_and_walks_name_none() {
     let mut walks = 0;
     for (protocol, body) in trips {
         let network = network(protocol);
-        let found = network.parse_trips(&respond(200, body)).unwrap();
+        let found = network
+            .parse_trips(
+                &publictransport::TripsQuery::new("from", "to"),
+                &respond(200, body),
+            )
+            .unwrap();
         let mut rides = 0;
         for leg in found.trips.iter().flat_map(|trip| &trip.legs) {
             match leg.kind {

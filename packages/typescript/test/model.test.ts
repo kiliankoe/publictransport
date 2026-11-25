@@ -38,6 +38,8 @@ import {
 import { fixture, foreignStop, ok, time } from "./support.ts";
 
 const vvo = bundledNetwork("vvo-efa");
+/** A query that keeps every trip of an answer. */
+const anyTrips = { origin: "a", destination: "b" };
 
 test("place is an ID, a coordinate or a location", () => {
   const position = { latitude: 51.04, longitude: 13.73 };
@@ -102,7 +104,9 @@ test("times are dates and missing values are missing keys", () => {
   assert.equal(first.scheduledTime.toISOString(), "2026-11-16T13:24:00.000Z");
   assert.equal(first.line.mode, "bus");
   // A walk ends at no platform.
-  const legs = parseTrips(vvo, ok(fixture("efa/vvo-trip.json"))).trips.flatMap((trip) => trip.legs);
+  const legs = parseTrips(vvo, anyTrips, ok(fixture("efa/vvo-trip.json"))).trips.flatMap(
+    (trip) => trip.legs,
+  );
   const walk = legs.find((leg) => leg.kind.type === "walk")?.arrival;
   assert.ok(walk && !("scheduledPlatform" in walk));
   // A time before 1970 with a fraction is rounded down, as in the other languages.
@@ -130,7 +134,7 @@ test("message of an error is the sentence of the core", () => {
 
 test("derived values come from the core", () => {
   const [first] = parseDepartures(vvo, ok(fixture("efa/vvo-departures.json")));
-  const [trip] = parseTrips(vvo, ok(fixture("efa/vvo-trip.json"))).trips;
+  const [trip] = parseTrips(vvo, anyTrips, ok(fixture("efa/vvo-trip.json"))).trips;
   const start = trip?.legs[0]?.departure;
   assert.ok(first && trip && start);
 

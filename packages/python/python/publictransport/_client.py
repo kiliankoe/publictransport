@@ -234,16 +234,17 @@ class Client:
         """Find the stops near a position. The nearest comes first.
 
         `radius_meters` is how far from the position to look, 1000 m if
-        left out. MOTIS has no radius and returns the nearest stops however
-        far they are. `limit` is the largest number wanted, which servers
+        left out. Stops farther away are not returned. MOTIS takes no radius
+        and returns only the nearest stops, so stops in the circle can be
+        missing there. `limit` is the largest number wanted, which servers
         treat as a guide. A `NearbyQuery` carries the same and takes the
         place of all three.
 
         `Coordinate.distance_meters` gives how far a stop is. A position
         off the globe raises `Error.InvalidQuery`.
         """
-        request = network.nearby_request(_nearby_query(position, radius_meters, limit))
-        return network.parse_nearby(self._send(request))
+        query = _nearby_query(position, radius_meters, limit)
+        return network.parse_nearby(query, self._send(network.nearby_request(query)))
 
     def departures(
         self,
@@ -328,7 +329,7 @@ class Client:
             limit=limit,
             page=page,
         )
-        return network.parse_trips(self._send(network.trips_request(query)))
+        return network.parse_trips(query, self._send(network.trips_request(query)))
 
     def close(self) -> None:
         """Close the connections, unless the caller passed `http_client`."""
@@ -412,16 +413,18 @@ class AsyncClient:
         """Find the stops near a position. The nearest comes first.
 
         `radius_meters` is how far from the position to look, 1000 m if
-        left out. MOTIS has no radius and returns the nearest stops however
-        far they are. `limit` is the largest number wanted, which servers
+        left out. Stops farther away are not returned. MOTIS takes no radius
+        and returns only the nearest stops, so stops in the circle can be
+        missing there. `limit` is the largest number wanted, which servers
         treat as a guide. A `NearbyQuery` carries the same and takes the
         place of all three.
 
         `Coordinate.distance_meters` gives how far a stop is. A position
         off the globe raises `Error.InvalidQuery`.
         """
-        request = network.nearby_request(_nearby_query(position, radius_meters, limit))
-        return network.parse_nearby(await self._send(request))
+        query = _nearby_query(position, radius_meters, limit)
+        request = network.nearby_request(query)
+        return network.parse_nearby(query, await self._send(request))
 
     async def departures(
         self,
@@ -506,7 +509,8 @@ class AsyncClient:
             limit=limit,
             page=page,
         )
-        return network.parse_trips(await self._send(network.trips_request(query)))
+        request = network.trips_request(query)
+        return network.parse_trips(query, await self._send(request))
 
     async def aclose(self) -> None:
         """Close the connections, unless the caller passed `http_client`."""

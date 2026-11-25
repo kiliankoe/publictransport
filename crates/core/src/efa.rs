@@ -145,7 +145,7 @@ pub(crate) fn departures_request(
 }
 
 pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<HttpRequest, Error> {
-    let limit = query.limit.map(|limit| limit.to_string());
+    let limit = query.paged_limit()?.map(|limit| limit.to_string());
     let (from_type, from) = place(query.origin.target(network)?);
     let (to_type, to) = place(query.destination.target(network)?);
     let time = query
@@ -284,7 +284,11 @@ fn local_time(network: &Network, time: Timestamp) -> Result<(String, String), Er
     ))
 }
 
-pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<Trips, Error> {
+pub(crate) fn parse_trips(
+    network: &Network,
+    query: &TripsQuery,
+    response: &HttpResponse,
+) -> Result<Trips, Error> {
     let response: TripsResponse = response.json()?;
     let Some(journeys) = response.journeys else {
         // Without trips the server explains itself in `systemMessages`.
@@ -297,7 +301,7 @@ pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<
             Some(message) => Err(Error::NotFound {
                 message: message.text.unwrap_or_default(),
             }),
-            None => Ok(Trips::paged_by_time(Vec::new())),
+            None => Trips::paged_by_time(Vec::new(), query),
         };
     };
     let mut trips = Vec::new();
@@ -322,7 +326,7 @@ pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<
         }
         trips.extend(Trip::new(legs));
     }
-    Ok(Trips::paged_by_time(trips))
+    Trips::paged_by_time(trips, query)
 }
 
 pub(crate) fn parse_departures(

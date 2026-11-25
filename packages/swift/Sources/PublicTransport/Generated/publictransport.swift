@@ -3154,8 +3154,9 @@ public struct NearbyQuery: Equatable, Hashable, Codable {
     public var position: Coordinate
     /**
      * How far from the position to look, in meters. 1000 m without it.
-     * MOTIS has no radius and returns the nearest stops however far they
-     * are; ``Coordinate/distanceMeters(to:)`` tells how far one is.
+     * MOTIS has no radius and returns only the nearest stops, 5 without a
+     * limit, so stops in the circle can be missing there.
+     * ``Coordinate/distanceMeters(to:)`` tells how far one is.
      */
     public var radiusMeters: UInt32?
     /**
@@ -3173,8 +3174,9 @@ public struct NearbyQuery: Equatable, Hashable, Codable {
          */position: Coordinate, 
         /**
          * How far from the position to look, in meters. 1000 m without it.
-         * MOTIS has no radius and returns the nearest stops however far they
-         * are; ``Coordinate/distanceMeters(to:)`` tells how far one is.
+         * MOTIS has no radius and returns only the nearest stops, 5 without a
+         * limit, so stops in the circle can be missing there.
+         * ``Coordinate/distanceMeters(to:)`` tells how far one is.
          */radiusMeters: UInt32? = nil, 
         /**
          * The largest number of stops wanted. Without it the server decides:
@@ -3643,8 +3645,10 @@ public func parseLocations(response: HttpResponse)throws  -> [Location]  {
 }
     
     /**
-     * Parses the response to a ``Network/nearbyRequest``: the stops in
-     * the order of the server, which is the nearest first.
+     * Parses the response to the ``Network/nearbyRequest`` of `query`:
+     * the stops in its circle in the order of the server, which is the
+     * nearest first. A stop that the server sends from outside the circle
+     * is left out, whatever way the server measures.
      * ``Coordinate/distanceMeters(to:)``
      * gives how far one is. None in the circle gives an empty list.
      *
@@ -3653,30 +3657,33 @@ public func parseLocations(response: HttpResponse)throws  -> [Location]  {
      * Returns an error if the status code reports a failure or if the body
      * is not what the protocol defines.
      */
-public func parseNearby(response: HttpResponse)throws  -> [Location]  {
+public func parseNearby(query: NearbyQuery, response: HttpResponse)throws  -> [Location]  {
     return try  FfiConverterSequenceTypeLocation.lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
         uniffiCallStatus in
     uniffi_publictransport_fn_method_network_parse_nearby(
             FfiConverterTypeNetwork_lower(self),
+        FfiConverterTypeNearbyQuery_lower(query),
         FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
     )
 })
 }
     
     /**
-     * Parses the response to a ``Network/tripsRequest``. The trips are in
-     * the order the server ranks them. No connection between the two places
-     * gives an empty list.
+     * Parses the response to the ``Network/tripsRequest`` of `query`. The
+     * trips are in the order the server ranks them. No connection between
+     * the two places gives an empty list.
      *
      * ``Trips/earlier`` and ``Trips/later`` continue the search. MOTIS,
      * HAFAS and `OpenTripPlanner` send such references. `OpenTripPlanner`
      * searches a window of time, so an answer can have no trips and still
      * a reference to later ones, as at night. For EFA, TRIAS and OJP the
-     * library makes them
-     * from the times of the trips: later trips leave at least a minute
-     * after the last of these, earlier ones arrive at least a minute
-     * before the first. A trip within that minute is missed. On TRIAS and
-     * OJP a search without ``TripsQuery/limit`` repeats one trip.
+     * library makes them from the times of the trips: a later page starts
+     * at the time the last of these trips leaves, an earlier one at the
+     * time the first arrives, and the trips that were on the page before
+     * are left out of its answer. Such an answer is also cut to
+     * ``TripsQuery/limit``, from the far side of the search, since a
+     * server may add trips hours away. Without a limit nothing is cut,
+     * and the next page starts after everything the server sent.
      *
      * # Errors
      *
@@ -3690,11 +3697,12 @@ public func parseNearby(response: HttpResponse)throws  -> [Location]  {
      * or may no longer work out because a vehicle is late; that is for the
      * application to check against its clock.
      */
-public func parseTrips(response: HttpResponse)throws  -> Trips  {
+public func parseTrips(query: TripsQuery, response: HttpResponse)throws  -> Trips  {
     return try  FfiConverterTypeTrips_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
         uniffiCallStatus in
     uniffi_publictransport_fn_method_network_parse_trips(
             FfiConverterTypeNetwork_lower(self),
+        FfiConverterTypeTripsQuery_lower(query),
         FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
     )
 })
@@ -4438,7 +4446,9 @@ public struct TripsQuery: Equatable, Hashable, Codable {
     /**
      * How many trips are wanted. This is not a maximum: servers treat it
      * as a guide and may return more or fewer, so cut the list where a
-     * fixed number matters. `nil` leaves the number to the server.
+     * fixed number matters. Only an answer of EFA, TRIAS or OJP is cut to
+     * it, see ``Network/parseTrips``.
+     * `nil` leaves the number to the server.
      */
     public var limit: UInt32?
     /**
@@ -4466,7 +4476,9 @@ public struct TripsQuery: Equatable, Hashable, Codable {
         /**
          * How many trips are wanted. This is not a maximum: servers treat it
          * as a guide and may return more or fewer, so cut the list where a
-         * fixed number matters. `nil` leaves the number to the server.
+         * fixed number matters. Only an answer of EFA, TRIAS or OJP is cut to
+         * it, see ``Network/parseTrips``.
+         * `nil` leaves the number to the server.
          */limit: UInt32? = nil, 
         /**
          * Continues an earlier search: ``Trips/earlier`` or ``Trips/later``

@@ -353,7 +353,7 @@ pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<Htt
     // A plain `NumberOfResults` makes the server add a trip from the other
     // side of the time. The schemas want both counts, and the servers take
     // a zero, which the schema of TRIAS does not allow.
-    let count = query.limit.map_or_else(String::new, |limit| {
+    let count = query.paged_limit()?.map_or_else(String::new, |limit| {
         let (before, after) = if arrival.is_some() {
             (limit, 0)
         } else {
@@ -403,7 +403,11 @@ pub(crate) fn parse_departures(
     Ok(departures)
 }
 
-pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<Trips, Error> {
+pub(crate) fn parse_trips(
+    network: &Network,
+    query: &TripsQuery,
+    response: &HttpResponse,
+) -> Result<Trips, Error> {
     let (answers, failure) = answers(network, response)?;
     let answer = answer(answers.trips, &failure, response.status)?;
     let context = Context::of(response);
@@ -422,7 +426,7 @@ pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<
             .collect::<Result<Vec<_>, _>>()?;
         trips.extend(Trip::new(legs));
     }
-    Ok(Trips::paged_by_time(trips))
+    Trips::paged_by_time(trips, query)
 }
 
 /// The answers in a response, from where the dialect of the network puts

@@ -86,7 +86,7 @@ struct Call: Sendable, CustomTestStringConvertible {
         Call(
             testDescription: name, fixture: "efa/vvo-nearby.json",
             request: { try $0.nearbyRequest(query: query) },
-            check: { try #expect(await call($0, $1) == $1.parseNearby(response: $2)) }
+            check: { try #expect(await call($0, $1) == $1.parseNearby(query: query, response: $2)) }
         )
     }
 
@@ -134,12 +134,18 @@ struct Call: Sendable, CustomTestStringConvertible {
         call: @escaping @Sendable (Client, Network, _ later: String?) async throws -> Trips
     ) -> Call {
         let later: @Sendable (Network) throws -> String? = {
-            try $0.parseTrips(response: ok(PublicTransportTests.fixture("efa/vvo-trip.json"))).later
+            try $0.parseTrips(
+                query: TripsQuery(origin: .id("de:14612:28"), destination: .id("de:14612:13")),
+                response: ok(PublicTransportTests.fixture("efa/vvo-trip.json"))
+            ).later
         }
         return Call(
             testDescription: name, fixture: "efa/vvo-trip.json",
             request: { try $0.tripsRequest(query: query(later($0))) },
-            check: { try #expect(await call($0, $1, later($1)) == $1.parseTrips(response: $2)) }
+            check: {
+                let query = try query(later($1))
+                try #expect(await call($0, $1, later($1)) == $1.parseTrips(query: query, response: $2))
+            }
         )
     }
 

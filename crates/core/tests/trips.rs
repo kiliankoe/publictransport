@@ -28,11 +28,14 @@ fn complete_network(protocol: Protocol) -> Network {
 }
 
 fn parse(protocol: Protocol, body: &[u8]) -> Result<Trips, Error> {
-    complete_network(protocol).parse_trips(&HttpResponse {
-        status: 200,
-        headers: Vec::new(),
-        body: body.to_vec(),
-    })
+    complete_network(protocol).parse_trips(
+        &publictransport::TripsQuery::new("from", "to"),
+        &HttpResponse {
+            status: 200,
+            headers: Vec::new(),
+            body: body.to_vec(),
+        },
+    )
 }
 
 fn ifopt(value: &str) -> GlobalId {
@@ -206,7 +209,7 @@ proptest! {
         ],
     ) {
         for protocol in [Protocol::Efa, Protocol::Motis] {
-            let _ = network(protocol).parse_trips(&HttpResponse {
+            let _ = network(protocol).parse_trips(&publictransport::TripsQuery::new("from", "to"), &HttpResponse {
                 status,
                 headers: Vec::new(),
                 body: body.clone(),
@@ -850,9 +853,11 @@ fn response_without_trips_is_an_empty_list_with_the_cursors_the_server_sent() {
 
 /// EFA, TRIAS and OJP 1.0 have no cursors. The trips of the second response
 /// are out of order, and only their predicted times tell which one leaves
-/// last and which one arrives first.
+/// last and which one arrives first. The next page starts at that trip, to
+/// the end of the minute for arrivals, since `query_at_parse.rs` shows that
+/// parsing leaves the trip itself out.
 #[test]
-fn reference_of_a_server_without_cursors_continues_the_search_past_the_trips_at_hand() {
+fn reference_of_a_server_without_cursors_continues_the_search_at_the_last_trip_at_hand() {
     let journey = |departure: [&str; 2], arrival: [&str; 2]| {
         let ([departure, expected_departure], [arrival, expected_arrival]) = (departure, arrival);
         format!(
@@ -867,12 +872,11 @@ fn reference_of_a_server_without_cursors_continues_the_search_past_the_trips_at_
     let query = TripsQuery::new(
         Place::Id("de:14612:28".into()),
         Place::Id("de:14612:13".into()),
-    )
-    .with_limit(3);
+    );
     // The time of the query that is continued does not count.
     let continued = query.clone().with_arrival(utc(13, 24));
-    let after = |time: Timestamp, seconds: i64| Timestamp {
-        unix_seconds: time.unix_seconds + seconds,
+    let end_of_minute = |time: Timestamp| Timestamp {
+        unix_seconds: (time.unix_seconds + 59).div_euclid(60) * 60,
     };
 
     for (protocol, body) in [
@@ -900,12 +904,12 @@ fn reference_of_a_server_without_cursors_continues_the_search_past_the_trips_at_
 
         assert_eq!(
             request(continued.clone().with_page(found.later.unwrap())),
-            request(query.clone().with_departure(after(latest_departure, 60))),
+            request(query.clone().with_departure(latest_departure)),
             "{protocol:?} later"
         );
         assert_eq!(
             request(continued.clone().with_page(found.earlier.unwrap())),
-            request(query.clone().with_arrival(after(earliest_arrival, -60))),
+            request(query.clone().with_arrival(end_of_minute(earliest_arrival))),
             "{protocol:?} earlier"
         );
     }
@@ -1023,7 +1027,8 @@ fn unknown_place_is_not_found() {
         body: br#"{"error":"Could not find timetable location \"de-DELFI_de:14612:99999\""}"#
             .to_vec(),
     };
-    let result = network(Protocol::Motis).parse_trips(&response);
+    let result = network(Protocol::Motis)
+        .parse_trips(&publictransport::TripsQuery::new("from", "to"), &response);
     assert!(matches!(result, Err(Error::NotFound { .. })), "{result:?}");
 }
 

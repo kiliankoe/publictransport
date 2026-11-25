@@ -116,7 +116,12 @@ def test_conveniences_of_departures_and_trips_cross_the_boundary() -> None:
     vvo = BundledNetwork.VVO_EFA.network()
 
     departure = vvo.parse_departures(answer("vvo-departures.json"))[0]
-    trip = vvo.parse_trips(answer("vvo-trip.json")).trips[0]
+    # The generated `Place.ID` is not typed as a `Place`.
+    query = TripsQuery(
+        origin=Place.ID("a"),  # pyright: ignore[reportArgumentType]
+        destination=Place.ID("b"),  # pyright: ignore[reportArgumentType]
+    )
+    trip = vvo.parse_trips(query, answer("vvo-trip.json")).trips[0]
     start = trip.legs[0].departure
     scheduled = departure.local_scheduled_time()
     expected = departure.local_expected_time()
@@ -172,9 +177,13 @@ def test_page_of_a_trips_answer_continues_the_query() -> None:
         b'{"direct":[],"itineraries":[],"previousPageCursor":"a","nextPageCursor":"b"}'
     )
 
-    found = MOTIS.parse_trips(HttpResponse(status=200, headers=[], body=body))
+    # The generated `Place.ID` is not typed as a `Place`.
+    query = TripsQuery(
+        origin=Place.ID("x"),  # pyright: ignore[reportArgumentType]
+        destination=Place.ID("y"),  # pyright: ignore[reportArgumentType]
+    )
+    found = MOTIS.parse_trips(query, HttpResponse(status=200, headers=[], body=body))
     request = MOTIS.trips_request(
-        # The generated `Place.ID` is not typed as a `Place`.
         TripsQuery(
             origin=Place.ID("x"),  # pyright: ignore[reportArgumentType]
             destination=Place.ID("y"),  # pyright: ignore[reportArgumentType]

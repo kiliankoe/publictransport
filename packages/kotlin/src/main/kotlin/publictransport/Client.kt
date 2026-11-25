@@ -124,8 +124,9 @@ class Client(
      * @param position Where to look. A position off the globe throws
      *   [PublicTransportException.InvalidQuery].
      * @param radiusMeters How far from the position to look. 1000 m if left
-     *   out. MOTIS has no radius and returns the nearest stops however far
-     *   they are.
+     *   out. Stops farther away are not returned. MOTIS takes no radius
+     *   and returns only the nearest stops, so stops in the circle can be
+     *   missing there.
      * @param limit The largest number wanted. Servers treat it as a guide.
      * @throws IllegalArgumentException if the radius or the limit is
      *   negative.
@@ -144,7 +145,7 @@ class Client(
     suspend fun nearby(
         network: Network,
         query: NearbyQuery,
-    ): List<Location> = send(network.nearbyRequest(query), network::parseNearby)
+    ): List<Location> = send(network.nearbyRequest(query)) { network.parseNearby(query, it) }
 
     /**
      * Lists the next departures at a stop, ordered by expected time.
@@ -284,7 +285,7 @@ class Client(
     suspend fun trips(
         network: Network,
         query: TripsQuery,
-    ): Trips = send(network.tripsRequest(query), network::parseTrips)
+    ): Trips = send(network.tripsRequest(query)) { network.parseTrips(query, it) }
 
     /** A number of results as the core library takes it. */
     private fun count(limit: Int?): UInt? {

@@ -39,7 +39,7 @@ class BindingsTest {
     fun `derived values are properties`() {
         val network = BundledNetwork.VVO_EFA.network()
         val departure = network.parseDepartures(ok(fixture("efa/vvo-departures.json"))).first()
-        val trip = network.parseTrips(ok(fixture("efa/vvo-trip.json"))).trips.first()
+        val trip = network.parseTrips(TripsQuery(Place.Id("a"), Place.Id("b")), ok(fixture("efa/vvo-trip.json"))).trips.first()
         val start = trip.legs.first().departure
 
         assertEquals(departure.realtimeTime ?: departure.scheduledTime, departure.expectedTime)

@@ -646,12 +646,12 @@ RustBuffer uniffi_publictransport_fn_method_network_parse_locations(RustBuffer p
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PUBLICTRANSPORT_FN_METHOD_NETWORK_PARSE_NEARBY
 #define UNIFFI_FFIDEF_UNIFFI_PUBLICTRANSPORT_FN_METHOD_NETWORK_PARSE_NEARBY
-RustBuffer uniffi_publictransport_fn_method_network_parse_nearby(RustBuffer ptr, RustBuffer response, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_publictransport_fn_method_network_parse_nearby(RustBuffer ptr, RustBuffer query, RustBuffer response, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PUBLICTRANSPORT_FN_METHOD_NETWORK_PARSE_TRIPS
 #define UNIFFI_FFIDEF_UNIFFI_PUBLICTRANSPORT_FN_METHOD_NETWORK_PARSE_TRIPS
-RustBuffer uniffi_publictransport_fn_method_network_parse_trips(RustBuffer ptr, RustBuffer response, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_publictransport_fn_method_network_parse_trips(RustBuffer ptr, RustBuffer query, RustBuffer response, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PUBLICTRANSPORT_FN_METHOD_NETWORK_PLACE

@@ -105,8 +105,9 @@ pub struct NearbyQuery {
     /// Where to look.
     pub position: Coordinate,
     /// How far from the position to look, in meters. 1000 m without it.
-    /// MOTIS has no radius and returns the nearest stops however far they
-    /// are; [`Coordinate::distance_meters`] tells how far one is.
+    /// MOTIS has no radius and returns only the nearest stops, 5 without a
+    /// limit, so stops in the circle can be missing there.
+    /// [`Coordinate::distance_meters`] tells how far one is.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     #[cfg_attr(
         feature = "unstable-wasm",
@@ -977,7 +978,9 @@ pub struct TripsQuery {
     pub time: Option<TripTime>,
     /// How many trips are wanted. This is not a maximum: servers treat it
     /// as a guide and may return more or fewer, so cut the list where a
-    /// fixed number matters. `None` leaves the number to the server.
+    /// fixed number matters. Only an answer of EFA, TRIAS or OJP is cut to
+    /// it, see [`Network::parse_trips`](crate::Network::parse_trips).
+    /// `None` leaves the number to the server.
     #[cfg_attr(feature = "uniffi", uniffi(default = None))]
     #[cfg_attr(
         feature = "unstable-wasm",
@@ -1027,19 +1030,54 @@ impl TripsQuery {
     /// own: the one a reference of [`Trips::paged_by_time`] holds, otherwise
     /// the one of the query.
     pub(crate) fn paged_time(&self) -> Result<Option<TripTime>, crate::Error> {
+        Ok(match self.time_page()?.map(|page| page.time) {
+            // To the end of the minute: a server that counts in minutes
+            // would leave out a trip that arrives within it.
+            Some(TripTime::ArriveBy(time)) => Some(TripTime::ArriveBy(Timestamp {
+                unix_seconds: time.unix_seconds.saturating_add(59).div_euclid(60) * 60,
+            })),
+            Some(time) => Some(time),
+            None => self.time,
+        })
+    }
+
+    /// The number of trips to ask for on such a protocol: the server
+    /// repeats the trips of the page before, which do not count.
+    pub(crate) fn paged_limit(&self) -> Result<Option<u32>, crate::Error> {
+        let shown = self.time_page()?.map_or(0, |page| page.shown.len());
+        let shown = u32::try_from(shown).unwrap_or(u32::MAX);
+        Ok(self.limit.map(|limit| limit.saturating_add(shown)))
+    }
+
+    /// What a reference of [`Trips::paged_by_time`] holds.
+    fn time_page(&self) -> Result<Option<TimePage>, crate::Error> {
         let Some(page) = &self.page else {
-            return Ok(self.time);
+            return Ok(None);
         };
-        let time = |text: &str| {
-            text.parse()
-                .ok()
-                .map(|unix_seconds| Timestamp { unix_seconds })
+        let read = |rest: &str, later: bool| {
+            // Without the second part in a reference of version 0.2.
+            let (time, shown) = rest.split_once(':').unwrap_or((rest, ""));
+            let time = Timestamp {
+                unix_seconds: time.parse().ok()?,
+            };
+            let shown = shown.split(',').filter(|trip| !trip.is_empty());
+            Some(TimePage {
+                time: if later {
+                    TripTime::DepartAt(time)
+                } else {
+                    TripTime::ArriveBy(time)
+                },
+                shown: shown
+                    .map(|trip| u64::from_str_radix(trip, 16).ok())
+                    .collect::<Option<_>>()?,
+            })
         };
-        let later = page.strip_prefix(LATER).and_then(time);
-        let earlier = page.strip_prefix(EARLIER).and_then(time);
+        let later = page.strip_prefix(LATER).and_then(|rest| read(rest, true));
+        let earlier = page
+            .strip_prefix(EARLIER)
+            .and_then(|rest| read(rest, false));
         later
-            .map(TripTime::DepartAt)
-            .or(earlier.map(TripTime::ArriveBy))
+            .or(earlier)
             .map(Some)
             .ok_or_else(|| crate::Error::InvalidQuery {
                 message: "the page is not a reference from this network".to_owned(),
@@ -1239,20 +1277,127 @@ pub struct Trips {
     pub later: Option<String>,
 }
 
+/// A page of a protocol without page references of its own.
+struct TimePage {
+    /// Where the search goes on: at the departure of the last trip of the
+    /// page before, or at the arrival of its first.
+    time: TripTime,
+    /// The trips of the page before, each as [`Trip::identity`]. The
+    /// server answers with those at `time` again.
+    shown: Vec<u64>,
+}
+
 impl Trips {
-    /// The trips with references made from their times, for protocols that
-    /// have none: later trips leave after the last of these, earlier ones
-    /// arrive before the first. A minute apart, so that a server which
-    /// counts in minutes does not return the same trip again.
-    pub(crate) fn paged_by_time(trips: Vec<Trip>) -> Self {
-        let time = |end: &LegEnd| end.expected_time().unix_seconds;
-        let last = trips.iter().map(|trip| time(trip.departure())).max();
-        let first = trips.iter().map(|trip| time(trip.arrival())).min();
-        Self {
-            later: last.map(|time| format!("{LATER}{}", time.saturating_add(60))),
-            earlier: first.map(|time| format!("{EARLIER}{}", time.saturating_sub(60))),
-            trips,
+    /// The trips of an answer to `query` with references made from their
+    /// times, for protocols that have none. A later page starts at the
+    /// time the last of these trips leaves, an earlier one at the time the
+    /// first arrives, and the reference names the trips, so that this
+    /// function can leave them out of the next answer. Starting a minute
+    /// further on would lose a trip that leaves within that minute.
+    ///
+    /// The answer is cut to the limit of the query from the far side of
+    /// the search: a server may add trips hours away, which would move
+    /// the next page past everything between.
+    pub(crate) fn paged_by_time(
+        mut trips: Vec<Trip>,
+        query: &TripsQuery,
+    ) -> Result<Self, crate::Error> {
+        let departure = |trip: &Trip| trip.departure().expected_time().unix_seconds;
+        let arrival = |trip: &Trip| trip.arrival().expected_time().unix_seconds;
+        let answered = !trips.is_empty();
+        let page = query.time_page()?;
+        // Servers count in minutes, so a page starts with its minute.
+        let start_of_minute = |time: i64| time.div_euclid(60) * 60;
+        let end_of_minute = |time: i64| start_of_minute(time.saturating_add(59));
+        if let Some(page) = &page {
+            trips.retain(|trip| {
+                let on_this_side = match page.time {
+                    TripTime::DepartAt(time) => {
+                        departure(trip) >= start_of_minute(time.unix_seconds)
+                    }
+                    TripTime::ArriveBy(time) => arrival(trip) <= end_of_minute(time.unix_seconds),
+                };
+                on_this_side && !page.shown.contains(&trip.identity())
+            });
         }
+        // Smaller for a trip nearer to the time of the search.
+        let backwards = matches!(query.paged_time()?, Some(TripTime::ArriveBy(_)));
+        let distance = |trip: &Trip| {
+            if backwards {
+                arrival(trip).saturating_neg()
+            } else {
+                departure(trip)
+            }
+        };
+        let limit = query.limit.and_then(|limit| usize::try_from(limit).ok());
+        let mut distances: Vec<i64> = trips.iter().map(distance).collect();
+        distances.sort_unstable();
+        let farthest = limit.and_then(|limit| distances.get(limit.checked_sub(1)?));
+        if let (Some(limit), Some(&farthest)) = (limit, farthest) {
+            // Of several trips at the farthest time, the first ones stay.
+            let nearer = distances.iter().filter(|&&time| time < farthest).count();
+            let mut room = limit.saturating_sub(nearer);
+            trips.retain(|trip| {
+                let keep = distance(trip) < farthest || (distance(trip) == farthest && room > 0);
+                room -= usize::from(keep && distance(trip) == farthest);
+                keep
+            });
+        }
+        let mut later = trips.iter().map(departure).max();
+        let mut earlier = trips.iter().map(arrival).min();
+        // Every trip was on the page before: the search moves on a minute,
+        // the unit the servers count in.
+        if answered && trips.is_empty() {
+            match page.as_ref().map(|page| page.time) {
+                Some(TripTime::DepartAt(time)) => {
+                    later = Some(time.unix_seconds.saturating_add(60));
+                }
+                Some(TripTime::ArriveBy(time)) => {
+                    earlier = Some(time.unix_seconds.saturating_sub(60));
+                }
+                None => {}
+            }
+        }
+        // The trips that the server answers with again: those within the
+        // minute the next page starts in. If that is the minute this page
+        // started in, the trips of the pages before it are among them.
+        let before = |next: i64, forwards: bool| {
+            let same_minute = match page.as_ref().map(|page| page.time) {
+                Some(TripTime::DepartAt(time)) if forwards => {
+                    start_of_minute(time.unix_seconds) == start_of_minute(next)
+                }
+                Some(TripTime::ArriveBy(time)) if !forwards => {
+                    end_of_minute(time.unix_seconds) == end_of_minute(next)
+                }
+                _ => false,
+            };
+            let before = page.as_ref().filter(|_| same_minute);
+            before.map_or_else(Vec::new, |page| page.shown.clone())
+        };
+        let shown = |before: Vec<u64>, within: &dyn Fn(&Trip) -> bool| {
+            let shown = trips.iter().filter(|trip| within(trip)).map(Trip::identity);
+            let shown: Vec<_> = before
+                .into_iter()
+                .chain(shown)
+                .map(|trip| format!("{trip:x}"))
+                .collect();
+            shown.join(",")
+        };
+        let later = later.map(|time| {
+            let minute = start_of_minute(time);
+            let shown = shown(before(time, true), &|trip| departure(trip) >= minute);
+            format!("{LATER}{time}:{shown}")
+        });
+        let earlier = earlier.map(|time| {
+            let minute = end_of_minute(time);
+            let shown = shown(before(time, false), &|trip| arrival(trip) <= minute);
+            format!("{EARLIER}{time}:{shown}")
+        });
+        Ok(Self {
+            trips,
+            earlier,
+            later,
+        })
     }
 }
 
@@ -1298,6 +1443,33 @@ impl Trip {
     #[expect(clippy::expect_used, reason = "no parsed trip is without legs")]
     pub fn arrival(&self) -> &LegEnd {
         &self.legs.last().expect("a trip has a leg").arrival
+    }
+
+    /// A number that tells this trip from the others of an answer, and
+    /// that stays the same when real-time data changes: from the planned
+    /// times, the lines and the stops of its rides. The times of a walk
+    /// follow the ride before it on some servers, so a walk counts only
+    /// in a trip without a ride.
+    fn identity(&self) -> u64 {
+        // FNV-1a, since the hasher of the standard library may change
+        // between two versions of Rust and a reference outlives neither.
+        let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+        let mut add = |bytes: &[u8]| {
+            for byte in bytes.iter().chain(&[0xff]) {
+                hash = (hash ^ u64::from(*byte)).wrapping_mul(0x0100_0000_01b3);
+            }
+        };
+        let is_ride = |leg: &&Leg| matches!(leg.kind, LegKind::Transit { .. });
+        let walks_only = !self.legs.iter().any(|leg| is_ride(&leg));
+        for leg in self.legs.iter().filter(|leg| walks_only || is_ride(leg)) {
+            add(&leg.departure.scheduled_time.unix_seconds.to_le_bytes());
+            add(&leg.arrival.scheduled_time.unix_seconds.to_le_bytes());
+            add(leg.departure.stop.id.as_bytes());
+            if let LegKind::Transit { line, .. } = &leg.kind {
+                add(line.name.as_bytes());
+            }
+        }
+        hash
     }
 
     /// How often the traveler changes vehicles: the number of rides minus

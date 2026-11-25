@@ -544,7 +544,12 @@ fn mode_follows_the_transport_mode_and_for_rail_the_submode() {
 
 #[test]
 fn trips_have_rides_with_their_stops_and_cursors_for_more() {
-    let found = entur().parse_trips(&respond(TRIP)).unwrap();
+    let found = entur()
+        .parse_trips(
+            &publictransport::TripsQuery::new("from", "to"),
+            &respond(TRIP),
+        )
+        .unwrap();
     assert!(
         found
             .earlier
@@ -646,7 +651,12 @@ fn legs_without_a_line_are_walks_or_other_and_a_dropped_call_cancels_the_ride() 
         leg("bicycle", &at_quay("NSR:Quay:3"), &address),
     ]}]}}});
 
-    let found = entur().parse_trips(&respond(answer.to_string())).unwrap();
+    let found = entur()
+        .parse_trips(
+            &publictransport::TripsQuery::new("from", "to"),
+            &respond(answer.to_string()),
+        )
+        .unwrap();
     assert_eq!((found.earlier, found.later), (None, None));
     let [trip] = found.trips.as_slice() else {
         unreachable!("one trip: {:?}", found.trips)
@@ -708,7 +718,12 @@ fn answers_without_a_result_are_told_apart() {
     .to_string();
     for result in [
         network.parse_departures(&respond(&failed)).map(|_| ()),
-        network.parse_trips(&respond(&failed)).map(|_| ()),
+        network
+            .parse_trips(
+                &publictransport::TripsQuery::new("from", "to"),
+                &respond(&failed),
+            )
+            .map(|_| ()),
     ] {
         assert!(
             matches!(&result, Err(Error::Server { status: 200, message }) if message.contains("no such field")),
@@ -725,7 +740,10 @@ fn answers_without_a_result_are_told_apart() {
         "tripPatterns": [],
         "routingErrors": [{"code": "locationNotFound", "inputField": "from"}]
     }}});
-    let result = network.parse_trips(&respond(unknown.to_string()));
+    let result = network.parse_trips(
+        &publictransport::TripsQuery::new("from", "to"),
+        &respond(unknown.to_string()),
+    );
     assert!(matches!(result, Err(Error::NotFound { .. })), "{result:?}");
 
     // An error next to an empty result explains why it is empty.
@@ -750,7 +768,12 @@ fn answers_without_a_result_are_told_apart() {
     let none = json!({"data": {"trip": {
         "previousPageCursor": "before", "nextPageCursor": null, "tripPatterns": []
     }}});
-    let found = network.parse_trips(&respond(none.to_string())).unwrap();
+    let found = network
+        .parse_trips(
+            &publictransport::TripsQuery::new("from", "to"),
+            &respond(none.to_string()),
+        )
+        .unwrap();
     assert_eq!(found.trips, []);
     assert_eq!(
         (found.earlier.as_deref(), found.later),

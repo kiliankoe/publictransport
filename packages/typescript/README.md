@@ -187,6 +187,8 @@ const request = locationsRequest(network, query); // a LocationQuery
 const locations = parseLocations(network, response);
 ```
 
+The parse functions for nearby stops and trips also take the query that was sent, as in `parseTrips(network, query, response)`. With it they leave out stops outside the radius and, on EFA, TRIAS and OJP, trips that the page before already had.
+
 The headers of both are lists of `{ name, value }`, since a name can repeat.
 
 ## Known limitations

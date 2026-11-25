@@ -97,14 +97,16 @@ pub fn nearby_request(
     write(&request.map_err(thrown)?)
 }
 
-/// Reads the answer to a `nearbyRequest`: the stops in the order of the
-/// server, which is the nearest first.
+/// Reads the answer to the `nearbyRequest` of `query`: the stops in its
+/// circle in the order of the server, which is the nearest first.
 #[wasm_bindgen(js_name = parseNearby)]
 pub fn parse_nearby(
     network: &Ts<Network>,
+    query: &Ts<NearbyQuery>,
     response: &Ts<HttpResponse>,
 ) -> Result<Vec<Ts<Location>>, JsValue> {
-    let locations = read("network", network)?.parse_nearby(&read("response", response)?);
+    let locations = read("network", network)?
+        .parse_nearby(&read("query", query)?, &read("response", response)?);
     write_all(&locations.map_err(thrown)?)
 }
 
@@ -187,14 +189,16 @@ pub fn trips_request(
     write(&request.map_err(thrown)?)
 }
 
-/// Reads the answer to a `tripsRequest`. The trips are in the order the
-/// server ranks them.
+/// Reads the answer to the `tripsRequest` of `query`. The trips are in
+/// the order the server ranks them.
 #[wasm_bindgen(js_name = parseTrips)]
 pub fn parse_trips(
     network: &Ts<Network>,
+    query: &Ts<TripsQuery>,
     response: &Ts<HttpResponse>,
 ) -> Result<Ts<Trips>, JsValue> {
-    let trips = read("network", network)?.parse_trips(&read("response", response)?);
+    let trips =
+        read("network", network)?.parse_trips(&read("query", query)?, &read("response", response)?);
     write(&trips.map_err(thrown)?)
 }
 

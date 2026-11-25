@@ -467,8 +467,10 @@ impl Network {
         Ok(self.sent(request))
     }
 
-    /// Parses the response to a [`Network::nearby_request`]: the stops in
-    /// the order of the server, which is the nearest first.
+    /// Parses the response to the [`Network::nearby_request`] of `query`:
+    /// the stops in its circle in the order of the server, which is the
+    /// nearest first. A stop that the server sends from outside the circle
+    /// is left out, whatever way the server measures.
     /// [`Coordinate::distance_meters`](crate::Coordinate::distance_meters)
     /// gives how far one is. None in the circle gives an empty list.
     ///
@@ -476,7 +478,11 @@ impl Network {
     ///
     /// Returns an error if the status code reports a failure or if the body
     /// is not what the protocol defines.
-    pub fn parse_nearby(&self, response: &HttpResponse) -> Result<Vec<Location>, Error> {
+    pub fn parse_nearby(
+        &self,
+        query: &NearbyQuery,
+        response: &HttpResponse,
+    ) -> Result<Vec<Location>, Error> {
         let mut locations = match self.protocol {
             Protocol::Efa => efa::parse_nearby(self, response),
             Protocol::Motis => motis::parse_locations(response),
@@ -484,8 +490,16 @@ impl Network {
             Protocol::HafasMgate => hafas::parse_nearby(self, response),
             Protocol::OtpTransmodel => otp::parse_nearby(self, response),
         }?;
-        // The request asks for stops only. A server may not filter.
-        locations.retain(|location| location.kind == LocationKind::Stop);
+        // The request asks for stops only. A server may not filter. Nor
+        // does every server measure the radius as the distance on the
+        // ground, and MOTIS takes none.
+        let radius = f64::from(query.radius());
+        locations.retain(|location| {
+            let near = location
+                .coordinate
+                .is_none_or(|stop| query.position.distance_meters(stop) <= radius);
+            location.kind == LocationKind::Stop && near
+        });
         for location in &mut locations {
             self.mark(location);
         }
@@ -631,19 +645,21 @@ impl Network {
         Ok(self.sent(request))
     }
 
-    /// Parses the response to a [`Network::trips_request`]. The trips are in
-    /// the order the server ranks them. No connection between the two places
-    /// gives an empty list.
+    /// Parses the response to the [`Network::trips_request`] of `query`. The
+    /// trips are in the order the server ranks them. No connection between
+    /// the two places gives an empty list.
     ///
     /// [`Trips::earlier`] and [`Trips::later`] continue the search. MOTIS,
     /// HAFAS and `OpenTripPlanner` send such references. `OpenTripPlanner`
     /// searches a window of time, so an answer can have no trips and still
     /// a reference to later ones, as at night. For EFA, TRIAS and OJP the
-    /// crate makes them
-    /// from the times of the trips: later trips leave at least a minute
-    /// after the last of these, earlier ones arrive at least a minute
-    /// before the first. A trip within that minute is missed. On TRIAS and
-    /// OJP a search without [`TripsQuery::limit`] repeats one trip.
+    /// crate makes them from the times of the trips: a later page starts
+    /// at the time the last of these trips leaves, an earlier one at the
+    /// time the first arrives, and the trips that were on the page before
+    /// are left out of its answer. Such an answer is also cut to
+    /// [`TripsQuery::limit`], from the far side of the search, since a
+    /// server may add trips hours away. Without a limit nothing is cut,
+    /// and the next page starts after everything the server sent.
     ///
     /// # Errors
     ///
@@ -656,11 +672,11 @@ impl Network {
     /// The trips are as the server planned them. Some may have left already
     /// or may no longer work out because a vehicle is late; that is for the
     /// application to check against its clock.
-    pub fn parse_trips(&self, response: &HttpResponse) -> Result<Trips, Error> {
+    pub fn parse_trips(&self, query: &TripsQuery, response: &HttpResponse) -> Result<Trips, Error> {
         let mut trips = match self.protocol {
-            Protocol::Efa => efa::parse_trips(self, response),
+            Protocol::Efa => efa::parse_trips(self, query, response),
             Protocol::Motis => motis::parse_trips(response),
-            Protocol::Trias | Protocol::Ojp1 => trias::parse_trips(self, response),
+            Protocol::Trias | Protocol::Ojp1 => trias::parse_trips(self, query, response),
             Protocol::HafasMgate => hafas::parse_trips(self, response),
             Protocol::OtpTransmodel => otp::parse_trips(self, response),
         }?;

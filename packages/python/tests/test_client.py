@@ -165,9 +165,11 @@ def test_sends_the_library_request_and_returns_the_parsed_answer(
 ) -> None:
     body = (FIXTURES / fixture).read_bytes()
     request = getattr(network, f"{operation}_request")(query)
-    expected = getattr(network, f"parse_{operation}")(
-        HttpResponse(status=200, headers=[], body=body)
-    )
+    response = HttpResponse(status=200, headers=[], body=body)
+    parse = getattr(network, f"parse_{operation}")
+    # Nearby stops and trips are parsed for the query that was sent.
+    with_query = operation in ("nearby", "trips")
+    expected = parse(query, response) if with_query else parse(response)
     # A trips answer holds its trips next to the paging references.
     assert getattr(expected, "trips", expected)
     sent: list[httpx.Request] = []
@@ -391,9 +393,13 @@ EFA_FIXTURES = {
 }
 # The reference to the trips after those of the fixture.
 LATER = EFA.parse_trips(
+    TripsQuery(
+        origin=Place.ID("de:14612:28"),  # pyright: ignore[reportArgumentType]
+        destination=Place.ID("de:14612:13"),  # pyright: ignore[reportArgumentType]
+    ),
     HttpResponse(
         status=200, headers=[], body=(FIXTURES / EFA_FIXTURES["trips"]).read_bytes()
-    )
+    ),
 ).later
 
 

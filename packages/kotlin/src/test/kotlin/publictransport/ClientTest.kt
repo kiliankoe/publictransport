@@ -65,7 +65,7 @@ private val later: String by lazy {
     checkNotNull(
         BundledNetwork.VVO_EFA
             .network()
-            .parseTrips(ok(fixture("efa/vvo-trip.json")))
+            .parseTrips(TripsQuery(hbf, albertplatz), ok(fixture("efa/vvo-trip.json")))
             .later,
     )
 }
@@ -146,7 +146,7 @@ private fun nearby(
     name: String,
     query: NearbyQuery,
     call: suspend Client.(Network) -> List<Location>,
-) = Case(name, "efa/vvo-nearby.json", ::efa, { nearbyRequest(query) }, { parseNearby(it) }, call)
+) = Case(name, "efa/vvo-nearby.json", ::efa, { nearbyRequest(query) }, { parseNearby(query, it) }, call)
 
 private fun departures(
     name: String,
@@ -164,7 +164,7 @@ private fun trips(
     name: String,
     query: () -> TripsQuery,
     call: suspend Client.(Network) -> Trips,
-) = Case(name, "efa/vvo-trip.json", ::efa, { tripsRequest(query()) }, { parseTrips(it) }, call)
+) = Case(name, "efa/vvo-trip.json", ::efa, { tripsRequest(query()) }, { parseTrips(query(), it) }, call)
 
 private val calls =
     listOf(

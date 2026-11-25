@@ -36,7 +36,10 @@ fn departure() -> Departure {
 
 /// A trip to assign fields to.
 fn trip() -> Trip {
-    let Ok(mut trips) = network().parse_trips(&response(TRIPS)) else {
+    let Ok(mut trips) = network().parse_trips(
+        &publictransport::TripsQuery::new("from", "to"),
+        &response(TRIPS),
+    ) else {
         unreachable!("the fixture is a MOTIS response");
     };
     trips.trips.remove(0)

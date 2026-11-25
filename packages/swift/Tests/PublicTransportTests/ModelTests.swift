@@ -8,6 +8,8 @@ import Testing
 
 private let dresden = Coordinate(latitude: 51.04, longitude: 13.73)
 private let secret = Header(name: "X-Api-Key", value: "hunter2")
+/// A query that keeps every trip of an answer.
+private let anyTrips = TripsQuery(origin: .id("a"), destination: .id("b"))
 
 private func file(_ path: String, file: String = #filePath) throws -> Data {
     var root = URL(fileURLWithPath: file)
@@ -30,7 +32,7 @@ private func stop(_ ifopt: String, timezone: String? = nil) -> Location {
 @Test func derivedValuesOfDeparturesAndTripsAreProperties() throws {
     let vvo = Network.bundled(.vvoEfa)
     let departures = try vvo.parseDepartures(response: answer("efa/vvo-departures.json"))
-    let trips = try vvo.parseTrips(response: answer("efa/vvo-trip.json")).trips
+    let trips = try vvo.parseTrips(query: anyTrips, response: answer("efa/vvo-trip.json")).trips
     try #require(!departures.isEmpty && !trips.isEmpty)
 
     #expect(departures.first?.delaySeconds == 60)
@@ -193,7 +195,7 @@ private func storedText(_ values: [some Encodable]) throws -> [String] {
     let vvo = Network.bundled(.vvoEfa)
     let locations = try vvo.parseLocations(response: answer("efa/vvo-stopfinder.json"))
     let departures = try vvo.parseDepartures(response: answer("efa/vvo-departures.json"))
-    let trips = try vvo.parseTrips(response: answer("efa/vvo-trip.json"))
+    let trips = try vvo.parseTrips(query: anyTrips, response: answer("efa/vvo-trip.json"))
     try #require(!locations.isEmpty && !departures.isEmpty && !trips.trips.isEmpty)
 
     #expect(try stored(locations) == locations)

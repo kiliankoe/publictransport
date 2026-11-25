@@ -41,6 +41,11 @@ fn network(protocol: Protocol) -> Network {
     }
 }
 
+/// A query whose circle holds every stop of an answer.
+fn anywhere() -> NearbyQuery {
+    NearbyQuery::new(DRESDEN).with_radius_meters(u32::MAX)
+}
+
 fn respond(status: u16, body: &[u8]) -> HttpResponse {
     HttpResponse {
         status,
@@ -309,16 +314,16 @@ fn stops_come_in_the_servers_order_near_the_position() {
         ),
     ];
     for (protocol, fixture, (latitude, longitude), ids, name) in cases {
-        let stops = network(protocol)
-            .parse_nearby(&respond(200, fixture))
-            .unwrap();
-        let found: Vec<&str> = stops.iter().map(|stop| stop.id.as_str()).collect();
-        assert_eq!(found, ids, "{protocol:?}");
-        assert_eq!(stops[0].name, name, "{protocol:?}");
         let asked = Coordinate {
             latitude,
             longitude,
         };
+        let stops = network(protocol)
+            .parse_nearby(&NearbyQuery::new(asked), &respond(200, fixture))
+            .unwrap();
+        let found: Vec<&str> = stops.iter().map(|stop| stop.id.as_str()).collect();
+        assert_eq!(found, ids, "{protocol:?}");
+        assert_eq!(stops[0].name, name, "{protocol:?}");
         for stop in &stops {
             assert_eq!(stop.kind, LocationKind::Stop, "{stop:?}");
             let distance = stop.coordinate.map(|at| asked.distance_meters(at));
@@ -362,7 +367,11 @@ fn stop_is_the_location_the_search_by_name_returns_for_it() {
             let stop = locations.into_iter().find(|location| location.id == id);
             stop.map(|stop| format!("{stop:?}"))
         };
-        let near = pick(network.parse_nearby(&respond(200, nearby)).unwrap());
+        let near = pick(
+            network
+                .parse_nearby(&anywhere(), &respond(200, nearby))
+                .unwrap(),
+        );
         let named = pick(network.parse_locations(&respond(200, search)).unwrap());
         assert!(near.is_some(), "{protocol:?}");
         assert_eq!(near, named, "{protocol:?}");
@@ -389,16 +398,17 @@ fn answer_without_stops_is_empty_and_a_failed_one_is_an_error() {
         ),
     ];
     for (protocol, body) in empty {
-        let stops = network(protocol).parse_nearby(&respond(200, body));
+        let stops = network(protocol).parse_nearby(&anywhere(), &respond(200, body));
         assert_eq!(stops.map(|stops| stops.len()), Ok(0), "{protocol:?}");
     }
     // An error next to an empty list is why the list is empty.
     let failed = br#"{"errors":[{"message":"timeout"}],"data":{"nearest":{"edges":[]}}}"#;
-    let stops = network(Protocol::OtpTransmodel).parse_nearby(&respond(200, failed));
+    let stops = network(Protocol::OtpTransmodel).parse_nearby(&anywhere(), &respond(200, failed));
     assert!(matches!(stops, Err(Error::Server { .. })), "{stops:?}");
 
     for protocol in PROTOCOLS {
-        let parse = |status, body| network(protocol).parse_nearby(&respond(status, body));
+        let parse =
+            |status, body| network(protocol).parse_nearby(&anywhere(), &respond(status, body));
         assert_eq!(parse(503, b""), Err(Error::Unavailable), "{protocol:?}");
         let foreign = parse(200, b"<html>Maintenance</html>");
         assert!(

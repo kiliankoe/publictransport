@@ -32,7 +32,10 @@ export const parseLocations = throwing(parseLocationsOrThrown);
 /** Builds the request for the stops near a position. */
 export const nearbyRequest = throwing(nearbyRequestOrThrown);
 
-/** Reads the answer to a {@link nearbyRequest}. The nearest stop comes first. */
+/**
+ * Reads the answer to the {@link nearbyRequest} of a query. The nearest stop
+ * comes first. A stop outside the circle of the query is left out.
+ */
 export const parseNearby = throwing(parseNearbyOrThrown);
 
 /** Builds the request for the next departures at a stop. */
@@ -59,7 +62,11 @@ export const parseJourney = throwing(parseJourneyOrThrown);
 /** Builds the request for trips between two places. */
 export const tripsRequest = throwing(tripsRequestOrThrown);
 
-/** Reads the answer to a {@link tripsRequest}. The trips are in the order the server ranks them. */
+/**
+ * Reads the answer to the {@link tripsRequest} of a query. The trips are in
+ * the order the server ranks them. On EFA, TRIAS and OJP the query tells
+ * which trips the page before already had, and those are left out.
+ */
 export const parseTrips = throwing(parseTripsOrThrown);
 
 /**

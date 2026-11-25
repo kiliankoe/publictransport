@@ -99,7 +99,12 @@ async fn each_operation_sends_the_cores_request_and_returns_what_the_core_parses
 
         let [from, to] = stops.map(|stop| Place::Id(stop.to_owned()));
         let trips_query = TripsQuery::new(from, to).with_departure(TIME);
-        let expected = network.parse_trips(&ok(trips.1)).unwrap();
+        let expected = network
+            .parse_trips(
+                &publictransport::TripsQuery::new("from", "to"),
+                &ok(trips.1),
+            )
+            .unwrap();
         assert_ne!(expected.trips, [], "the fixture has results");
         let found = client.trips(&network, &trips_query).await.unwrap();
         assert_eq!(found, expected);

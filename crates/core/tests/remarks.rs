@@ -282,7 +282,14 @@ fn efa_titles_a_message_by_its_subtitle_and_drops_a_link_that_cannot_open() {
 /// EFA sends its validity on Berlin's clocks and a page, OJP sends it in UTC.
 #[test]
 fn efa_and_ojp_describe_the_remarks_of_the_same_leg_alike() {
-    let trips = |protocol, body| network(protocol).parse_trips(&response(body)).unwrap();
+    let trips = |protocol, body| {
+        network(protocol)
+            .parse_trips(
+                &publictransport::TripsQuery::new("from", "to"),
+                &response(body),
+            )
+            .unwrap()
+    };
     let (efa, ojp) = (
         trips(Protocol::Efa, EFA_TRIP),
         trips(Protocol::Ojp1, OJP_TRIP),
