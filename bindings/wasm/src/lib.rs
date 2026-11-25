@@ -212,6 +212,22 @@ pub fn parse_trips(
     write(&trips.map_err(thrown)?)
 }
 
+/// The query to send next if `trips`, the answer to `query`, is an empty
+/// window of time: no trips, only a reference to where the search goes on,
+/// as an `OpenTripPlanner` server can answer at night. `undefined` for any
+/// other answer, for a query that already has a page and for every other
+/// protocol, so following it sends one more request at most.
+#[wasm_bindgen(js_name = nextWindow)]
+pub fn next_window(
+    network: &Ts<Network>,
+    query: &Ts<TripsQuery>,
+    trips: &Ts<Trips>,
+) -> Result<Option<Ts<TripsQuery>>, JsValue> {
+    let next =
+        read("network", network)?.next_window(&read("query", query)?, &read("trips", trips)?);
+    next.as_ref().map(write).transpose()
+}
+
 /// Reads a network from an entry in the JSON format of the
 /// [transport-apis](https://github.com/public-transport/transport-apis)
 /// repository. `id` is the name of the entry's file without `.json`.

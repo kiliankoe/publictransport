@@ -240,10 +240,7 @@ class Client(
      * @param limit How many trips are wanted. This is not a maximum: servers
      *   treat it as a guide and may return more or fewer.
      * @param page [Trips.earlier] or [Trips.later] of an answer, to continue
-     *   that search with the same other arguments. A server that searches a
-     *   window of time can answer with no trips and a reference to later
-     *   ones, as at night: follow it before telling a user that there are
-     *   none.
+     *   that search with the same other arguments.
      * @throws IllegalArgumentException if both times are given or the limit
      *   is negative.
      */
@@ -279,11 +276,19 @@ class Client(
         return trips(network, TripsQuery(origin, destination, time, count(limit), page))
     }
 
-    /** Plans trips with a query of the core library. */
+    /**
+     * Plans trips with a query of the core library. An answer that is an
+     * empty window of time, see [Network.nextWindow], is followed with one
+     * more request.
+     */
     suspend fun trips(
         network: Network,
         query: TripsQuery,
-    ): Trips = send(network.tripsRequest(query)) { network.parseTrips(query, it) }
+    ): Trips {
+        val trips = send(network.tripsRequest(query)) { network.parseTrips(query, it) }
+        val next = network.nextWindow(query, trips) ?: return trips
+        return send(network.tripsRequest(next)) { network.parseTrips(next, it) }
+    }
 
     /** A number of results as the core library takes it. */
     private fun count(limit: Int?): UInt? {

@@ -917,3 +917,62 @@ fn remark_of_an_unknown_shape_costs_only_itself() {
 
     assert_eq!(titles, [[Some("Kept".to_owned())]]);
 }
+
+#[test]
+fn an_empty_window_goes_on_once_in_the_direction_of_the_search() {
+    let network = entur();
+    let window = |previous: Option<&str>, next: Option<&str>| {
+        json!({"data": {"trip": {
+            "previousPageCursor": previous, "nextPageCursor": next, "tripPatterns": []
+        }}})
+        .to_string()
+    };
+    let both = window(Some("before"), Some("after"));
+    let base = TripsQuery::new("NSR:StopPlace:337", "NSR:StopPlace:451").with_limit(3);
+    let by_departure = base.clone().with_departure(utc(17, 2, 0, 0));
+    let by_arrival = base.clone().with_arrival(utc(17, 2, 0, 0));
+
+    for (query, answer, expected) in [
+        (&base, both.as_bytes(), Some("after")),
+        (&by_departure, both.as_bytes(), Some("after")),
+        (&by_arrival, both.as_bytes(), Some("before")),
+        // Only the other direction goes on.
+        (&by_departure, window(Some("before"), None).as_bytes(), None),
+        (&by_arrival, window(None, Some("after")).as_bytes(), None),
+        // An answer with trips is no empty window, though it has both cursors.
+        (&by_departure, TRIP, None),
+        // A paged query has an unknown direction and limits the client to one more request.
+        (
+            &by_departure.clone().with_page("after"),
+            both.as_bytes(),
+            None,
+        ),
+    ] {
+        let trips = network.parse_trips(query, &respond(answer)).unwrap();
+        assert_eq!(
+            network.next_window(query, &trips),
+            expected.map(|page| query.clone().with_page(page)),
+            "{query:?}"
+        );
+    }
+}
+
+#[test]
+fn only_opentripplanner_goes_on_after_an_empty_window() {
+    // MOTIS sends cursors with an empty answer too, also for places without a connection.
+    let network = Network::new("test", "Test", "https://example.org/api", Protocol::Motis);
+    let query = TripsQuery::new("from", "to");
+    let trips = network
+        .parse_trips(
+            &query,
+            &respond(
+                r#"{"direct":[],"itineraries":[],"previousPageCursor":"a","nextPageCursor":"b"}"#,
+            ),
+        )
+        .unwrap();
+    assert_eq!(
+        (trips.earlier.as_deref(), trips.later.as_deref()),
+        (Some("a"), Some("b"))
+    );
+    assert_eq!(network.next_window(&query, &trips), None);
+}

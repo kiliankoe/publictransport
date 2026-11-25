@@ -14,6 +14,7 @@ import type {
   Trips,
   TripsQuery,
 } from "./generated/publictransport_wasm.js";
+import { nextWindow } from "./generated/publictransport_wasm.js";
 import {
   arrivalsRequest,
   departuresRequest,
@@ -229,7 +230,10 @@ export class Client {
     return parseJourney(network, await this.#send(journeyRequest(network, id), signal));
   }
 
-  /** Plans trips with a query. */
+  /**
+   * Plans trips with a query. An answer that is an empty window of time,
+   * see {@link nextWindow}, is followed with one more request.
+   */
   trips(network: Network, query: TripsQuery, options?: RequestOptions): Promise<Trips>;
   /**
    * Plans trips between two places, in the order the server ranks them.
@@ -241,9 +245,7 @@ export class Client {
    *   {@link TripsQuery}: how many trips are wanted as `limit`, which
    *   servers treat as a guide and not as a maximum, and `page`, the
    *   `earlier` or `later` of an answer, to continue that search with the
-   *   same other arguments. A server that searches a window of time can
-   *   answer with no trips and a reference to later ones, as at night:
-   *   follow it before telling a user that there are none.
+   *   same other arguments.
    */
   trips(
     network: Network,
@@ -272,7 +274,16 @@ export class Client {
       query = { ...rest, origin, destination: destination as Place, time };
       signal = given;
     }
-    return parseTrips(network, query, await this.#send(tripsRequest(network, query), signal));
+    const trips = parseTrips(
+      network,
+      query,
+      await this.#send(tripsRequest(network, query), signal),
+    );
+    const next = nextWindow(network, query, trips);
+    if (!next) {
+      return trips;
+    }
+    return parseTrips(network, next, await this.#send(tripsRequest(network, next), signal));
   }
 
   async #send(request: HttpRequest, signal?: AbortSignal): Promise<HttpResponse> {

@@ -624,6 +624,11 @@ RustBuffer uniffi_publictransport_fn_method_network_locations_request(RustBuffer
 RustBuffer uniffi_publictransport_fn_method_network_nearby_request(RustBuffer ptr, RustBuffer query, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_PUBLICTRANSPORT_FN_METHOD_NETWORK_NEXT_WINDOW
+#define UNIFFI_FFIDEF_UNIFFI_PUBLICTRANSPORT_FN_METHOD_NETWORK_NEXT_WINDOW
+RustBuffer uniffi_publictransport_fn_method_network_next_window(RustBuffer ptr, RustBuffer query, RustBuffer trips, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_PUBLICTRANSPORT_FN_METHOD_NETWORK_PARSE_ARRIVALS
 #define UNIFFI_FFIDEF_UNIFFI_PUBLICTRANSPORT_FN_METHOD_NETWORK_PARSE_ARRIVALS
 RustBuffer uniffi_publictransport_fn_method_network_parse_arrivals(RustBuffer ptr, RustBuffer query, RustBuffer response, RustCallStatus *_Nonnull out_status

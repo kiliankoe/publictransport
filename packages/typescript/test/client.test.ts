@@ -228,6 +228,27 @@ test("user agent of the network replaces the one of the client", async () => {
   });
 });
 
+test("empty window of time is followed once", async () => {
+  const empty = '{"data":{"trip":{"nextPageCursor":"after","tripPatterns":[]}}}';
+  const body = fixture("otp/entur-trip.json");
+  await serving([{ body: new TextEncoder().encode(empty) }, { body }], async (url, received) => {
+    const network: Network = {
+      id: "entur",
+      name: "Entur",
+      endpoint: `${url}/graphql`,
+      protocol: "otpTransmodel",
+    };
+    const query = { origin: "NSR:StopPlace:337", destination: "NSR:StopPlace:451" };
+    const next = { ...query, page: "after" };
+
+    const found = await new Client(USER_AGENT).trips(network, query);
+
+    assert.deepEqual(found, parseTrips(network, next, ok(body)));
+    assert.equal(received.length, 2);
+    assert.deepEqual(received[1]?.body, tripsRequest(network, next).body);
+  });
+});
+
 const moved = [{ name: "Location", value: "/new" }];
 const retryAfter = [{ name: "Retry-After", value: "120" }];
 

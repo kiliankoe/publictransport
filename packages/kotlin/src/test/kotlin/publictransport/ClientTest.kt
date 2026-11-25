@@ -252,6 +252,23 @@ class ClientTest {
             assertEquals(listOf("network/1.0"), server.takeRequest().headers.values("User-Agent"))
         }
 
+    @Test
+    fun `empty window of time is followed once`() {
+        val empty = """{"data":{"trip":{"nextPageCursor":"after","tripPatterns":[]}}}"""
+        val body = fixture("otp/entur-trip.json")
+        serving(answer(empty.toByteArray()), answer(body)) { server ->
+            val network = Network("entur", "Entur", server.url("/graphql").toString(), Protocol.OTP_TRANSMODEL)
+            val query = TripsQuery(Place.Id("NSR:StopPlace:337"), Place.Id("NSR:StopPlace:451"))
+            val next = query.copy(page = "after")
+
+            assertEquals(network.parseTrips(next, ok(body)), Client(USER_AGENT).trips(network, query))
+
+            assertEquals(2, server.requestCount)
+            server.takeRequest()
+            assertContentEquals(network.tripsRequest(next).body, server.takeRequest().body?.toByteArray())
+        }
+    }
+
     /** An answer the core refuses, which OkHttp would answer with a second request. */
     private class Refused(
         val name: String,

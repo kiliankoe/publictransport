@@ -1,7 +1,8 @@
 use crate::{
     Arrival, Attribution, Coverage, Departure, DeparturesQuery, Error, HafasOptions, Header,
     HttpRequest, HttpResponse, IdScheme, Journey, Location, LocationKind, LocationQuery,
-    NearbyQuery, Operation, Place, Trips, TripsQuery, efa, hafas, model::Board, motis, otp, trias,
+    NearbyQuery, Operation, Place, TripTime, Trips, TripsQuery, efa, hafas, model::Board, motis,
+    otp, trias,
 };
 
 /// The scheme, host and port of a URL, as it writes them. `None` for a
@@ -695,9 +696,9 @@ impl Network {
     /// the two places gives an empty list.
     ///
     /// [`Trips::earlier`] and [`Trips::later`] continue the search. MOTIS,
-    /// HAFAS and `OpenTripPlanner` send such references. `OpenTripPlanner`
-    /// searches a window of time, so an answer can have no trips and still
-    /// a reference to later ones, as at night. For EFA, TRIAS and OJP the
+    /// HAFAS and `OpenTripPlanner` send such references. An answer of
+    /// `OpenTripPlanner` can have no trips and only such a reference, see
+    /// [`Network::next_window`]. For EFA, TRIAS and OJP the
     /// crate makes them from the times of the trips: a later page starts
     /// at the time the last of these trips leaves, an earlier one at the
     /// time the first arrives, and the trips that were on the page before
@@ -733,5 +734,35 @@ impl Network {
             }
         }
         Ok(trips)
+    }
+
+    /// The query to send next if `trips`, the answer to `query`, is an
+    /// empty window of time: an answer without trips that only says where
+    /// the search goes on. An `OpenTripPlanner` server searches a window
+    /// of an hour or two, so at night it can answer like this although
+    /// trips leave later. The result is `query` with the reference in the
+    /// direction of the search as its page: [`Trips::later`], or
+    /// [`Trips::earlier`] for a search by arrival.
+    ///
+    /// `None` for an answer with trips, without that reference, for a
+    /// query that already has a page and for every other protocol. The
+    /// direction of a page is unknown, and since the result has one, a
+    /// client that follows it sends one more request at most. MOTIS sends
+    /// references with an empty answer too, also between two places
+    /// without a connection, so following them would only load the
+    /// server.
+    #[must_use]
+    pub fn next_window(&self, query: &TripsQuery, trips: &Trips) -> Option<TripsQuery> {
+        if self.protocol != Protocol::OtpTransmodel
+            || !trips.trips.is_empty()
+            || query.page.is_some()
+        {
+            return None;
+        }
+        let page = match query.time {
+            Some(TripTime::ArriveBy(_)) => trips.earlier.clone(),
+            None | Some(TripTime::DepartAt(_)) => trips.later.clone(),
+        }?;
+        Some(query.clone().with_page(page))
     }
 }

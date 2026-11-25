@@ -21,8 +21,9 @@ struct HTTPStub: Sendable {
 
     let host = "\(UUID().uuidString.lowercased()).example"
 
-    init(_ answer: Answer) {
-        Self.exchanges.withLock { $0[host] = (answer, []) }
+    /// Each request gets the next answer, and the last one goes on.
+    init(_ answers: Answer...) {
+        Self.exchanges.withLock { $0[host] = (answers, []) }
     }
 
     /// The requests that reached this stub.
@@ -37,7 +38,7 @@ struct HTTPStub: Sendable {
         return URLSession(configuration: configuration)
     }
 
-    private static let exchanges = Mutex<[String: (answer: Answer, sent: [Sent])]>([:])
+    private static let exchanges = Mutex<[String: (answers: [Answer], sent: [Sent])]>([:])
 
     private final class Loader: URLProtocol {
         override class func canInit(with _: URLRequest) -> Bool { true }
@@ -49,9 +50,10 @@ struct HTTPStub: Sendable {
             let body = request.httpBody ?? request.httpBodyStream.map(Self.read)
             let sent = Sent(request: request, body: body)
             let answer = HTTPStub.exchanges.withLock { exchanges -> Answer? in
-                guard let host = request.url?.host else { return nil }
-                exchanges[host]?.sent.append(sent)
-                return exchanges[host]?.answer
+                guard let host = request.url?.host, var exchange = exchanges[host] else { return nil }
+                exchange.sent.append(sent)
+                exchanges[host] = exchange
+                return exchange.answers[min(exchange.sent.count, exchange.answers.count) - 1]
             }
             guard case .response(let status, let headers, let body) = answer,
                 let url = request.url,

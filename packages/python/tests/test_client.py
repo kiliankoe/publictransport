@@ -186,6 +186,36 @@ def test_sends_the_library_request_and_returns_the_parsed_answer(
     assert sent[0].headers["User-Agent"] == USER_AGENT
 
 
+def test_empty_window_of_time_is_followed_once(call: Call) -> None:
+    network = Network(
+        id="entur",
+        name="Entur",
+        endpoint="https://otp.example/graphql",
+        protocol=Protocol.OTP_TRANSMODEL,
+    )
+    query = TripsQuery(
+        origin=Place.ID("NSR:StopPlace:337"),  # pyright: ignore[reportArgumentType]
+        destination=Place.ID("NSR:StopPlace:451"),  # pyright: ignore[reportArgumentType]
+    )
+    next_query = TripsQuery(
+        origin=query.origin, destination=query.destination, page="after"
+    )
+    empty = b'{"data":{"trip":{"nextPageCursor":"after","tripPatterns":[]}}}'
+    body = (FIXTURES / "otp/entur-trip.json").read_bytes()
+    sent: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        return httpx.Response(200, content=empty if len(sent) == 1 else body)
+
+    response = HttpResponse(status=200, headers=[], body=body)
+    assert call(handler, "trips", network, query) == network.parse_trips(
+        next_query, response
+    )
+    assert len(sent) == 2
+    assert sent[1].content == network.trips_request(next_query).body
+
+
 @pytest.mark.parametrize(
     ("status", "error", "fields"),
     [

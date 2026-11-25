@@ -264,6 +264,23 @@ func sendsTheRequestOfTheCoreAndReturnsWhatTheCoreParses(call: Call) async throw
     #expect(stub.sent.map { $0.request.value(forHTTPHeaderField: "User-Agent") } == ["network/1.0"])
 }
 
+@Test func emptyWindowOfTimeIsFollowedOnce() async throws {
+    let empty = Data(#"{"data":{"trip":{"nextPageCursor":"after","tripPatterns":[]}}}"#.utf8)
+    let body = try fixture("otp/entur-trip.json")
+    let stub = HTTPStub(.response(status: 200, body: [empty]), .response(status: 200, body: [body]))
+    let network = TransitNetwork(
+        id: "entur", name: "Entur", endpoint: "https://\(stub.host)/graphql", protocol: .otpTransmodel)
+    let query = TripsQuery(origin: .id("NSR:StopPlace:337"), destination: .id("NSR:StopPlace:451"))
+    var next = query
+    next.page = "after"
+
+    let found = try await Client(userAgent: userAgent, session: stub.session).trips(in: network, query: query)
+
+    #expect(try found == network.parseTrips(query: next, response: ok(body)))
+    let bodies = try [query, next].map { try network.tripsRequest(query: $0).body }
+    #expect(stub.sent.map(\.body) == bodies)
+}
+
 /// An answer the core refuses. The stop of the last one is unknown.
 struct Refused: Sendable, CustomTestStringConvertible {
     let testDescription: String

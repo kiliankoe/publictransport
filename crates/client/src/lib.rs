@@ -223,7 +223,10 @@ impl Client {
 
     /// Plans trips between two places. The query is a [`TripsQuery`],
     /// whose ends are locations, coordinates or IDs. See
-    /// [`Network::parse_trips`] for the result. Its references continue the search:
+    /// [`Network::parse_trips`] for the result. An answer that is an
+    /// empty window of time, see [`Network::next_window`], is followed
+    /// with one more request. The references of the result continue the
+    /// search:
     ///
     /// ```no_run
     /// # use publictransport_client::{Client, Error, Network, TripsQuery};
@@ -249,7 +252,12 @@ impl Client {
     ) -> Result<Trips, Error> {
         let query = query.into();
         let response = self.send(network.trips_request(&query)?).await?;
-        Ok(network.parse_trips(&query, &response)?)
+        let trips = network.parse_trips(&query, &response)?;
+        let Some(next) = network.next_window(&query, &trips) else {
+            return Ok(trips);
+        };
+        let response = self.send(network.trips_request(&next)?).await?;
+        Ok(network.parse_trips(&next, &response)?)
     }
 
     async fn send(&self, request: HttpRequest) -> Result<HttpResponse, Error> {

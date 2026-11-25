@@ -39,6 +39,7 @@ export {
   localExpectedTime,
   localScheduledTime,
   localTime,
+  nextWindow,
   place,
   platform,
   Registry,

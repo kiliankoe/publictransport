@@ -3968,6 +3968,34 @@ public func nearbyRequest(query: NearbyQuery)throws  -> HttpRequest  {
 }
     
     /**
+     * The query to send next if `trips`, the answer to `query`, is an
+     * empty window of time: an answer without trips that only says where
+     * the search goes on. An `OpenTripPlanner` server searches a window
+     * of an hour or two, so at night it can answer like this although
+     * trips leave later. The result is `query` with the reference in the
+     * direction of the search as its page: ``Trips/later``, or
+     * ``Trips/earlier`` for a search by arrival.
+     *
+     * `nil` for an answer with trips, without that reference, for a
+     * query that already has a page and for every other protocol. The
+     * direction of a page is unknown, and since the result has one, a
+     * client that follows it sends one more request at most. MOTIS sends
+     * references with an empty answer too, also between two places
+     * without a connection, so following them would only load the
+     * server.
+     */
+public func nextWindow(query: TripsQuery, trips: Trips) -> TripsQuery?  {
+    return try!  FfiConverterOptionTypeTripsQuery.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_next_window(
+            FfiConverterTypeTransitNetwork_lower(self),
+        FfiConverterTypeTripsQuery_lower(query),
+        FfiConverterTypeTrips_lower(trips),uniffiCallStatus
+    )
+})
+}
+    
+    /**
      * Parses the response to the ``TransitNetwork/arrivalsRequest`` of `query`.
      * The arrivals are ordered by ``Arrival/expectedTime``, and left out
      * and cut as in ``TransitNetwork/parseDepartures``.
@@ -4089,9 +4117,9 @@ public func parseNearby(query: NearbyQuery, response: HttpResponse)throws  -> [L
      * the two places gives an empty list.
      *
      * ``Trips/earlier`` and ``Trips/later`` continue the search. MOTIS,
-     * HAFAS and `OpenTripPlanner` send such references. `OpenTripPlanner`
-     * searches a window of time, so an answer can have no trips and still
-     * a reference to later ones, as at night. For EFA, TRIAS and OJP the
+     * HAFAS and `OpenTripPlanner` send such references. An answer of
+     * `OpenTripPlanner` can have no trips and only such a reference, see
+     * ``TransitNetwork/nextWindow``. For EFA, TRIAS and OJP the
      * library makes them from the times of the trips: a later page starts
      * at the time the last of these trips leaves, an earlier one at the
      * time the first arrives, and the trips that were on the page before
@@ -4389,9 +4417,8 @@ public struct Trips: Equatable, Hashable, Codable {
     public var earlier: String?
     /**
      * A reference for the trips after these, with the same rules. An
-     * `OpenTripPlanner` server searches a window of an hour or two, so at
-     * night its answer can have no trips and this reference: follow it,
-     * a few times if need be, before telling a user that there are none.
+     * `OpenTripPlanner` answer can have no trips and only this reference,
+     * see ``TransitNetwork/nextWindow``.
      */
     public var later: String?
 
@@ -4410,9 +4437,8 @@ public struct Trips: Equatable, Hashable, Codable {
          */earlier: String?, 
         /**
          * A reference for the trips after these, with the same rules. An
-         * `OpenTripPlanner` server searches a window of an hour or two, so at
-         * night its answer can have no trips and this reference: follow it,
-         * a few times if need be, before telling a user that there are none.
+         * `OpenTripPlanner` answer can have no trips and only this reference,
+         * see ``TransitNetwork/nextWindow``.
          */later: String?) {
         self.trips = trips
         self.earlier = earlier
@@ -6769,6 +6795,30 @@ fileprivate struct FfiConverterOptionTypeTransitNetwork: FfiConverterRustBuffer 
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeTransitNetwork.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeTripsQuery: FfiConverterRustBuffer {
+    typealias SwiftType = TripsQuery?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeTripsQuery.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeTripsQuery.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }

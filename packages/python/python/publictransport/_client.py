@@ -318,7 +318,8 @@ class Client:
         carries the same and takes the place of all of them.
 
         `limit` is not a maximum: servers treat it as a guide and may return
-        more or fewer.
+        more or fewer. An answer that is an empty window of time, see
+        `Network.next_window`, is followed with one more request.
         """
         query = _trips_query(
             origin,
@@ -328,7 +329,11 @@ class Client:
             limit=limit,
             page=page,
         )
-        return network.parse_trips(query, self._send(network.trips_request(query)))
+        trips = network.parse_trips(query, self._send(network.trips_request(query)))
+        if (next_query := network.next_window(query, trips)) is None:
+            return trips
+        response = self._send(network.trips_request(next_query))
+        return network.parse_trips(next_query, response)
 
     def close(self) -> None:
         """Close the connections, unless the caller passed `http_client`."""
@@ -497,7 +502,8 @@ class AsyncClient:
         carries the same and takes the place of all of them.
 
         `limit` is not a maximum: servers treat it as a guide and may return
-        more or fewer.
+        more or fewer. An answer that is an empty window of time, see
+        `Network.next_window`, is followed with one more request.
         """
         query = _trips_query(
             origin,
@@ -508,7 +514,11 @@ class AsyncClient:
             page=page,
         )
         request = network.trips_request(query)
-        return network.parse_trips(query, await self._send(request))
+        trips = network.parse_trips(query, await self._send(request))
+        if (next_query := network.next_window(query, trips)) is None:
+            return trips
+        response = await self._send(network.trips_request(next_query))
+        return network.parse_trips(next_query, response)
 
     async def aclose(self) -> None:
         """Close the connections, unless the caller passed `http_client`."""

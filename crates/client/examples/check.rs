@@ -20,7 +20,7 @@ use std::path::Path;
 
 use publictransport_client::{
     BundledNetwork, Client, DeparturesQuery, LegKind, LocationKind, LocationQuery, Mode, Network,
-    Operation, Trips, TripsQuery,
+    Operation, TripsQuery,
 };
 
 const USER_AGENT: &str = concat!(
@@ -157,19 +157,7 @@ async fn check_with(
         let mut failure = None;
         for to in [near, far] {
             let query = TripsQuery::new(from, to).with_limit(2);
-            let mut answer = client.trips(network, &query).await;
-            // OpenTripPlanner searches a window of time and answers with
-            // no trips and a reference if the window has none, as at night.
-            if let Ok(Trips {
-                trips,
-                later: Some(later),
-                ..
-            }) = &answer
-                && trips.is_empty()
-            {
-                answer = client.trips(network, &query.clone().with_page(later)).await;
-            }
-            outcome = match answer {
+            outcome = match client.trips(network, &query).await {
                 Ok(found) if found.trips.is_empty() => Err(format!("no trips to {}", to.name)),
                 Ok(found) => Ok((query, found, &to.name)),
                 Err(error) => {

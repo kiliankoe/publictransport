@@ -17,6 +17,7 @@ const MOTIS_LOCATIONS: &[u8] =
 const MOTIS_DEPARTURES: &[u8] =
     include_bytes!("../../core/tests/fixtures/motis/transitous-stoptimes.json");
 const MOTIS_TRIPS: &[u8] = include_bytes!("../../core/tests/fixtures/motis/transitous-plan.json");
+const OTP_TRIPS: &[u8] = include_bytes!("../../core/tests/fixtures/otp/entur-trip.json");
 
 const USER_AGENT: &str = "publictransport-tests/1.0 (+https://example.org)";
 
@@ -128,6 +129,43 @@ async fn each_operation_sends_the_cores_request_and_returns_what_the_core_parses
             assert_eq!(received.headers.get("user-agent").unwrap(), USER_AGENT);
         }
     }
+}
+
+#[tokio::test]
+async fn empty_window_of_time_is_followed_once() {
+    let server = MockServer::start().await;
+    let empty = r#"{"data":{"trip":{"nextPageCursor":"after","tripPatterns":[]}}}"#;
+    Mock::given(any())
+        .respond_with(ResponseTemplate::new(200).set_body_string(empty))
+        .up_to_n_times(1)
+        .mount(&server)
+        .await;
+    Mock::given(any())
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(OTP_TRIPS))
+        .mount(&server)
+        .await;
+    let network = Network::new("test", "Test", server.uri(), Protocol::OtpTransmodel);
+    let query = TripsQuery::new("NSR:StopPlace:337", "NSR:StopPlace:451").with_departure(TIME);
+
+    let found = Client::new(USER_AGENT)
+        .unwrap()
+        .trips(&network, &query)
+        .await
+        .unwrap();
+
+    let next = query.with_page("after");
+    let response = HttpResponse {
+        status: 200,
+        headers: Vec::new(),
+        body: OTP_TRIPS.to_vec(),
+    };
+    assert_eq!(found, network.parse_trips(&next, &response).unwrap());
+    let received = server.received_requests().await.unwrap();
+    assert_eq!(received.len(), 2);
+    assert_eq!(
+        Some(&received[1].body),
+        network.trips_request(&next).unwrap().body.as_ref()
+    );
 }
 
 #[tokio::test]

@@ -1271,9 +1271,8 @@ pub struct Trips {
     )]
     pub earlier: Option<String>,
     /// A reference for the trips after these, with the same rules. An
-    /// `OpenTripPlanner` server searches a window of an hour or two, so at
-    /// night its answer can have no trips and this reference: follow it,
-    /// a few times if need be, before telling a user that there are none.
+    /// `OpenTripPlanner` answer can have no trips and only this reference,
+    /// see [`Network::next_window`](crate::Network::next_window).
     #[cfg_attr(
         feature = "unstable-wasm",
         serde(skip_serializing_if = "Option::is_none")

@@ -34,10 +34,12 @@
 //! Departures, arrivals and trips work the same way, with
 //! [`Network::departures_request`] and [`Network::parse_departures`], with
 //! [`Network::arrivals_request`] and [`Network::parse_arrivals`], and with
-//! [`Network::trips_request`] and [`Network::parse_trips`]. An EFA
-//! network needs [`Network::with_timezone`] for requests that carry a time,
-//! a TRIAS or OJP network needs [`Network::with_requestor_ref`], and a
-//! HAFAS network needs [`Network::with_hafas`] and a time zone. Entur
+//! [`Network::trips_request`] and [`Network::parse_trips`]. After a
+//! trips answer, [`Network::next_window`] gives the one query to send
+//! next if the answer is an empty window of time. An EFA network needs
+//! [`Network::with_timezone`] for requests that carry a time, a TRIAS or
+//! OJP network needs [`Network::with_requestor_ref`], and a HAFAS
+//! network needs [`Network::with_hafas`] and a time zone. Entur
 //! asks every client for its name in the header `ET-Client-Name`
 //! (`company-application`) and limits clients without it, so add it with
 //! [`Network::with_header`].

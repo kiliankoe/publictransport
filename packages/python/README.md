@@ -138,7 +138,9 @@ request = network.locations_request(query)  # a LocationQuery
 locations = network.parse_locations(query, response)
 ```
 
-The parse functions for nearby stops and trips also take the query that was sent, as in `network.parse_trips(query, response)`. With it they leave out stops outside the radius and, on EFA, TRIAS and OJP, trips that the page before already had.
+Every parse function except the one for a journey takes the query that was sent. Parsing cuts locations, stops, departures and arrivals to the limit of the query. It also leaves out stops outside the radius, departures and arrivals expected before the time and, on EFA, TRIAS and OJP, trips that the page before already had.
+
+An answer for trips can be an empty window of time: no trips, only a reference to where the search goes on, as an OpenTripPlanner server sends at night. `network.next_window(query, trips)` then gives the query to send next, which the clients send by themselves.
 
 ## Known limitations
 

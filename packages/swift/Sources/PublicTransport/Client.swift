@@ -322,10 +322,7 @@ public struct Client: Sendable {
     ///   - limit: How many trips are wanted. This is not a maximum: servers
     ///     treat it as a guide and may return more or fewer.
     ///   - page: ``Trips/earlier`` or ``Trips/later`` of an answer, to
-    ///     continue that search with the same other arguments. A server
-    ///     that searches a window of time can answer with no trips and a
-    ///     reference to later ones, as at night: follow it before telling
-    ///     a user that there are none.
+    ///     continue that search with the same other arguments.
     /// - Throws: ``PublicTransportError``, such as `notFound` for a place
     ///   the network does not know, and `URLError` if the request got no
     ///   answer.
@@ -357,10 +354,14 @@ public struct Client: Sendable {
         return try await trips(in: network, query: query)
     }
 
-    /// Plans trips with a query of the core library.
+    /// Plans trips with a query of the core library. An answer that is an
+    /// empty window of time, see `TransitNetwork.nextWindow(query:trips:)`,
+    /// is followed with one more request.
     public func trips(in network: TransitNetwork, query: TripsQuery) async throws -> Trips {
         let response = try await send(network.tripsRequest(query: query))
-        return try network.parseTrips(query: query, response: response)
+        let trips = try network.parseTrips(query: query, response: response)
+        guard let next = network.nextWindow(query: query, trips: trips) else { return trips }
+        return try network.parseTrips(query: next, response: await send(network.tripsRequest(query: next)))
     }
 
     /// A number of results as the core library takes it.
