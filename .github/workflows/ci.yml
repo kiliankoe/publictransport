@@ -237,8 +237,9 @@ jobs:
         with:
           cache-provider: basic
       # Builds the Rust library for the Android ABIs, lints the library and
-      # builds the app that tests it.
-      - run: nix develop .#android -c just android
+      # builds the app that tests it. With the SDK of the runner, which has
+      # the versions that the flake pins; its shell stops if not.
+      - run: nix develop .#android-host-sdk -c just android
       # The emulator needs hardware virtualization.
       - run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

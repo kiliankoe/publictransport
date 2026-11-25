@@ -43,7 +43,7 @@ kotlin:
     ktlint 'packages/kotlin/**/*.kt' 'packages/kotlin/**/*.kts' 'examples/kotlin/**/*.kt' 'examples/kotlin/**/*.kts' '!**/build/**'
     gradle --project-dir packages/kotlin --quiet build
 
-# Build and lint the Android library and the app that tests it, in the shell of `nix develop .#android`
+# Build and lint the Android library and the app that tests it, in an Android shell such as `nix develop .#android`
 android:
     gradle --project-dir packages/kotlin --quiet :android:build :android:smoke:build :android:smoke:assembleAndroidTest
 

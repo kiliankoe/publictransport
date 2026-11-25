@@ -61,9 +61,12 @@
               android_sdk.accept_license = true;
             };
           };
+          # `android` adds what the Android library needs besides an SDK,
+          # `sdk` the SDK itself.
           shell =
             {
-              android ? null,
+              android ? false,
+              sdk ? null,
             }:
             pkgs.mkShell (
               {
@@ -81,7 +84,7 @@
                         # The WebAssembly module of the TypeScript package
                         "wasm32-unknown-unknown"
                       ]
-                      ++ lib.optionals (android != null) androidTargets
+                      ++ lib.optionals android androidTargets
                       # For the XCFramework of the Swift package, see
                       # scripts/build-swift.sh
                       ++ lib.optionals stdenv.hostPlatform.isDarwin [
@@ -132,23 +135,34 @@
                     pnpm
                     biome
                   ]
-                  ++ lib.optionals (android != null) [
-                    android
-                    # Builds the Rust library for the Android ABIs
-                    cargo-ndk
-                  ];
+                  # Builds the Rust library for the Android ABIs
+                  ++ lib.optional android cargo-ndk
+                  ++ lib.optional (sdk != null) sdk;
                 # On Linux the native-tls feature of the client links OpenSSL.
                 buildInputs = [ pkgs.openssl ];
               }
-              // pkgs.lib.optionalAttrs (android != null) rec {
-                ANDROID_HOME = "${android}/libexec/android-sdk";
+              // pkgs.lib.optionalAttrs android {
+                # Makes the Android library a part of the Gradle build, see
+                # packages/kotlin/settings.gradle.kts.
+                ORG_GRADLE_PROJECT_android = "true";
+              }
+              // pkgs.lib.optionalAttrs (android && sdk == null) {
+                # cargo-ndk takes the NDK from this variable, which names
+                # another version on GitHub's runners.
+                shellHook = ''
+                  export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/${androidVersions.ndk}"
+                  if [ ! -d "$ANDROID_NDK_HOME" ]; then
+                    echo "The SDK in ANDROID_HOME has no NDK ${androidVersions.ndk}" >&2
+                    exit 1
+                  fi
+                '';
+              }
+              // pkgs.lib.optionalAttrs (sdk != null) rec {
+                ANDROID_HOME = "${sdk}/libexec/android-sdk";
                 # GitHub's runners set this one to their own SDK, and the Android
                 # Gradle Plugin refuses two.
                 ANDROID_SDK_ROOT = ANDROID_HOME;
                 ANDROID_NDK_HOME = "${ANDROID_HOME}/ndk/${androidVersions.ndk}";
-                # Makes the Android library a part of the Gradle build, see
-                # packages/kotlin/settings.gradle.kts.
-                ORG_GRADLE_PROJECT_android = "true";
                 # The aapt2 that the Android Gradle Plugin downloads does not run on NixOS.
                 GRADLE_OPTS = "-Dorg.gradle.project.android.aapt2FromMavenOverride=${ANDROID_HOME}/build-tools/${androidVersions.buildTools}/aapt2";
               }
@@ -160,7 +174,8 @@
           # library: `nix develop .#android`. Entering it accepts the license
           # of the SDK.
           android = shell {
-            android =
+            android = true;
+            sdk =
               (unfree.androidenv.composeAndroidPackages {
                 platformVersions = [ androidVersions.platform ];
                 buildToolsVersions = [ androidVersions.buildTools ];
@@ -168,6 +183,10 @@
                 ndkVersions = [ androidVersions.ndk ];
               }).androidsdk;
           };
+          # The same for a machine that has these versions of the SDK and
+          # the NDK itself, under ANDROID_HOME. CI uses it, since GitHub's
+          # runners have them and building the SDK takes minutes.
+          android-host-sdk = shell { android = true; };
         }
       );
     };

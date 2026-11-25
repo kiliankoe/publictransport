@@ -174,9 +174,9 @@ jobs:
           path: ${{ runner.temp }}/wheels
           merge-multiple: true
       - run: scripts/kotlin-natives.sh "$RUNNER_TEMP/wheels" "$RUNNER_TEMP/natives"
-      # In the shell with the Android SDK, so that the build covers the
-      # Android library too.
-      - run: nix develop .#android -c gradle --project-dir packages/kotlin build publishToMavenLocal -PnativeLibraries="$RUNNER_TEMP/natives"
+      # In the shell for the Android SDK of the runner, so that the build
+      # covers the Android library too.
+      - run: nix develop .#android-host-sdk -c gradle --project-dir packages/kotlin build publishToMavenLocal -PnativeLibraries="$RUNNER_TEMP/natives"
       - name: Check the jar and the Android library
         run: |
           jar=$(echo ~/.m2/repository/io/github/kiliankoe/publictransport/*/publictransport-*[0-9].jar)
@@ -369,9 +369,9 @@ jobs:
           esac
       # On its own, so that only the upload runs with the secrets.
       - if: steps.published.outputs.published != 'true'
-        run: nix develop .#android -c gradle --project-dir packages/kotlin build -PnativeLibraries="$RUNNER_TEMP/natives"
+        run: nix develop .#android-host-sdk -c gradle --project-dir packages/kotlin build -PnativeLibraries="$RUNNER_TEMP/natives"
       - if: steps.published.outputs.published != 'true'
-        run: nix develop .#android -c gradle --project-dir packages/kotlin publishAndReleaseToMavenCentral -PnativeLibraries="$RUNNER_TEMP/natives"
+        run: nix develop .#android-host-sdk -c gradle --project-dir packages/kotlin publishAndReleaseToMavenCentral -PnativeLibraries="$RUNNER_TEMP/natives"
         env:
           # Waits until the version can be downloaded, not only until
           # Maven Central has accepted it.
