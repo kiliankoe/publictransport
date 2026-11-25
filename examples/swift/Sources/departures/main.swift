@@ -6,7 +6,7 @@ import PublicTransport
 
 // Servers want to know who asks: name your application and a way to reach you.
 let client = Client(userAgent: "publictransport-example (+https://github.com/kiliankoe/publictransport)")
-let network = Network.bundled(.vbbHafas)
+let network = TransitNetwork.bundled(.vbbHafas)
 
 let stops = try await client.locations(in: network, matching: "S+U Alexanderplatz", kinds: [.stop])
 guard let stop = stops.first else { fatalError("found no stop") }

@@ -38,21 +38,21 @@ private func ok(_ body: Data) -> HttpResponse {
     HttpResponse(status: 200, headers: [], body: body)
 }
 
-@Sendable private func efa(_ host: String) -> Network {
-    Network(
+@Sendable private func efa(_ host: String) -> TransitNetwork {
+    TransitNetwork(
         id: "vvo", name: "VVO", endpoint: "https://\(host)/std3", protocol: .efa,
         timeZoneIdentifier: "Europe/Berlin"
     )
 }
 
-@Sendable private func motis(_ host: String) -> Network {
-    Network(id: "transitous", name: "Transitous", endpoint: "https://\(host)/api", protocol: .motis)
+@Sendable private func motis(_ host: String) -> TransitNetwork {
+    TransitNetwork(id: "transitous", name: "Transitous", endpoint: "https://\(host)/api", protocol: .motis)
 }
 
 /// TRIAS is the protocol whose requests have a body and a header of their
 /// own, next to the one of the network.
-@Sendable private func trias(_ host: String) -> Network {
-    Network(
+@Sendable private func trias(_ host: String) -> TransitNetwork {
+    TransitNetwork(
         id: "trias", name: "TRIAS", endpoint: "https://\(host)/trias", protocol: .trias,
         requestorRef: "OpenService", headers: [Header(name: "X-Api-Key", value: "secret")]
     )
@@ -61,16 +61,16 @@ private func ok(_ body: Data) -> HttpResponse {
 /// One call of the client, next to the request the core builds for it.
 struct Call: Sendable, CustomTestStringConvertible {
     let testDescription: String
-    var network: @Sendable (String) -> Network = efa
+    var network: @Sendable (String) -> TransitNetwork = efa
     let fixture: String
-    let request: @Sendable (Network) throws -> HttpRequest
+    let request: @Sendable (TransitNetwork) throws -> HttpRequest
     /// Makes the call and compares its result with what the core parses.
-    let check: @Sendable (Client, Network, HttpResponse) async throws -> Void
+    let check: @Sendable (Client, TransitNetwork, HttpResponse) async throws -> Void
 
     static func locations(
-        _ name: String, network: @escaping @Sendable (String) -> Network = efa,
+        _ name: String, network: @escaping @Sendable (String) -> TransitNetwork = efa,
         fixture: String = "efa/vvo-stopfinder.json", query: LocationQuery,
-        call: @escaping @Sendable (Client, Network) async throws -> [Location]
+        call: @escaping @Sendable (Client, TransitNetwork) async throws -> [Location]
     ) -> Call {
         Call(
             testDescription: name, network: network, fixture: fixture,
@@ -81,7 +81,7 @@ struct Call: Sendable, CustomTestStringConvertible {
 
     static func nearby(
         _ name: String, query: NearbyQuery,
-        call: @escaping @Sendable (Client, Network) async throws -> [Location]
+        call: @escaping @Sendable (Client, TransitNetwork) async throws -> [Location]
     ) -> Call {
         Call(
             testDescription: name, fixture: "efa/vvo-nearby.json",
@@ -91,9 +91,9 @@ struct Call: Sendable, CustomTestStringConvertible {
     }
 
     static func departures(
-        _ name: String, network: @escaping @Sendable (String) -> Network = efa,
+        _ name: String, network: @escaping @Sendable (String) -> TransitNetwork = efa,
         fixture: String = "efa/vvo-departures.json", query: DeparturesQuery,
-        call: @escaping @Sendable (Client, Network) async throws -> [Departure]
+        call: @escaping @Sendable (Client, TransitNetwork) async throws -> [Departure]
     ) -> Call {
         Call(
             testDescription: name, network: network, fixture: fixture,
@@ -104,7 +104,7 @@ struct Call: Sendable, CustomTestStringConvertible {
 
     static func arrivals(
         _ name: String, query: DeparturesQuery,
-        call: @escaping @Sendable (Client, Network) async throws -> [Arrival]
+        call: @escaping @Sendable (Client, TransitNetwork) async throws -> [Arrival]
     ) -> Call {
         Call(
             testDescription: name, fixture: "efa/vvo-arrivals.json",
@@ -116,7 +116,7 @@ struct Call: Sendable, CustomTestStringConvertible {
     /// The ID is the one of a departure in the answer that was recorded
     /// with the run.
     static let journey: Call = {
-        let id: @Sendable (Network) throws -> String = {
+        let id: @Sendable (TransitNetwork) throws -> String = {
             let departures = try $0.parseDepartures(
                 response: ok(PublicTransportTests.fixture("efa/vvo-journey-departure.json")))
             return try #require(departures.compactMap(\.journeyId).first)
@@ -131,9 +131,9 @@ struct Call: Sendable, CustomTestStringConvertible {
     /// The query gets the reference to the trips after those of the fixture.
     static func trips(
         _ name: String, query: @escaping @Sendable (_ later: String?) -> TripsQuery,
-        call: @escaping @Sendable (Client, Network, _ later: String?) async throws -> Trips
+        call: @escaping @Sendable (Client, TransitNetwork, _ later: String?) async throws -> Trips
     ) -> Call {
-        let later: @Sendable (Network) throws -> String? = {
+        let later: @Sendable (TransitNetwork) throws -> String? = {
             try $0.parseTrips(
                 query: TripsQuery(origin: .id("de:14612:28"), destination: .id("de:14612:13")),
                 response: ok(PublicTransportTests.fixture("efa/vvo-trip.json"))
@@ -338,7 +338,7 @@ func errorOfTheCoreComesOutUnchanged(answer: Refused) async throws {
 /// A plain call with values that no query can hold.
 struct Rejected: Sendable, CustomTestStringConvertible {
     let testDescription: String
-    let call: @Sendable (Client, Network) async throws -> Void
+    let call: @Sendable (Client, TransitNetwork) async throws -> Void
 
     static let all = [
         Rejected(testDescription: "trips departing at and arriving by a time") {

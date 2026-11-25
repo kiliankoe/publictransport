@@ -30,7 +30,7 @@ private func stop(_ ifopt: String, timezone: String? = nil) -> Location {
 }
 
 @Test func derivedValuesOfDeparturesAndTripsAreProperties() throws {
-    let vvo = Network.bundled(.vvoEfa)
+    let vvo = TransitNetwork.bundled(.vvoEfa)
     let departures = try vvo.parseDepartures(response: answer("efa/vvo-departures.json"))
     let trips = try vvo.parseTrips(query: anyTrips, response: answer("efa/vvo-trip.json")).trips
     try #require(!departures.isEmpty && !trips.isEmpty)
@@ -53,7 +53,8 @@ private func stop(_ ifopt: String, timezone: String? = nil) -> Location {
 }
 
 @Test func remarksCrossTheBoundary() throws {
-    let departures = try Network.bundled(.vrrEfa).parseDepartures(response: answer("efa/vrr-departures.json"))
+    let departures = try TransitNetwork.bundled(.vrrEfa).parseDepartures(
+        response: answer("efa/vrr-departures.json"))
 
     let remark = try #require(departures.flatMap(\.remarks).first { $0.id == "314433" })
     #expect(remark.kind == .disruption)
@@ -79,10 +80,10 @@ private func stop(_ ifopt: String, timezone: String? = nil) -> Location {
 
 @Test func registryFindsNetworksByIDAndByPosition() {
     let registry = Registry.bundled()
-    let vvo = Network.bundled(.vvoEfa)
+    let vvo = TransitNetwork.bundled(.vvoEfa)
 
     #expect(BundledNetwork.vvoEfa.id == "vvo-efa")
-    #expect(vvo == Network.bundled(.vvoEfa))
+    #expect(vvo == TransitNetwork.bundled(.vvoEfa))
     #expect(registry.network(id: "vvo-efa") == vvo)
     #expect(registry.network(id: "no-such-network") == nil)
     // A case is sent to Rust as its position in the list, so the order matters.
@@ -90,7 +91,7 @@ private func stop(_ ifopt: String, timezone: String? = nil) -> Location {
     let listed = BundledNetwork.allCases.map(\.id).filter { registry.network(id: $0) != nil }
     #expect(listed == registry.networks().map(\.id))
     #expect(registry.network(id: "vvo-trias") == nil)
-    #expect(Network.bundled(.vvoTrias).id == "vvo-trias")
+    #expect(TransitNetwork.bundled(.vvoTrias).id == "vvo-trias")
 
     #expect(vvo.coverage.tier(at: dresden) == .realtime)
     #expect(vvo.coverage.tier(at: Coordinate(latitude: 0, longitude: 0)) == nil)
@@ -123,7 +124,7 @@ private func stop(_ ifopt: String, timezone: String? = nil) -> Location {
 
     let wait = [Header(name: "Retry-After", value: "120")]
     let thrown = #expect(throws: PublicTransportError.self) {
-        try Network.bundled(.vvoEfa)
+        try TransitNetwork.bundled(.vvoEfa)
             .parseDepartures(response: HttpResponse(status: 429, headers: wait, body: Data()))
     }
     #expect(thrown == .rateLimited(retryAfterSeconds: 120))
@@ -133,12 +134,13 @@ private func stop(_ ifopt: String, timezone: String? = nil) -> Location {
 @Test func descriptionsAreSwiftsOwnAndHideSecrets() throws {
     #expect(String(describing: LocationKind.stop) == "stop")
 
-    let locations = try Network.bundled(.vvoEfa).parseLocations(response: answer("efa/vvo-stopfinder.json"))
+    let locations = try TransitNetwork.bundled(.vvoEfa).parseLocations(
+        response: answer("efa/vvo-stopfinder.json"))
     let location = try #require(locations.first)
     #expect(String(describing: location).contains("globalIds"))
     #expect(!String(describing: location).contains("global_ids"))
 
-    var network = Network.bundled(.vvoEfa)
+    var network = TransitNetwork.bundled(.vvoEfa)
     network.headers = [secret]
     let printed = [
         String(describing: secret), String(reflecting: secret),
@@ -154,12 +156,12 @@ private func stop(_ ifopt: String, timezone: String? = nil) -> Location {
 @Test func networkIsReadFromAnEntryOfTransportAPIs() throws {
     let json = try String(decoding: file("data/networks/vvo-efa.json"), as: UTF8.self)
 
-    #expect(try Network(id: "mine", json: json).id == "mine")
+    #expect(try TransitNetwork(id: "mine", json: json).id == "mine")
     // The entry is the one of the bundled network.
-    #expect(try Network(id: "vvo-efa", json: json) == Network.bundled(.vvoEfa))
+    #expect(try TransitNetwork(id: "vvo-efa", json: json) == TransitNetwork.bundled(.vvoEfa))
 
     let thrown = #expect(throws: PublicTransportError.self) {
-        try Network(id: "mine", json: "no entry")
+        try TransitNetwork(id: "mine", json: "no entry")
     }
     guard case .invalidNetwork = thrown else {
         Issue.record("expected invalidNetwork, got \(String(describing: thrown))")
@@ -192,7 +194,7 @@ private func storedText(_ values: [some Encodable]) throws -> [String] {
 }
 
 @Test func storedAnswersAreReadBackEqual() throws {
-    let vvo = Network.bundled(.vvoEfa)
+    let vvo = TransitNetwork.bundled(.vvoEfa)
     let locations = try vvo.parseLocations(response: answer("efa/vvo-stopfinder.json"))
     let departures = try vvo.parseDepartures(response: answer("efa/vvo-departures.json"))
     let trips = try vvo.parseTrips(query: anyTrips, response: answer("efa/vvo-trip.json"))

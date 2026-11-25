@@ -6,7 +6,7 @@ import PublicTransport
 
 // Servers want to know who asks: name your application and a way to reach you.
 let client = Client(userAgent: "publictransport-example (+https://github.com/kiliankoe/publictransport)")
-var network = Network.bundled(.entur)
+var network = TransitNetwork.bundled(.entur)
 // Entur asks every client for its name, as `company-application`.
 network.headers.append(Header(name: "ET-Client-Name", value: "publictransport-example"))
 

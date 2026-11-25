@@ -677,12 +677,12 @@ protocol RegistryProtocol: AnyObject, Sendable {
     /**
      * The network with the given ID.
      */
-    func network(id: String)  -> Network?
+    func network(id: String)  -> TransitNetwork?
     
     /**
      * All networks, in the order they were given.
      */
-    func networks()  -> [Network]
+    func networks()  -> [TransitNetwork]
     
 }
 /**
@@ -732,12 +732,12 @@ public final class Registry: RegistryProtocol, @unchecked Sendable {
      * together with an application's own. If two share an ID,
      * ``Registry/network(id:)`` finds the first.
      */
-public convenience init(networks: [Network]) {
+public convenience init(networks: [TransitNetwork]) {
     let handle =
         try! rustCall() {
         uniffiCallStatus in
     uniffi_publictransport_fn_constructor_registry_new(
-        FfiConverterSequenceTypeNetwork.lower(networks),uniffiCallStatus
+        FfiConverterSequenceTypeTransitNetwork.lower(networks),uniffiCallStatus
     )
 }
     self.init(unsafeFromHandle: handle)
@@ -757,7 +757,7 @@ public convenience init(networks: [Network]) {
      * The networks that ship with the library, one for each operator. Each
      * was checked against its live server when it was added. Where an
      * operator has servers for several protocols, this is the one with
-     * the most data; ``Network/bundled`` gives the others.
+     * the most data; ``TransitNetwork/bundled`` gives the others.
      */
 public static func bundled() -> Registry  {
     return try!  FfiConverterTypeRegistry_lift(try! rustCall() {
@@ -788,8 +788,8 @@ public func covering(at: Coordinate) -> [CoveringNetwork]  {
     /**
      * The network with the given ID.
      */
-public func network(id: String) -> Network?  {
-    return try!  FfiConverterOptionTypeNetwork.lift(try! rustCall() {
+public func network(id: String) -> TransitNetwork?  {
+    return try!  FfiConverterOptionTypeTransitNetwork.lift(try! rustCall() {
         uniffiCallStatus in
     uniffi_publictransport_fn_method_registry_get(
             self.uniffiCloneHandle(),
@@ -801,8 +801,8 @@ public func network(id: String) -> Network?  {
     /**
      * All networks, in the order they were given.
      */
-public func networks() -> [Network]  {
-    return try!  FfiConverterSequenceTypeNetwork.lift(try! rustCall() {
+public func networks() -> [TransitNetwork]  {
+    return try!  FfiConverterSequenceTypeTransitNetwork.lift(try! rustCall() {
         uniffiCallStatus in
     uniffi_publictransport_fn_method_registry_networks(
             self.uniffiCloneHandle(),uniffiCallStatus
@@ -971,7 +971,7 @@ public struct Arrival: Equatable, Hashable, Codable {
     public var remarks: [Remark]
     /**
      * Names the run of the vehicle for
-     * ``Network/journeyRequest``.
+     * ``TransitNetwork/journeyRequest``.
      * `nil` if the server does not name the run. The text is made for
      * the network it came from and has no meaning elsewhere; a server
      * knows a run for about a day.
@@ -1012,7 +1012,7 @@ public struct Arrival: Equatable, Hashable, Codable {
          */remarks: [Remark], 
         /**
          * Names the run of the vehicle for
-         * ``Network/journeyRequest``.
+         * ``TransitNetwork/journeyRequest``.
          * `nil` if the server does not name the run. The text is made for
          * the network it came from and has no meaning elsewhere; a server
          * knows a run for about a day.
@@ -1154,7 +1154,7 @@ func FfiConverterTypeArrival_lower(_ value: Arrival) -> RustBuffer {
 
 
 /**
- * Whom to name as the source of a ``Network``'s data.
+ * Whom to name as the source of a ``TransitNetwork``'s data.
  */
 public struct Attribution: Equatable, Hashable {
     /**
@@ -1314,7 +1314,7 @@ func FfiConverterTypeCoordinate_lower(_ value: Coordinate) -> RustBuffer {
 
 
 /**
- * Where a ``Network`` has data, in three tiers of quality.
+ * Where a ``TransitNetwork`` has data, in three tiers of quality.
  */
 public struct Coverage: Equatable, Hashable {
     /**
@@ -1412,7 +1412,7 @@ public struct CoveringNetwork: Equatable, Hashable {
     /**
      * The network.
      */
-    public var network: Network
+    public var network: TransitNetwork
     /**
      * The best tier of its coverage at the position.
      */
@@ -1423,7 +1423,7 @@ public struct CoveringNetwork: Equatable, Hashable {
     public init(
         /**
          * The network.
-         */network: Network, 
+         */network: TransitNetwork, 
         /**
          * The best tier of its coverage at the position.
          */tier: CoverageTier) {
@@ -1446,13 +1446,13 @@ struct FfiConverterTypeCoveringNetwork: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CoveringNetwork {
         return
             try CoveringNetwork(
-                network: FfiConverterTypeNetwork.read(from: &buf), 
+                network: FfiConverterTypeTransitNetwork.read(from: &buf), 
                 tier: FfiConverterTypeCoverageTier.read(from: &buf)
         )
     }
 
     public static func write(_ value: CoveringNetwork, into buf: inout [UInt8]) {
-        FfiConverterTypeNetwork.write(value.network, into: &buf)
+        FfiConverterTypeTransitNetwork.write(value.network, into: &buf)
         FfiConverterTypeCoverageTier.write(value.tier, into: &buf)
     }
 }
@@ -1521,7 +1521,7 @@ public struct Departure: Equatable, Hashable, Codable {
     public var remarks: [Remark]
     /**
      * Names the run of the vehicle for
-     * ``Network/journeyRequest``.
+     * ``TransitNetwork/journeyRequest``.
      * `nil` if the server does not name the run. The text is made for
      * the network it came from and has no meaning elsewhere; a server
      * knows a run for about a day.
@@ -1566,7 +1566,7 @@ public struct Departure: Equatable, Hashable, Codable {
          */remarks: [Remark], 
         /**
          * Names the run of the vehicle for
-         * ``Network/journeyRequest``.
+         * ``TransitNetwork/journeyRequest``.
          * `nil` if the server does not name the run. The text is made for
          * the network it came from and has no meaning elsewhere; a server
          * knows a run for about a day.
@@ -1885,7 +1885,7 @@ public struct HafasOptions: Equatable, Hashable, CustomDebugStringConvertible, C
     public var version: String
     /**
      * The language the server is asked in where the network has no
-     * ``Network/language``, such as `de`. The server needs one.
+     * ``TransitNetwork/language``, such as `de`. The server needs one.
      */
     public var language: String
     /**
@@ -1912,7 +1912,7 @@ public struct HafasOptions: Equatable, Hashable, CustomDebugStringConvertible, C
          */version: String, 
         /**
          * The language the server is asked in where the network has no
-         * ``Network/language``, such as `de`. The server needs one.
+         * ``TransitNetwork/language``, such as `de`. The server needs one.
          */language: String = "en", 
         /**
          * The operator's kinds of vehicles, which give a line its mode.
@@ -2341,7 +2341,7 @@ func FfiConverterTypeHttpResponse_lower(_ value: HttpResponse) -> RustBuffer {
 
 /**
  * The run of one vehicle from its first stop to its last, as
- * ``Network/parseJourney`` returns it.
+ * ``TransitNetwork/parseJourney`` returns it.
  * A ``Trip`` is a way from one place to another and can use several
  * runs, each for a part of it.
  */
@@ -2487,7 +2487,7 @@ public struct Leg: Equatable, Hashable, Codable {
     public var remarks: [Remark]
     /**
      * Names the run of the vehicle for
-     * ``Network/journeyRequest``.
+     * ``TransitNetwork/journeyRequest``.
      * `nil` for a walk, and if the server does not name the run. The
      * text is made for the network it came from and has no meaning
      * elsewhere; a server knows a run for about a day.
@@ -2525,7 +2525,7 @@ public struct Leg: Equatable, Hashable, Codable {
          */remarks: [Remark], 
         /**
          * Names the run of the vehicle for
-         * ``Network/journeyRequest``.
+         * ``TransitNetwork/journeyRequest``.
          * `nil` for a walk, and if the server does not name the run. The
          * text is made for the network it came from and has no meaning
          * elsewhere; a server knows a run for about a day.
@@ -2904,14 +2904,14 @@ public struct Location: Equatable, Hashable, Codable {
      * `Europe/Berlin`, for showing times there, as
      * ``Location/timeZone`` does. MOTIS sends it, and
      * `OpenTripPlanner` for stops in departures and trips; otherwise it is
-     * ``Network/timeZoneIdentifier``.
+     * ``TransitNetwork/timeZoneIdentifier``.
      */
     public var timeZoneIdentifier: String?
     /**
-     * The ``Network/id`` of the network that returned
+     * The ``TransitNetwork/id`` of the network that returned
      * the location. Its `id` belongs to that network;
-     * ``Network/place`` and
-     * ``Network/stopId`` translate the location
+     * ``TransitNetwork/place`` and
+     * ``TransitNetwork/stopId`` translate the location
      * for another one. A location without a network, such as one an
      * application built itself, is treated as one from another network.
      */
@@ -2945,13 +2945,13 @@ public struct Location: Equatable, Hashable, Codable {
          * `Europe/Berlin`, for showing times there, as
          * ``Location/timeZone`` does. MOTIS sends it, and
          * `OpenTripPlanner` for stops in departures and trips; otherwise it is
-         * ``Network/timeZoneIdentifier``.
+         * ``TransitNetwork/timeZoneIdentifier``.
          */timeZoneIdentifier: String?, 
         /**
-         * The ``Network/id`` of the network that returned
+         * The ``TransitNetwork/id`` of the network that returned
          * the location. Its `id` belongs to that network;
-         * ``Network/place`` and
-         * ``Network/stopId`` translate the location
+         * ``TransitNetwork/place`` and
+         * ``TransitNetwork/stopId`` translate the location
          * for another one. A location without a network, such as one an
          * application built itself, is treated as one from another network.
          */network: String? = nil) {
@@ -3249,619 +3249,6 @@ func FfiConverterTypeNearbyQuery_lower(_ value: NearbyQuery) -> RustBuffer {
 
 
 /**
- * One server that answers public transport queries.
- */
-public struct Network: Equatable, Hashable {
-    /**
-     * A short identifier, e.g. `vvo-efa`. It has to be unique among the
-     * networks an application uses, because a ``Location`` names its
-     * network by it.
-     */
-    public var id: String
-    /**
-     * The name to show to users.
-     */
-    public var name: String
-    /**
-     * The URL of the server. For EFA and MOTIS it is the base URL that the
-     * protocol's paths are appended to, e.g.
-     * `https://efa.vvo-online.de/std3` or `https://api.transitous.org/api`,
-     * and a trailing slash is allowed. TRIAS and OJP have one URL for all
-     * requests, e.g. `https://efa.vvo-online.de/std3/trias`, and so have
-     * HAFAS mgate, e.g. `https://fahrinfo.vbb.de/bin/mgate.exe`, and
-     * `OpenTripPlanner`, e.g.
-     * `https://api.entur.io/journey-planner/v3/graphql`.
-     */
-    public var endpoint: String
-    /**
-     * The protocol the server speaks.
-     */
-    public var `protocol`: NetworkProtocol
-    /**
-     * The IANA name of the time zone the server works in, e.g.
-     * `Europe/Berlin`. EFA needs it for requests that carry a time and
-     * HAFAS for nearly all. Locations get it as their time zone where the
-     * server sends none per stop, as MOTIS and `OpenTripPlanner` do.
-     */
-    public var timeZoneIdentifier: String?
-    /**
-     * Identifies the client to a TRIAS or OJP server, which refuses
-     * requests without it. Public servers document a value such as
-     * `OpenService`; others hand out a key.
-     */
-    public var requestorRef: String?
-    /**
-     * Where the network has data.
-     */
-    public var coverage: Coverage
-    /**
-     * Whom to name as the source of the data.
-     */
-    public var attribution: Attribution?
-    /**
-     * The operations the server is known not to answer. Building a request
-     * for one of them fails with ``PublicTransportError/unsupported``.
-     */
-    public var unsupported: [NetworkOperation]
-    /**
-     * Whether the server only answers with a key that its operator hands
-     * out on request. The application sets it as
-     * ``Network/requestorRef``.
-     */
-    public var requiresKey: Bool
-    /**
-     * A link to usage terms that restrict who may use the server, for
-     * example to non-commercial projects. `nil` if anyone may. The library
-     * does not enforce them: read them before using the network.
-     */
-    public var terms: String?
-    /**
-     * HTTP headers that every request to the server carries, for servers
-     * that want a key or the name of the client in one. A request to
-     * ``Network/geocoder`` carries them only if the geocoder has the
-     * scheme, host and port of ``Network/endpoint``, both written out
-     * and alike, so that a key does not reach someone else. A header here
-     * takes the place of one with the same name that the protocol or the
-     * HTTP client would set, such as `User-Agent`. The library does not
-     * check names and values; the HTTP client rejects invalid ones. Debug
-     * output leaves the values out.
-     */
-    public var headers: [Header]
-    /**
-     * The URL of a geocoder in the Pelias format, such as
-     * `https://api.entur.io/geocoder/v1`, for protocols without a search
-     * for locations of their own. Location searches go to `autocomplete`
-     * below it, so it must not have a query string; without it they fail
-     * with ``PublicTransportError/unsupported``. The kinds of a search follow Entur's
-     * use of the format: stops are in the layer `venue`, everything else
-     * in `address`.
-     */
-    public var geocoder: String?
-    /**
-     * What a HAFAS mgate server needs. Requests to such a network fail
-     * without it.
-     */
-    public var hafas: HafasOptions?
-    /**
-     * The language to ask names and remarks in, such as `en`. Every
-     * request carries it the way the protocol has for it, as it is written
-     * here without the whitespace around it, and an empty one counts as
-     * none: most servers take a lower-case ISO 639-1 code, a few have
-     * codes of their own. `nil` leaves the choice to the server, and
-     * HAFAS, which has to name one, asks in ``HafasOptions/language``.
-     * A server answers in
-     * its own language where it has no translation, and some ignore the
-     * wish altogether. An `OpenTripPlanner` server sends its disruptions
-     * in every language it has, and the library takes the one named here.
-     */
-    public var language: String?
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(
-        /**
-         * A short identifier, e.g. `vvo-efa`. It has to be unique among the
-         * networks an application uses, because a ``Location`` names its
-         * network by it.
-         */id: String, 
-        /**
-         * The name to show to users.
-         */name: String, 
-        /**
-         * The URL of the server. For EFA and MOTIS it is the base URL that the
-         * protocol's paths are appended to, e.g.
-         * `https://efa.vvo-online.de/std3` or `https://api.transitous.org/api`,
-         * and a trailing slash is allowed. TRIAS and OJP have one URL for all
-         * requests, e.g. `https://efa.vvo-online.de/std3/trias`, and so have
-         * HAFAS mgate, e.g. `https://fahrinfo.vbb.de/bin/mgate.exe`, and
-         * `OpenTripPlanner`, e.g.
-         * `https://api.entur.io/journey-planner/v3/graphql`.
-         */endpoint: String, 
-        /**
-         * The protocol the server speaks.
-         */`protocol`: NetworkProtocol, 
-        /**
-         * The IANA name of the time zone the server works in, e.g.
-         * `Europe/Berlin`. EFA needs it for requests that carry a time and
-         * HAFAS for nearly all. Locations get it as their time zone where the
-         * server sends none per stop, as MOTIS and `OpenTripPlanner` do.
-         */timeZoneIdentifier: String? = nil, 
-        /**
-         * Identifies the client to a TRIAS or OJP server, which refuses
-         * requests without it. Public servers document a value such as
-         * `OpenService`; others hand out a key.
-         */requestorRef: String? = nil, 
-        /**
-         * Where the network has data.
-         */coverage: Coverage = Coverage(), 
-        /**
-         * Whom to name as the source of the data.
-         */attribution: Attribution? = nil, 
-        /**
-         * The operations the server is known not to answer. Building a request
-         * for one of them fails with ``PublicTransportError/unsupported``.
-         */unsupported: [NetworkOperation] = [], 
-        /**
-         * Whether the server only answers with a key that its operator hands
-         * out on request. The application sets it as
-         * ``Network/requestorRef``.
-         */requiresKey: Bool = false, 
-        /**
-         * A link to usage terms that restrict who may use the server, for
-         * example to non-commercial projects. `nil` if anyone may. The library
-         * does not enforce them: read them before using the network.
-         */terms: String? = nil, 
-        /**
-         * HTTP headers that every request to the server carries, for servers
-         * that want a key or the name of the client in one. A request to
-         * ``Network/geocoder`` carries them only if the geocoder has the
-         * scheme, host and port of ``Network/endpoint``, both written out
-         * and alike, so that a key does not reach someone else. A header here
-         * takes the place of one with the same name that the protocol or the
-         * HTTP client would set, such as `User-Agent`. The library does not
-         * check names and values; the HTTP client rejects invalid ones. Debug
-         * output leaves the values out.
-         */headers: [Header] = [], 
-        /**
-         * The URL of a geocoder in the Pelias format, such as
-         * `https://api.entur.io/geocoder/v1`, for protocols without a search
-         * for locations of their own. Location searches go to `autocomplete`
-         * below it, so it must not have a query string; without it they fail
-         * with ``PublicTransportError/unsupported``. The kinds of a search follow Entur's
-         * use of the format: stops are in the layer `venue`, everything else
-         * in `address`.
-         */geocoder: String? = nil, 
-        /**
-         * What a HAFAS mgate server needs. Requests to such a network fail
-         * without it.
-         */hafas: HafasOptions? = nil, 
-        /**
-         * The language to ask names and remarks in, such as `en`. Every
-         * request carries it the way the protocol has for it, as it is written
-         * here without the whitespace around it, and an empty one counts as
-         * none: most servers take a lower-case ISO 639-1 code, a few have
-         * codes of their own. `nil` leaves the choice to the server, and
-         * HAFAS, which has to name one, asks in ``HafasOptions/language``.
-         * A server answers in
-         * its own language where it has no translation, and some ignore the
-         * wish altogether. An `OpenTripPlanner` server sends its disruptions
-         * in every language it has, and the library takes the one named here.
-         */language: String? = nil) {
-        self.id = id
-        self.name = name
-        self.endpoint = endpoint
-        self.`protocol` = `protocol`
-        self.timeZoneIdentifier = timeZoneIdentifier
-        self.requestorRef = requestorRef
-        self.coverage = coverage
-        self.attribution = attribution
-        self.unsupported = unsupported
-        self.requiresKey = requiresKey
-        self.terms = terms
-        self.headers = headers
-        self.geocoder = geocoder
-        self.hafas = hafas
-        self.language = language
-    }
-
-    
-    /**
-     * Builds the request for the arrivals at a stop, from the query that
-     * ``Network/departuresRequest`` takes: its time is the one from
-     * which arrivals are wanted.
-     *
-     * # Errors
-     *
-     * The same as ``Network/departuresRequest``. A network that lists
-     * departures as unsupported has no arrivals either.
-     */
-public func arrivalsRequest(query: DeparturesQuery)throws  -> HttpRequest  {
-    return try  FfiConverterTypeHttpRequest_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
-        uniffiCallStatus in
-    uniffi_publictransport_fn_method_network_arrivals_request(
-            FfiConverterTypeNetwork_lower(self),
-        FfiConverterTypeDeparturesQuery_lower(query),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * Builds the request for the next departures at a stop.
-     *
-     * EFA takes the time as local time to the minute. In the hour that
-     * repeats when daylight saving time ends, it cannot tell the first pass
-     * from the second.
-     *
-     * # Errors
-     *
-     * Returns ``PublicTransportError/invalidNetwork`` if the query has a time and the
-     * network needs a time zone for it but has none or an unknown one, or
-     * if a TRIAS or OJP network has no requestor reference or a HAFAS
-     * network no usable ``Network/hafas`` or no time zone, which the
-     * answer needs, and ``PublicTransportError/invalidQuery`` if the time is outside the
-     * supported range, if the stop is a position, or if it is a location
-     * that the network cannot name as a stop, see ``Network/stopId``.
-     */
-public func departuresRequest(query: DeparturesQuery)throws  -> HttpRequest  {
-    return try  FfiConverterTypeHttpRequest_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
-        uniffiCallStatus in
-    uniffi_publictransport_fn_method_network_departures_request(
-            FfiConverterTypeNetwork_lower(self),
-        FfiConverterTypeDeparturesQuery_lower(query),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * Builds the request for the run of one vehicle, from the
-     * ``Departure/journeyId`` of a departure, an arrival or a leg that
-     * this network returned.
-     *
-     * # Errors
-     *
-     * Returns ``PublicTransportError/invalidQuery`` if the ID is not one of this
-     * network. MOTIS and HAFAS send any text on, and their servers do not
-     * know a foreign one. ``PublicTransportError/unsupported`` and
-     * ``PublicTransportError/invalidNetwork`` are as for
-     * ``Network/departuresRequest``; EFA and HAFAS always need the
-     * time zone here.
-     */
-public func journeyRequest(id: String)throws  -> HttpRequest  {
-    return try  FfiConverterTypeHttpRequest_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
-        uniffiCallStatus in
-    uniffi_publictransport_fn_method_network_journey_request(
-            FfiConverterTypeNetwork_lower(self),
-        FfiConverterString.lower(id),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * Builds the request that searches for locations by name.
-     *
-     * # Errors
-     *
-     * Returns ``PublicTransportError/invalidNetwork`` if a TRIAS or OJP network has no
-     * requestor reference or a HAFAS network lacks ``Network/hafas`` or
-     * has options that are no JSON objects, and
-     * ``PublicTransportError/invalidQuery`` if the query asks
-     * only for kinds of location the protocol does not have or holds text
-     * the protocol cannot carry. An `OpenTripPlanner` network without a
-     * ``Network/geocoder`` gives ``PublicTransportError/unsupported``.
-     */
-public func locationsRequest(query: LocationQuery)throws  -> HttpRequest  {
-    return try  FfiConverterTypeHttpRequest_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
-        uniffiCallStatus in
-    uniffi_publictransport_fn_method_network_locations_request(
-            FfiConverterTypeNetwork_lower(self),
-        FfiConverterTypeLocationQuery_lower(query),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * Builds the request for the stops near a position.
-     *
-     * # Errors
-     *
-     * Returns ``PublicTransportError/invalidQuery`` if the position is not on the globe,
-     * ``PublicTransportError/unsupported`` if the network is known not to answer this
-     * search, and ``PublicTransportError/invalidNetwork`` if a TRIAS or OJP network has
-     * no requestor reference or a HAFAS network no usable
-     * ``Network/hafas``.
-     */
-public func nearbyRequest(query: NearbyQuery)throws  -> HttpRequest  {
-    return try  FfiConverterTypeHttpRequest_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
-        uniffiCallStatus in
-    uniffi_publictransport_fn_method_network_nearby_request(
-            FfiConverterTypeNetwork_lower(self),
-        FfiConverterTypeNearbyQuery_lower(query),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * Parses the response to a ``Network/arrivalsRequest``. The arrivals
-     * are ordered by ``Arrival/expectedTime``.
-     *
-     * # Errors
-     *
-     * The same as ``Network/parseDepartures``.
-     */
-public func parseArrivals(response: HttpResponse)throws  -> [Arrival]  {
-    return try  FfiConverterSequenceTypeArrival.lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
-        uniffiCallStatus in
-    uniffi_publictransport_fn_method_network_parse_arrivals(
-            FfiConverterTypeNetwork_lower(self),
-        FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * Parses the response to a ``Network/departuresRequest``. The
-     * departures are ordered by ``Departure/expectedTime``.
-     *
-     * # Errors
-     *
-     * Returns ``PublicTransportError/notFound`` if the network says that it does not know
-     * the stop, and another error if the status code reports a failure or
-     * if the body is not what the protocol defines. TRIAS and OJP servers
-     * built on EFA answer an unknown stop with an internal error, which is
-     * an ``PublicTransportError/server``. A HAFAS answer needs the network's time zone
-     * and is an ``PublicTransportError/invalidNetwork`` without it.
-     */
-public func parseDepartures(response: HttpResponse)throws  -> [Departure]  {
-    return try  FfiConverterSequenceTypeDeparture.lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
-        uniffiCallStatus in
-    uniffi_publictransport_fn_method_network_parse_departures(
-            FfiConverterTypeNetwork_lower(self),
-        FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * Parses the response to a ``Network/journeyRequest``.
-     *
-     * # Errors
-     *
-     * Returns ``PublicTransportError/notFound`` if the server does not know the run,
-     * as for an ID that is older than about a day, and another error if
-     * the status code reports a failure or if the body is not what the
-     * protocol defines.
-     */
-public func parseJourney(response: HttpResponse)throws  -> Journey  {
-    return try  FfiConverterTypeJourney_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
-        uniffiCallStatus in
-    uniffi_publictransport_fn_method_network_parse_journey(
-            FfiConverterTypeNetwork_lower(self),
-        FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * Parses the response to a ``Network/locationsRequest``. The best
-     * match comes first. A search without matches gives an empty list.
-     *
-     * # Errors
-     *
-     * Returns an error if the status code reports a failure or if the body
-     * is not what the protocol defines.
-     */
-public func parseLocations(response: HttpResponse)throws  -> [Location]  {
-    return try  FfiConverterSequenceTypeLocation.lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
-        uniffiCallStatus in
-    uniffi_publictransport_fn_method_network_parse_locations(
-            FfiConverterTypeNetwork_lower(self),
-        FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * Parses the response to the ``Network/nearbyRequest`` of `query`:
-     * the stops in its circle in the order of the server, which is the
-     * nearest first. A stop that the server sends from outside the circle
-     * is left out, whatever way the server measures.
-     * ``Coordinate/distanceMeters(to:)``
-     * gives how far one is. None in the circle gives an empty list.
-     *
-     * # Errors
-     *
-     * Returns an error if the status code reports a failure or if the body
-     * is not what the protocol defines.
-     */
-public func parseNearby(query: NearbyQuery, response: HttpResponse)throws  -> [Location]  {
-    return try  FfiConverterSequenceTypeLocation.lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
-        uniffiCallStatus in
-    uniffi_publictransport_fn_method_network_parse_nearby(
-            FfiConverterTypeNetwork_lower(self),
-        FfiConverterTypeNearbyQuery_lower(query),
-        FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * Parses the response to the ``Network/tripsRequest`` of `query`. The
-     * trips are in the order the server ranks them. No connection between
-     * the two places gives an empty list.
-     *
-     * ``Trips/earlier`` and ``Trips/later`` continue the search. MOTIS,
-     * HAFAS and `OpenTripPlanner` send such references. `OpenTripPlanner`
-     * searches a window of time, so an answer can have no trips and still
-     * a reference to later ones, as at night. For EFA, TRIAS and OJP the
-     * library makes them from the times of the trips: a later page starts
-     * at the time the last of these trips leaves, an earlier one at the
-     * time the first arrives, and the trips that were on the page before
-     * are left out of its answer. Such an answer is also cut to
-     * ``TripsQuery/limit``, from the far side of the search, since a
-     * server may add trips hours away. Without a limit nothing is cut,
-     * and the next page starts after everything the server sent.
-     *
-     * # Errors
-     *
-     * Returns ``PublicTransportError/notFound`` if the network does not know one of the
-     * two places, and another error if the status code reports a failure or
-     * if the body is not what the protocol defines. A HAFAS answer needs
-     * the network's time zone and is an ``PublicTransportError/invalidNetwork`` without
-     * it.
-     *
-     * The trips are as the server planned them. Some may have left already
-     * or may no longer work out because a vehicle is late; that is for the
-     * application to check against its clock.
-     */
-public func parseTrips(query: TripsQuery, response: HttpResponse)throws  -> Trips  {
-    return try  FfiConverterTypeTrips_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
-        uniffiCallStatus in
-    uniffi_publictransport_fn_method_network_parse_trips(
-            FfiConverterTypeNetwork_lower(self),
-        FfiConverterTypeTripsQuery_lower(query),
-        FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * The location as an end of a trip on this network: the stop as for
-     * ``Network/stopId``, otherwise the coordinate. A ``TripsQuery``
-     * with a location as an end is sent with it. A trip planned from a
-     * coordinate starts with a walk to a stop nearby.
-     *
-     * `nil` if the location has neither and is not from this network.
-     */
-public func place(location: Location) -> Place?  {
-    return try!  FfiConverterOptionTypePlace.lift(try! rustCall() {
-        uniffiCallStatus in
-    uniffi_publictransport_fn_method_network_place(
-            FfiConverterTypeNetwork_lower(self),
-        FfiConverterTypeLocation_lower(location),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * The ID that names the location as a stop on this network. A
-     * ``DeparturesQuery`` with a location as its stop is sent with it.
-     *
-     * For a stop this network returned, that is its ID. For a stop from
-     * another network, or one without a network, it is the global ID of
-     * its station where the protocol takes one. A platform then becomes
-     * its whole station, and the server may still not know the stop.
-     *
-     * `nil` if the location is not a stop, or if this network could only
-     * find it with a search by name, as MOTIS for a stop from another
-     * network.
-     */
-public func stopId(location: Location) -> String?  {
-    return try!  FfiConverterOptionString.lift(try! rustCall() {
-        uniffiCallStatus in
-    uniffi_publictransport_fn_method_network_stop_id(
-            FfiConverterTypeNetwork_lower(self),
-        FfiConverterTypeLocation_lower(location),uniffiCallStatus
-    )
-})
-}
-    
-    /**
-     * Builds the request for trips between two places.
-     *
-     * EFA takes the time as local time to the minute, with the same limits
-     * as in ``Network/departuresRequest``.
-     *
-     * # Errors
-     *
-     * Returns ``PublicTransportError/invalidNetwork`` if the query has a time and the
-     * network needs a time zone for it but has none or an unknown one, or
-     * if a TRIAS or OJP network has no requestor reference or a HAFAS
-     * network no usable ``Network/hafas`` or no time zone, which the
-     * answer needs, and ``PublicTransportError/invalidQuery`` if the time is outside the
-     * supported range, if an end is a coordinate off the globe or a
-     * location that the network cannot name, see ``Network/place``, or
-     * if the page is not a reference from this network. MOTIS, HAFAS and
-     * `OpenTripPlanner` send the page on unchecked, and their servers
-     * reject a foreign one.
-     */
-public func tripsRequest(query: TripsQuery)throws  -> HttpRequest  {
-    return try  FfiConverterTypeHttpRequest_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
-        uniffiCallStatus in
-    uniffi_publictransport_fn_method_network_trips_request(
-            FfiConverterTypeNetwork_lower(self),
-        FfiConverterTypeTripsQuery_lower(query),uniffiCallStatus
-    )
-})
-}
-    
-
-}
-
-#if compiler(>=6)
-extension Network: Sendable {}
-#endif
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-struct FfiConverterTypeNetwork: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Network {
-        return
-            try Network(
-                id: FfiConverterString.read(from: &buf), 
-                name: FfiConverterString.read(from: &buf), 
-                endpoint: FfiConverterString.read(from: &buf), 
-                protocol: FfiConverterTypeNetworkProtocol.read(from: &buf), 
-                timeZoneIdentifier: FfiConverterOptionString.read(from: &buf), 
-                requestorRef: FfiConverterOptionString.read(from: &buf), 
-                coverage: FfiConverterTypeCoverage.read(from: &buf), 
-                attribution: FfiConverterOptionTypeAttribution.read(from: &buf), 
-                unsupported: FfiConverterSequenceTypeNetworkOperation.read(from: &buf), 
-                requiresKey: FfiConverterBool.read(from: &buf), 
-                terms: FfiConverterOptionString.read(from: &buf), 
-                headers: FfiConverterSequenceTypeHeader.read(from: &buf), 
-                geocoder: FfiConverterOptionString.read(from: &buf), 
-                hafas: FfiConverterOptionTypeHafasOptions.read(from: &buf), 
-                language: FfiConverterOptionString.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: Network, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.id, into: &buf)
-        FfiConverterString.write(value.name, into: &buf)
-        FfiConverterString.write(value.endpoint, into: &buf)
-        FfiConverterTypeNetworkProtocol.write(value.`protocol`, into: &buf)
-        FfiConverterOptionString.write(value.timeZoneIdentifier, into: &buf)
-        FfiConverterOptionString.write(value.requestorRef, into: &buf)
-        FfiConverterTypeCoverage.write(value.coverage, into: &buf)
-        FfiConverterOptionTypeAttribution.write(value.attribution, into: &buf)
-        FfiConverterSequenceTypeNetworkOperation.write(value.unsupported, into: &buf)
-        FfiConverterBool.write(value.requiresKey, into: &buf)
-        FfiConverterOptionString.write(value.terms, into: &buf)
-        FfiConverterSequenceTypeHeader.write(value.headers, into: &buf)
-        FfiConverterOptionString.write(value.geocoder, into: &buf)
-        FfiConverterOptionTypeHafasOptions.write(value.hafas, into: &buf)
-        FfiConverterOptionString.write(value.language, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-func FfiConverterTypeNetwork_lift(_ buf: RustBuffer) throws -> Network {
-    return try FfiConverterTypeNetwork.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-func FfiConverterTypeNetwork_lower(_ value: Network) -> RustBuffer {
-    return FfiConverterTypeNetwork.lower(value)
-}
-
-
-/**
  * A polygon as in `GeoJSON`: the first ring is the outline, further rings
  * are holes in it.
  */
@@ -3934,7 +3321,7 @@ public struct Remark: Equatable, Hashable, Codable {
     public var title: String?
     /**
      * The message as plain text, in the language the server answers in,
-     * see ``Network/language``. Paragraphs are
+     * see ``TransitNetwork/language``. Paragraphs are
      * separated by line breaks, and a link is followed by its target in
      * brackets. At least one of `title` and `text` is set.
      */
@@ -3977,7 +3364,7 @@ public struct Remark: Equatable, Hashable, Codable {
          */title: String?, 
         /**
          * The message as plain text, in the language the server answers in,
-         * see ``Network/language``. Paragraphs are
+         * see ``TransitNetwork/language``. Paragraphs are
          * separated by line breaks, and a link is followed by its target in
          * brackets. At least one of `title` and `text` is set.
          */text: String?, 
@@ -4241,6 +3628,619 @@ func FfiConverterTypeStopover_lower(_ value: Stopover) -> RustBuffer {
 
 
 /**
+ * One server that answers public transport queries.
+ */
+public struct TransitNetwork: Equatable, Hashable {
+    /**
+     * A short identifier, e.g. `vvo-efa`. It has to be unique among the
+     * networks an application uses, because a ``Location`` names its
+     * network by it.
+     */
+    public var id: String
+    /**
+     * The name to show to users.
+     */
+    public var name: String
+    /**
+     * The URL of the server. For EFA and MOTIS it is the base URL that the
+     * protocol's paths are appended to, e.g.
+     * `https://efa.vvo-online.de/std3` or `https://api.transitous.org/api`,
+     * and a trailing slash is allowed. TRIAS and OJP have one URL for all
+     * requests, e.g. `https://efa.vvo-online.de/std3/trias`, and so have
+     * HAFAS mgate, e.g. `https://fahrinfo.vbb.de/bin/mgate.exe`, and
+     * `OpenTripPlanner`, e.g.
+     * `https://api.entur.io/journey-planner/v3/graphql`.
+     */
+    public var endpoint: String
+    /**
+     * The protocol the server speaks.
+     */
+    public var `protocol`: NetworkProtocol
+    /**
+     * The IANA name of the time zone the server works in, e.g.
+     * `Europe/Berlin`. EFA needs it for requests that carry a time and
+     * HAFAS for nearly all. Locations get it as their time zone where the
+     * server sends none per stop, as MOTIS and `OpenTripPlanner` do.
+     */
+    public var timeZoneIdentifier: String?
+    /**
+     * Identifies the client to a TRIAS or OJP server, which refuses
+     * requests without it. Public servers document a value such as
+     * `OpenService`; others hand out a key.
+     */
+    public var requestorRef: String?
+    /**
+     * Where the network has data.
+     */
+    public var coverage: Coverage
+    /**
+     * Whom to name as the source of the data.
+     */
+    public var attribution: Attribution?
+    /**
+     * The operations the server is known not to answer. Building a request
+     * for one of them fails with ``PublicTransportError/unsupported``.
+     */
+    public var unsupported: [NetworkOperation]
+    /**
+     * Whether the server only answers with a key that its operator hands
+     * out on request. The application sets it as
+     * ``TransitNetwork/requestorRef``.
+     */
+    public var requiresKey: Bool
+    /**
+     * A link to usage terms that restrict who may use the server, for
+     * example to non-commercial projects. `nil` if anyone may. The library
+     * does not enforce them: read them before using the network.
+     */
+    public var terms: String?
+    /**
+     * HTTP headers that every request to the server carries, for servers
+     * that want a key or the name of the client in one. A request to
+     * ``TransitNetwork/geocoder`` carries them only if the geocoder has the
+     * scheme, host and port of ``TransitNetwork/endpoint``, both written out
+     * and alike, so that a key does not reach someone else. A header here
+     * takes the place of one with the same name that the protocol or the
+     * HTTP client would set, such as `User-Agent`. The library does not
+     * check names and values; the HTTP client rejects invalid ones. Debug
+     * output leaves the values out.
+     */
+    public var headers: [Header]
+    /**
+     * The URL of a geocoder in the Pelias format, such as
+     * `https://api.entur.io/geocoder/v1`, for protocols without a search
+     * for locations of their own. Location searches go to `autocomplete`
+     * below it, so it must not have a query string; without it they fail
+     * with ``PublicTransportError/unsupported``. The kinds of a search follow Entur's
+     * use of the format: stops are in the layer `venue`, everything else
+     * in `address`.
+     */
+    public var geocoder: String?
+    /**
+     * What a HAFAS mgate server needs. Requests to such a network fail
+     * without it.
+     */
+    public var hafas: HafasOptions?
+    /**
+     * The language to ask names and remarks in, such as `en`. Every
+     * request carries it the way the protocol has for it, as it is written
+     * here without the whitespace around it, and an empty one counts as
+     * none: most servers take a lower-case ISO 639-1 code, a few have
+     * codes of their own. `nil` leaves the choice to the server, and
+     * HAFAS, which has to name one, asks in ``HafasOptions/language``.
+     * A server answers in
+     * its own language where it has no translation, and some ignore the
+     * wish altogether. An `OpenTripPlanner` server sends its disruptions
+     * in every language it has, and the library takes the one named here.
+     */
+    public var language: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * A short identifier, e.g. `vvo-efa`. It has to be unique among the
+         * networks an application uses, because a ``Location`` names its
+         * network by it.
+         */id: String, 
+        /**
+         * The name to show to users.
+         */name: String, 
+        /**
+         * The URL of the server. For EFA and MOTIS it is the base URL that the
+         * protocol's paths are appended to, e.g.
+         * `https://efa.vvo-online.de/std3` or `https://api.transitous.org/api`,
+         * and a trailing slash is allowed. TRIAS and OJP have one URL for all
+         * requests, e.g. `https://efa.vvo-online.de/std3/trias`, and so have
+         * HAFAS mgate, e.g. `https://fahrinfo.vbb.de/bin/mgate.exe`, and
+         * `OpenTripPlanner`, e.g.
+         * `https://api.entur.io/journey-planner/v3/graphql`.
+         */endpoint: String, 
+        /**
+         * The protocol the server speaks.
+         */`protocol`: NetworkProtocol, 
+        /**
+         * The IANA name of the time zone the server works in, e.g.
+         * `Europe/Berlin`. EFA needs it for requests that carry a time and
+         * HAFAS for nearly all. Locations get it as their time zone where the
+         * server sends none per stop, as MOTIS and `OpenTripPlanner` do.
+         */timeZoneIdentifier: String? = nil, 
+        /**
+         * Identifies the client to a TRIAS or OJP server, which refuses
+         * requests without it. Public servers document a value such as
+         * `OpenService`; others hand out a key.
+         */requestorRef: String? = nil, 
+        /**
+         * Where the network has data.
+         */coverage: Coverage = Coverage(), 
+        /**
+         * Whom to name as the source of the data.
+         */attribution: Attribution? = nil, 
+        /**
+         * The operations the server is known not to answer. Building a request
+         * for one of them fails with ``PublicTransportError/unsupported``.
+         */unsupported: [NetworkOperation] = [], 
+        /**
+         * Whether the server only answers with a key that its operator hands
+         * out on request. The application sets it as
+         * ``TransitNetwork/requestorRef``.
+         */requiresKey: Bool = false, 
+        /**
+         * A link to usage terms that restrict who may use the server, for
+         * example to non-commercial projects. `nil` if anyone may. The library
+         * does not enforce them: read them before using the network.
+         */terms: String? = nil, 
+        /**
+         * HTTP headers that every request to the server carries, for servers
+         * that want a key or the name of the client in one. A request to
+         * ``TransitNetwork/geocoder`` carries them only if the geocoder has the
+         * scheme, host and port of ``TransitNetwork/endpoint``, both written out
+         * and alike, so that a key does not reach someone else. A header here
+         * takes the place of one with the same name that the protocol or the
+         * HTTP client would set, such as `User-Agent`. The library does not
+         * check names and values; the HTTP client rejects invalid ones. Debug
+         * output leaves the values out.
+         */headers: [Header] = [], 
+        /**
+         * The URL of a geocoder in the Pelias format, such as
+         * `https://api.entur.io/geocoder/v1`, for protocols without a search
+         * for locations of their own. Location searches go to `autocomplete`
+         * below it, so it must not have a query string; without it they fail
+         * with ``PublicTransportError/unsupported``. The kinds of a search follow Entur's
+         * use of the format: stops are in the layer `venue`, everything else
+         * in `address`.
+         */geocoder: String? = nil, 
+        /**
+         * What a HAFAS mgate server needs. Requests to such a network fail
+         * without it.
+         */hafas: HafasOptions? = nil, 
+        /**
+         * The language to ask names and remarks in, such as `en`. Every
+         * request carries it the way the protocol has for it, as it is written
+         * here without the whitespace around it, and an empty one counts as
+         * none: most servers take a lower-case ISO 639-1 code, a few have
+         * codes of their own. `nil` leaves the choice to the server, and
+         * HAFAS, which has to name one, asks in ``HafasOptions/language``.
+         * A server answers in
+         * its own language where it has no translation, and some ignore the
+         * wish altogether. An `OpenTripPlanner` server sends its disruptions
+         * in every language it has, and the library takes the one named here.
+         */language: String? = nil) {
+        self.id = id
+        self.name = name
+        self.endpoint = endpoint
+        self.`protocol` = `protocol`
+        self.timeZoneIdentifier = timeZoneIdentifier
+        self.requestorRef = requestorRef
+        self.coverage = coverage
+        self.attribution = attribution
+        self.unsupported = unsupported
+        self.requiresKey = requiresKey
+        self.terms = terms
+        self.headers = headers
+        self.geocoder = geocoder
+        self.hafas = hafas
+        self.language = language
+    }
+
+    
+    /**
+     * Builds the request for the arrivals at a stop, from the query that
+     * ``TransitNetwork/departuresRequest`` takes: its time is the one from
+     * which arrivals are wanted.
+     *
+     * # Errors
+     *
+     * The same as ``TransitNetwork/departuresRequest``. A network that lists
+     * departures as unsupported has no arrivals either.
+     */
+public func arrivalsRequest(query: DeparturesQuery)throws  -> HttpRequest  {
+    return try  FfiConverterTypeHttpRequest_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_arrivals_request(
+            FfiConverterTypeTransitNetwork_lower(self),
+        FfiConverterTypeDeparturesQuery_lower(query),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Builds the request for the next departures at a stop.
+     *
+     * EFA takes the time as local time to the minute. In the hour that
+     * repeats when daylight saving time ends, it cannot tell the first pass
+     * from the second.
+     *
+     * # Errors
+     *
+     * Returns ``PublicTransportError/invalidNetwork`` if the query has a time and the
+     * network needs a time zone for it but has none or an unknown one, or
+     * if a TRIAS or OJP network has no requestor reference or a HAFAS
+     * network no usable ``TransitNetwork/hafas`` or no time zone, which the
+     * answer needs, and ``PublicTransportError/invalidQuery`` if the time is outside the
+     * supported range, if the stop is a position, or if it is a location
+     * that the network cannot name as a stop, see ``TransitNetwork/stopId``.
+     */
+public func departuresRequest(query: DeparturesQuery)throws  -> HttpRequest  {
+    return try  FfiConverterTypeHttpRequest_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_departures_request(
+            FfiConverterTypeTransitNetwork_lower(self),
+        FfiConverterTypeDeparturesQuery_lower(query),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Builds the request for the run of one vehicle, from the
+     * ``Departure/journeyId`` of a departure, an arrival or a leg that
+     * this network returned.
+     *
+     * # Errors
+     *
+     * Returns ``PublicTransportError/invalidQuery`` if the ID is not one of this
+     * network. MOTIS and HAFAS send any text on, and their servers do not
+     * know a foreign one. ``PublicTransportError/unsupported`` and
+     * ``PublicTransportError/invalidNetwork`` are as for
+     * ``TransitNetwork/departuresRequest``; EFA and HAFAS always need the
+     * time zone here.
+     */
+public func journeyRequest(id: String)throws  -> HttpRequest  {
+    return try  FfiConverterTypeHttpRequest_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_journey_request(
+            FfiConverterTypeTransitNetwork_lower(self),
+        FfiConverterString.lower(id),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Builds the request that searches for locations by name.
+     *
+     * # Errors
+     *
+     * Returns ``PublicTransportError/invalidNetwork`` if a TRIAS or OJP network has no
+     * requestor reference or a HAFAS network lacks ``TransitNetwork/hafas`` or
+     * has options that are no JSON objects, and
+     * ``PublicTransportError/invalidQuery`` if the query asks
+     * only for kinds of location the protocol does not have or holds text
+     * the protocol cannot carry. An `OpenTripPlanner` network without a
+     * ``TransitNetwork/geocoder`` gives ``PublicTransportError/unsupported``.
+     */
+public func locationsRequest(query: LocationQuery)throws  -> HttpRequest  {
+    return try  FfiConverterTypeHttpRequest_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_locations_request(
+            FfiConverterTypeTransitNetwork_lower(self),
+        FfiConverterTypeLocationQuery_lower(query),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Builds the request for the stops near a position.
+     *
+     * # Errors
+     *
+     * Returns ``PublicTransportError/invalidQuery`` if the position is not on the globe,
+     * ``PublicTransportError/unsupported`` if the network is known not to answer this
+     * search, and ``PublicTransportError/invalidNetwork`` if a TRIAS or OJP network has
+     * no requestor reference or a HAFAS network no usable
+     * ``TransitNetwork/hafas``.
+     */
+public func nearbyRequest(query: NearbyQuery)throws  -> HttpRequest  {
+    return try  FfiConverterTypeHttpRequest_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_nearby_request(
+            FfiConverterTypeTransitNetwork_lower(self),
+        FfiConverterTypeNearbyQuery_lower(query),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Parses the response to a ``TransitNetwork/arrivalsRequest``. The arrivals
+     * are ordered by ``Arrival/expectedTime``.
+     *
+     * # Errors
+     *
+     * The same as ``TransitNetwork/parseDepartures``.
+     */
+public func parseArrivals(response: HttpResponse)throws  -> [Arrival]  {
+    return try  FfiConverterSequenceTypeArrival.lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_parse_arrivals(
+            FfiConverterTypeTransitNetwork_lower(self),
+        FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Parses the response to a ``TransitNetwork/departuresRequest``. The
+     * departures are ordered by ``Departure/expectedTime``.
+     *
+     * # Errors
+     *
+     * Returns ``PublicTransportError/notFound`` if the network says that it does not know
+     * the stop, and another error if the status code reports a failure or
+     * if the body is not what the protocol defines. TRIAS and OJP servers
+     * built on EFA answer an unknown stop with an internal error, which is
+     * an ``PublicTransportError/server``. A HAFAS answer needs the network's time zone
+     * and is an ``PublicTransportError/invalidNetwork`` without it.
+     */
+public func parseDepartures(response: HttpResponse)throws  -> [Departure]  {
+    return try  FfiConverterSequenceTypeDeparture.lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_parse_departures(
+            FfiConverterTypeTransitNetwork_lower(self),
+        FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Parses the response to a ``TransitNetwork/journeyRequest``.
+     *
+     * # Errors
+     *
+     * Returns ``PublicTransportError/notFound`` if the server does not know the run,
+     * as for an ID that is older than about a day, and another error if
+     * the status code reports a failure or if the body is not what the
+     * protocol defines.
+     */
+public func parseJourney(response: HttpResponse)throws  -> Journey  {
+    return try  FfiConverterTypeJourney_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_parse_journey(
+            FfiConverterTypeTransitNetwork_lower(self),
+        FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Parses the response to a ``TransitNetwork/locationsRequest``. The best
+     * match comes first. A search without matches gives an empty list.
+     *
+     * # Errors
+     *
+     * Returns an error if the status code reports a failure or if the body
+     * is not what the protocol defines.
+     */
+public func parseLocations(response: HttpResponse)throws  -> [Location]  {
+    return try  FfiConverterSequenceTypeLocation.lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_parse_locations(
+            FfiConverterTypeTransitNetwork_lower(self),
+        FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Parses the response to the ``TransitNetwork/nearbyRequest`` of `query`:
+     * the stops in its circle in the order of the server, which is the
+     * nearest first. A stop that the server sends from outside the circle
+     * is left out, whatever way the server measures.
+     * ``Coordinate/distanceMeters(to:)``
+     * gives how far one is. None in the circle gives an empty list.
+     *
+     * # Errors
+     *
+     * Returns an error if the status code reports a failure or if the body
+     * is not what the protocol defines.
+     */
+public func parseNearby(query: NearbyQuery, response: HttpResponse)throws  -> [Location]  {
+    return try  FfiConverterSequenceTypeLocation.lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_parse_nearby(
+            FfiConverterTypeTransitNetwork_lower(self),
+        FfiConverterTypeNearbyQuery_lower(query),
+        FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Parses the response to the ``TransitNetwork/tripsRequest`` of `query`. The
+     * trips are in the order the server ranks them. No connection between
+     * the two places gives an empty list.
+     *
+     * ``Trips/earlier`` and ``Trips/later`` continue the search. MOTIS,
+     * HAFAS and `OpenTripPlanner` send such references. `OpenTripPlanner`
+     * searches a window of time, so an answer can have no trips and still
+     * a reference to later ones, as at night. For EFA, TRIAS and OJP the
+     * library makes them from the times of the trips: a later page starts
+     * at the time the last of these trips leaves, an earlier one at the
+     * time the first arrives, and the trips that were on the page before
+     * are left out of its answer. Such an answer is also cut to
+     * ``TripsQuery/limit``, from the far side of the search, since a
+     * server may add trips hours away. Without a limit nothing is cut,
+     * and the next page starts after everything the server sent.
+     *
+     * # Errors
+     *
+     * Returns ``PublicTransportError/notFound`` if the network does not know one of the
+     * two places, and another error if the status code reports a failure or
+     * if the body is not what the protocol defines. A HAFAS answer needs
+     * the network's time zone and is an ``PublicTransportError/invalidNetwork`` without
+     * it.
+     *
+     * The trips are as the server planned them. Some may have left already
+     * or may no longer work out because a vehicle is late; that is for the
+     * application to check against its clock.
+     */
+public func parseTrips(query: TripsQuery, response: HttpResponse)throws  -> Trips  {
+    return try  FfiConverterTypeTrips_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_parse_trips(
+            FfiConverterTypeTransitNetwork_lower(self),
+        FfiConverterTypeTripsQuery_lower(query),
+        FfiConverterTypeHttpResponse_lower(response),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * The location as an end of a trip on this network: the stop as for
+     * ``TransitNetwork/stopId``, otherwise the coordinate. A ``TripsQuery``
+     * with a location as an end is sent with it. A trip planned from a
+     * coordinate starts with a walk to a stop nearby.
+     *
+     * `nil` if the location has neither and is not from this network.
+     */
+public func place(location: Location) -> Place?  {
+    return try!  FfiConverterOptionTypePlace.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_place(
+            FfiConverterTypeTransitNetwork_lower(self),
+        FfiConverterTypeLocation_lower(location),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * The ID that names the location as a stop on this network. A
+     * ``DeparturesQuery`` with a location as its stop is sent with it.
+     *
+     * For a stop this network returned, that is its ID. For a stop from
+     * another network, or one without a network, it is the global ID of
+     * its station where the protocol takes one. A platform then becomes
+     * its whole station, and the server may still not know the stop.
+     *
+     * `nil` if the location is not a stop, or if this network could only
+     * find it with a search by name, as MOTIS for a stop from another
+     * network.
+     */
+public func stopId(location: Location) -> String?  {
+    return try!  FfiConverterOptionString.lift(try! rustCall() {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_stop_id(
+            FfiConverterTypeTransitNetwork_lower(self),
+        FfiConverterTypeLocation_lower(location),uniffiCallStatus
+    )
+})
+}
+    
+    /**
+     * Builds the request for trips between two places.
+     *
+     * EFA takes the time as local time to the minute, with the same limits
+     * as in ``TransitNetwork/departuresRequest``.
+     *
+     * # Errors
+     *
+     * Returns ``PublicTransportError/invalidNetwork`` if the query has a time and the
+     * network needs a time zone for it but has none or an unknown one, or
+     * if a TRIAS or OJP network has no requestor reference or a HAFAS
+     * network no usable ``TransitNetwork/hafas`` or no time zone, which the
+     * answer needs, and ``PublicTransportError/invalidQuery`` if the time is outside the
+     * supported range, if an end is a coordinate off the globe or a
+     * location that the network cannot name, see ``TransitNetwork/place``, or
+     * if the page is not a reference from this network. MOTIS, HAFAS and
+     * `OpenTripPlanner` send the page on unchecked, and their servers
+     * reject a foreign one.
+     */
+public func tripsRequest(query: TripsQuery)throws  -> HttpRequest  {
+    return try  FfiConverterTypeHttpRequest_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
+        uniffiCallStatus in
+    uniffi_publictransport_fn_method_network_trips_request(
+            FfiConverterTypeTransitNetwork_lower(self),
+        FfiConverterTypeTripsQuery_lower(query),uniffiCallStatus
+    )
+})
+}
+    
+
+}
+
+#if compiler(>=6)
+extension TransitNetwork: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+struct FfiConverterTypeTransitNetwork: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TransitNetwork {
+        return
+            try TransitNetwork(
+                id: FfiConverterString.read(from: &buf), 
+                name: FfiConverterString.read(from: &buf), 
+                endpoint: FfiConverterString.read(from: &buf), 
+                protocol: FfiConverterTypeNetworkProtocol.read(from: &buf), 
+                timeZoneIdentifier: FfiConverterOptionString.read(from: &buf), 
+                requestorRef: FfiConverterOptionString.read(from: &buf), 
+                coverage: FfiConverterTypeCoverage.read(from: &buf), 
+                attribution: FfiConverterOptionTypeAttribution.read(from: &buf), 
+                unsupported: FfiConverterSequenceTypeNetworkOperation.read(from: &buf), 
+                requiresKey: FfiConverterBool.read(from: &buf), 
+                terms: FfiConverterOptionString.read(from: &buf), 
+                headers: FfiConverterSequenceTypeHeader.read(from: &buf), 
+                geocoder: FfiConverterOptionString.read(from: &buf), 
+                hafas: FfiConverterOptionTypeHafasOptions.read(from: &buf), 
+                language: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: TransitNetwork, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.id, into: &buf)
+        FfiConverterString.write(value.name, into: &buf)
+        FfiConverterString.write(value.endpoint, into: &buf)
+        FfiConverterTypeNetworkProtocol.write(value.`protocol`, into: &buf)
+        FfiConverterOptionString.write(value.timeZoneIdentifier, into: &buf)
+        FfiConverterOptionString.write(value.requestorRef, into: &buf)
+        FfiConverterTypeCoverage.write(value.coverage, into: &buf)
+        FfiConverterOptionTypeAttribution.write(value.attribution, into: &buf)
+        FfiConverterSequenceTypeNetworkOperation.write(value.unsupported, into: &buf)
+        FfiConverterBool.write(value.requiresKey, into: &buf)
+        FfiConverterOptionString.write(value.terms, into: &buf)
+        FfiConverterSequenceTypeHeader.write(value.headers, into: &buf)
+        FfiConverterOptionString.write(value.geocoder, into: &buf)
+        FfiConverterOptionTypeHafasOptions.write(value.hafas, into: &buf)
+        FfiConverterOptionString.write(value.language, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+func FfiConverterTypeTransitNetwork_lift(_ buf: RustBuffer) throws -> TransitNetwork {
+    return try FfiConverterTypeTransitNetwork.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+func FfiConverterTypeTransitNetwork_lower(_ value: TransitNetwork) -> RustBuffer {
+    return FfiConverterTypeTransitNetwork.lower(value)
+}
+
+
+/**
  * One way to get from the start to the destination.
  */
 public struct Trip: Equatable, Hashable, Codable {
@@ -4463,7 +4463,7 @@ public struct TripsQuery: Equatable, Hashable, Codable {
      * How many trips are wanted. This is not a maximum: servers treat it
      * as a guide and may return more or fewer, so cut the list where a
      * fixed number matters. Only an answer of EFA, TRIAS or OJP is cut to
-     * it, see ``Network/parseTrips``.
+     * it, see ``TransitNetwork/parseTrips``.
      * `nil` leaves the number to the server.
      */
     public var limit: UInt32?
@@ -4493,7 +4493,7 @@ public struct TripsQuery: Equatable, Hashable, Codable {
          * How many trips are wanted. This is not a maximum: servers treat it
          * as a guide and may return more or fewer, so cut the list where a
          * fixed number matters. Only an answer of EFA, TRIAS or OJP is cut to
-         * it, see ``Network/parseTrips``.
+         * it, see ``TransitNetwork/parseTrips``.
          * `nil` leaves the number to the server.
          */limit: UInt32? = nil, 
         /**
@@ -4794,8 +4794,8 @@ public var id: String {
     /**
      * The network, as the bundled registry has or would have it.
      */
-public func network() -> Network  {
-    return try!  FfiConverterTypeNetwork_lift(try! rustCall() {
+public func network() -> TransitNetwork  {
+    return try!  FfiConverterTypeTransitNetwork_lift(try! rustCall() {
         uniffiCallStatus in
     uniffi_publictransport_fn_method_bundlednetwork_network(
             FfiConverterTypeBundledNetwork_lower(self),uniffiCallStatus
@@ -5779,7 +5779,7 @@ func FfiConverterTypeMode_lower(_ value: Mode) -> RustBuffer {
 
 
 /**
- * One of the kinds of request that a ``Network`` can be asked.
+ * One of the kinds of request that a ``TransitNetwork`` can be asked.
  */
 
 public enum NetworkOperation: Equatable, Hashable, CaseIterable {
@@ -5883,7 +5883,7 @@ func FfiConverterTypeNetworkOperation_lower(_ value: NetworkOperation) -> RustBu
 
 
 /**
- * The protocol a ``Network`` speaks.
+ * The protocol a ``TransitNetwork`` speaks.
  */
 
 public enum NetworkProtocol: Equatable, Hashable, CaseIterable {
@@ -5906,7 +5906,7 @@ public enum NetworkProtocol: Equatable, Hashable, CaseIterable {
     case ojp1
     /**
      * HAFAS mgate, the JSON interface behind the apps of operators that
-     * run the HAFAS journey planner. It needs ``Network/hafas``. The
+     * run the HAFAS journey planner. It needs ``TransitNetwork/hafas``. The
      * operators made it for their own apps and have not opened it to
      * others, so a server can change or lock others out without notice.
      */
@@ -5914,7 +5914,7 @@ public enum NetworkProtocol: Equatable, Hashable, CaseIterable {
     /**
      * `OpenTripPlanner` 2 with its Transmodel API, a GraphQL interface
      * used in the Nordic countries. It has no search for locations, so it
-     * needs ``Network/geocoder`` for that.
+     * needs ``TransitNetwork/geocoder`` for that.
      */
     case otpTransmodel
 
@@ -6025,8 +6025,8 @@ public enum Place: Equatable, Hashable, Codable {
     /**
      * A location from a search, a departure or a trip, of this network or
      * another. The network that is asked translates it with
-     * ``Network/stopId`` for departures and
-     * ``Network/place`` for trips. A location it
+     * ``TransitNetwork/stopId`` for departures and
+     * ``TransitNetwork/place`` for trips. A location it
      * cannot name is an
      * ``PublicTransportError/invalidQuery``.
      */
@@ -6113,7 +6113,7 @@ enum PublicTransportError: Swift.Error, Equatable, Hashable, Foundation.Localize
     
     
     /**
-     * The ``Network`` lacks something the request needs,
+     * The ``TransitNetwork`` lacks something the request needs,
      * such as a time zone, or its description cannot be read.
      */
     case invalidNetwork(
@@ -6132,9 +6132,9 @@ enum PublicTransportError: Swift.Error, Equatable, Hashable, Foundation.Localize
     )
     /**
      * The network's server is known not to answer this kind of request,
-     * see ``Network/unsupported``, or the
+     * see ``TransitNetwork/unsupported``, or the
      * network lacks what the request needs: an `OpenTripPlanner` network
-     * without a ``Network/geocoder`` cannot
+     * without a ``TransitNetwork/geocoder`` cannot
      * search for locations.
      */
     case unsupported(
@@ -6733,8 +6733,8 @@ fileprivate struct FfiConverterOptionTypeLegEnd: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterOptionTypeNetwork: FfiConverterRustBuffer {
-    typealias SwiftType = Network?
+fileprivate struct FfiConverterOptionTypeTransitNetwork: FfiConverterRustBuffer {
+    typealias SwiftType = TransitNetwork?
 
     public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
         guard let value = value else {
@@ -6742,13 +6742,13 @@ fileprivate struct FfiConverterOptionTypeNetwork: FfiConverterRustBuffer {
             return
         }
         writeInt(&buf, Int8(1))
-        FfiConverterTypeNetwork.write(value, into: &buf)
+        FfiConverterTypeTransitNetwork.write(value, into: &buf)
     }
 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
-        case 1: return try FfiConverterTypeNetwork.read(from: &buf)
+        case 1: return try FfiConverterTypeTransitNetwork.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -7152,31 +7152,6 @@ fileprivate struct FfiConverterSequenceTypeLocation: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterSequenceTypeNetwork: FfiConverterRustBuffer {
-    typealias SwiftType = [Network]
-
-    public static func write(_ value: [Network], into buf: inout [UInt8]) {
-        let len = Int32(value.count)
-        writeInt(&buf, len)
-        for item in value {
-            FfiConverterTypeNetwork.write(item, into: &buf)
-        }
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [Network] {
-        let len: Int32 = try readInt(&buf)
-        var seq = [Network]()
-        seq.reserveCapacity(Int(len))
-        for _ in 0 ..< len {
-            seq.append(try FfiConverterTypeNetwork.read(from: &buf))
-        }
-        return seq
-    }
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 fileprivate struct FfiConverterSequenceTypePolygon: FfiConverterRustBuffer {
     typealias SwiftType = [Polygon]
 
@@ -7244,6 +7219,31 @@ fileprivate struct FfiConverterSequenceTypeStopover: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeStopover.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeTransitNetwork: FfiConverterRustBuffer {
+    typealias SwiftType = [TransitNetwork]
+
+    public static func write(_ value: [TransitNetwork], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeTransitNetwork.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [TransitNetwork] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [TransitNetwork]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeTransitNetwork.read(from: &buf))
         }
         return seq
     }
@@ -7433,8 +7433,8 @@ func FfiConverterTypeUtcTime_lower(_ value: UtcTime) -> RustBuffer {
  * repository, see `Network::from_json` in the Rust documentation. A record
  * cannot have a constructor in the bindings, so this is a function.
  */
-func networkFromJson(id: String, json: String)throws  -> Network  {
-    return try  FfiConverterTypeNetwork_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
+func networkFromJson(id: String, json: String)throws  -> TransitNetwork  {
+    return try  FfiConverterTypeTransitNetwork_lift(try rustCallWithError(FfiConverterTypePublicTransportError_lift) {
         uniffiCallStatus in
     uniffi_publictransport_fn_func_network_from_json(
         FfiConverterString.lower(id),

@@ -21,6 +21,7 @@ RENAMED = {
     "Protocol": "NetworkProtocol",
     "Operation": "NetworkOperation",
     "Method": "HttpMethod",
+    "Network": "TransitNetwork",
 }
 # Methods without arguments that Swift writes as properties, with the
 # number of types that have one. They only read fields.
@@ -56,13 +57,13 @@ MEMBERS = {
     "Location/timezone": "Location/timeZoneIdentifier",
     # Internal in Swift, see `hide_helpers`.
     "Location/localTime": "Location/timeZone",
-    "Network/timezone": "Network/timeZoneIdentifier",
-    "Network/fromJson": "Network/init(id:json:)",
+    "TransitNetwork/timezone": "TransitNetwork/timeZoneIdentifier",
+    "TransitNetwork/fromJson": "TransitNetwork/init(id:json:)",
 }
 # Types that are not `Codable`: they describe a network, which has its own
 # JSON form and can hold credentials, or an HTTP exchange.
 NOT_CODABLE = {
-    "Network",
+    "TransitNetwork",
     "NetworkProtocol",
     "NetworkOperation",
     "HafasOptions",
@@ -274,14 +275,21 @@ def main() -> None:
         fail(f"{path} was adapted before; generate it again")
 
     # UniFFI 0.32.2 renames the types but not their converters where a
-    # method of a record throws the type or a trait of the type is
-    # exported. Without this the code does not compile.
+    # method of a record or an enum throws or returns the type, or a trait
+    # of the type is exported. Nor does it rename the type that a method of
+    # an enum returns. Without this the code does not compile.
     for old, new in RENAMED.items():
         code.replace(
             f"converter of {old}",
             rf"FfiConverterType{old}_(lift|lower)",
             rf"FfiConverterType{new}_\1",
         )
+    code.replace(
+        "return type of BundledNetwork.network()",
+        r"^public func network\(\) -> Network\b",
+        "public func network() -> TransitNetwork",
+        1,
+    )
 
     # The message of an error is the one from Rust, which the generated
     # code has as `description`, where it would print the case.
@@ -317,7 +325,7 @@ def main() -> None:
         "public func distanceMeters(to other: Coordinate)",
         1,
     )
-    # `Network(id:json:)` in Client.swift takes its place.
+    # `TransitNetwork(id:json:)` in Client.swift takes its place.
     code.replace("networkFromJson", r"^public func networkFromJson\(", "func networkFromJson(", 1)
 
     error_cases(code)

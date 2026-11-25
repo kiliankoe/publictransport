@@ -55,7 +55,7 @@ extension String: PlaceConvertible {
         /// The stops near a position of Core Location, as for a
         /// ``Coordinate``.
         public func nearby(
-            in network: Network,
+            in network: TransitNetwork,
             at position: CLLocationCoordinate2D,
             radiusMeters: Int? = nil,
             limit: Int? = nil
@@ -72,10 +72,10 @@ extension String: PlaceConvertible {
     }
 #endif
 
-extension Network {
+extension TransitNetwork {
     /// The network that ships with the library under this name, such as
-    /// `Network.bundled(.vvoEfa)`.
-    public static func bundled(_ network: BundledNetwork) -> Network {
+    /// `TransitNetwork.bundled(.vvoEfa)`.
+    public static func bundled(_ network: BundledNetwork) -> TransitNetwork {
         network.network()
     }
 
@@ -101,7 +101,7 @@ extension Location {
     }
 }
 
-extension Network {
+extension TransitNetwork {
     /// The time zone the server works in. `nil` if the network names none,
     /// or if the system does not know the name.
     public var timeZone: TimeZone? {
@@ -111,7 +111,7 @@ extension Network {
 
 // Both have an `id` already, which lists in SwiftUI ask for.
 extension Location: Identifiable {}
-extension Network: Identifiable {}
+extension TransitNetwork: Identifiable {}
 
 /// What can go wrong in the client itself. Failures that the server or the
 /// query cause are a ``PublicTransportError``, and failures of the HTTP
@@ -130,12 +130,12 @@ public enum ClientError: Error, Equatable, LocalizedError {
 
 /// Sends requests to public transport servers and waits for the answers.
 ///
-/// One client serves every ``Network``. It does not retry, limit its
+/// One client serves every ``TransitNetwork``. It does not retry, limit its
 /// request rate or cache; those are decisions for the application.
 ///
 /// ```swift
 /// let client = Client(userAgent: "my-app/1.0 (+https://example.org)")
-/// let network = Network.bundled(.vvoEfa)
+/// let network = TransitNetwork.bundled(.vvoEfa)
 /// let stops = try await client.locations(in: network, matching: "Hauptbahnhof")
 /// let board = try await client.departures(in: network, at: stops[0])
 /// ```
@@ -187,7 +187,7 @@ public struct Client: Sendable {
     ///   got wrong, `URLError` if the request got no answer, and
     ///   `CancellationError` if the task was cancelled.
     public func locations(
-        in network: Network,
+        in network: TransitNetwork,
         matching text: String,
         kinds: [LocationKind] = [],
         limit: Int? = nil
@@ -197,7 +197,7 @@ public struct Client: Sendable {
     }
 
     /// Searches for locations with a query of the core library.
-    public func locations(in network: Network, query: LocationQuery) async throws -> [Location] {
+    public func locations(in network: TransitNetwork, query: LocationQuery) async throws -> [Location] {
         let response = try await send(network.locationsRequest(query: query))
         return try network.parseLocations(response: response)
     }
@@ -216,7 +216,7 @@ public struct Client: Sendable {
     ///   position off the globe, and `URLError` if the request got no
     ///   answer.
     public func nearby(
-        in network: Network,
+        in network: TransitNetwork,
         at position: Coordinate,
         radiusMeters: Int? = nil,
         limit: Int? = nil
@@ -232,7 +232,7 @@ public struct Client: Sendable {
     }
 
     /// Finds the stops near a position with a query of the core library.
-    public func nearby(in network: Network, query: NearbyQuery) async throws -> [Location] {
+    public func nearby(in network: TransitNetwork, query: NearbyQuery) async throws -> [Location] {
         let response = try await send(network.nearbyRequest(query: query))
         return try network.parseNearby(query: query, response: response)
     }
@@ -251,7 +251,7 @@ public struct Client: Sendable {
     ///   the network does not know, and `URLError` if the request got no
     ///   answer.
     public func departures(
-        in network: Network,
+        in network: TransitNetwork,
         at stop: some PlaceConvertible,
         after time: Date? = nil,
         limit: Int? = nil
@@ -261,7 +261,7 @@ public struct Client: Sendable {
     }
 
     /// Lists departures with a query of the core library.
-    public func departures(in network: Network, query: DeparturesQuery) async throws -> [Departure] {
+    public func departures(in network: TransitNetwork, query: DeparturesQuery) async throws -> [Departure] {
         let response = try await send(network.departuresRequest(query: query))
         return try network.parseDepartures(response: response)
     }
@@ -281,7 +281,7 @@ public struct Client: Sendable {
     ///   the network does not know, and `URLError` if the request got no
     ///   answer.
     public func arrivals(
-        in network: Network,
+        in network: TransitNetwork,
         at stop: some PlaceConvertible,
         after time: Date? = nil,
         limit: Int? = nil
@@ -292,7 +292,7 @@ public struct Client: Sendable {
 
     /// Lists arrivals with a query of the core library, the one of
     /// departures.
-    public func arrivals(in network: Network, query: DeparturesQuery) async throws -> [Arrival] {
+    public func arrivals(in network: TransitNetwork, query: DeparturesQuery) async throws -> [Arrival] {
         let response = try await send(network.arrivalsRequest(query: query))
         return try network.parseArrivals(response: response)
     }
@@ -307,7 +307,7 @@ public struct Client: Sendable {
     /// - Throws: ``PublicTransportError``, such as `notFound` for a run
     ///   the server no longer knows, and `URLError` if the request got no
     ///   answer.
-    public func journey(in network: Network, id: String) async throws -> Journey {
+    public func journey(in network: TransitNetwork, id: String) async throws -> Journey {
         let response = try await send(network.journeyRequest(id: id))
         return try network.parseJourney(response: response)
     }
@@ -333,7 +333,7 @@ public struct Client: Sendable {
     ///   the network does not know, and `URLError` if the request got no
     ///   answer.
     public func trips(
-        in network: Network,
+        in network: TransitNetwork,
         from origin: some PlaceConvertible,
         to destination: some PlaceConvertible,
         departingAt: Date? = nil,
@@ -361,7 +361,7 @@ public struct Client: Sendable {
     }
 
     /// Plans trips with a query of the core library.
-    public func trips(in network: Network, query: TripsQuery) async throws -> Trips {
+    public func trips(in network: TransitNetwork, query: TripsQuery) async throws -> Trips {
         let response = try await send(network.tripsRequest(query: query))
         return try network.parseTrips(query: query, response: response)
     }

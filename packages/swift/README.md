@@ -13,7 +13,7 @@ It runs on iOS, macOS, tvOS, watchOS and visionOS from version 26, and on Linux.
 import PublicTransport
 
 let client = Client(userAgent: "my-app/1.0 (+https://example.org)")
-let network = Network.bundled(.vvoEfa)
+let network = TransitNetwork.bundled(.vvoEfa)
 
 let stops = try await client.locations(in: network, matching: "Hauptbahnhof", kinds: [.stop])
 guard let from = stops.first, let to = stops.dropFirst().first else { return }
@@ -85,10 +85,10 @@ for covering in registry.covering(at: Coordinate(latitude: 51.22, longitude: 6.7
 }
 ```
 
-The [list of bundled networks](https://kiliankoe.github.io/publictransport/networks.html) also says what a network of your own needs. Describe one in code, or read one from an entry of [transport-apis](https://github.com/public-transport/transport-apis) with `Network(id:json:)`. A header for a key or a client name is one more entry in its list:
+The [list of bundled networks](https://kiliankoe.github.io/publictransport/networks.html) also says what a network of your own needs. Describe one in code, or read one from an entry of [transport-apis](https://github.com/public-transport/transport-apis) with `TransitNetwork(id:json:)`. A header for a key or a client name is one more entry in its list:
 
 ```swift
-var network = Network.bundled(.entur)
+var network = TransitNetwork.bundled(.entur)
 network.headers.append(Header(name: "ET-Client-Name", value: "mycompany-myapp"))
 ```
 
@@ -121,9 +121,9 @@ At least one of `title` and `text` is set. `text` is plain text without HTML, in
 
 ## SwiftUI and storing values
 
-`Location` and `Network` are `Identifiable`. A `Departure` and a `Trip` have no identifier from the server; they are `Hashable`, so a list can use `id: \.self`.
+`Location` and `TransitNetwork` are `Identifiable`. A `Departure` and a `Trip` have no identifier from the server; they are `Hashable`, so a list can use `id: \.self`.
 
-What a query takes and what an answer holds is `Codable`. The stored form follows the model, so it can change with any minor version before 1.0: read stored values with `try?` and fetch them again when that fails. For what has to outlive an update, such as a favorite stop, store `network.id` and `location.id`. A `Network` is not `Codable`, because it can hold credentials; find it again with `Registry.bundled().network(id:)`.
+What a query takes and what an answer holds is `Codable`. The stored form follows the model, so it can change with any minor version before 1.0: read stored values with `try?` and fetch them again when that fails. For what has to outlive an update, such as a favorite stop, store `network.id` and `location.id`. A `TransitNetwork` is not `Codable`, because it can hold credentials; find it again with `Registry.bundled().network(id:)`.
 
 ## Errors
 
