@@ -540,11 +540,10 @@ pub(crate) fn parse_trips(network: &Network, response: &HttpResponse) -> Result<
         .out_con_l
         .iter()
         .map(|connection| {
-            let legs = connection
-                .sec_l
-                .iter()
-                .map(|section| reader.leg(&connection.date, section))
-                .collect::<Result<_, _>>()?;
+            let mut legs = Vec::new();
+            for section in &connection.sec_l {
+                legs.extend(reader.legs(&connection.date, section)?);
+            }
             Ok(Trip::new(legs))
         })
         .filter_map(Result::transpose)
@@ -764,6 +763,78 @@ impl<'a> Reader<'a> {
             }
         }
         remarks
+    }
+
+    /// The legs of a section: one per line of a ride whose vehicle goes on
+    /// under another line, as EFA, TRIAS, OJP and `OpenTripPlanner` answer.
+    fn legs(&self, date: &str, section: &Section) -> Result<Vec<Leg>, Error> {
+        let leg = self.leg(date, section)?;
+        let parts = section
+            .jny
+            .as_ref()
+            .filter(|_| section.kind == "JNY")
+            .and_then(|journey| self.split(&leg, journey));
+        Ok(parts.unwrap_or_else(|| vec![leg]))
+    }
+
+    /// The legs of a ride with more than one line, or `None` if it has one
+    /// line or its lines do not match its stops. A ride that cannot be
+    /// split stays one leg rather than costing the whole answer.
+    fn split(&self, leg: &Leg, journey: &WireJourney) -> Option<Vec<Leg>> {
+        let stops = &journey.stop_l;
+        let position = |idx: Option<usize>| {
+            idx.and_then(|idx| stops.iter().position(|stop| stop.idx == Some(idx)))
+        };
+        let mut start = 0;
+        let mut parts = Vec::new();
+        for part in &journey.prod_l {
+            let (from, to) = (position(part.f_idx)?, position(part.t_idx)?);
+            if from != start || to <= from {
+                return None;
+            }
+            parts.push((from, to, part.prod_x));
+            start = to;
+        }
+        if parts.len() < 2 || start + 1 != stops.len() {
+            return None;
+        }
+        // The stop at position `p` of the ride is its intermediate stop `p - 1`.
+        let change = |position: usize, side: Board| {
+            let stopover = leg.intermediate_stops.get(position.checked_sub(1)?)?;
+            stopover.clone().on(side)
+        };
+        let LegKind::Transit { direction, .. } = &leg.kind else {
+            return None;
+        };
+        parts
+            .into_iter()
+            .map(|(from, to, product)| {
+                let further = from > 0;
+                Some(Leg {
+                    same_vehicle: further,
+                    kind: LegKind::Transit {
+                        line: self.line(product).ok()?,
+                        direction: stops
+                            .get(from)
+                            .and_then(|stop| stop.d_dir_txt.clone())
+                            .filter(|_| further)
+                            .or_else(|| direction.clone()),
+                    },
+                    departure: if further {
+                        change(from, Board::Departures)?
+                    } else {
+                        leg.departure.clone()
+                    },
+                    arrival: if to + 1 == stops.len() {
+                        leg.arrival.clone()
+                    } else {
+                        change(to, Board::Arrivals)?
+                    },
+                    intermediate_stops: leg.intermediate_stops.get(from..to - 1)?.to_vec(),
+                    ..leg.clone()
+                })
+            })
+            .collect()
     }
 
     fn leg(&self, date: &str, section: &Section) -> Result<Leg, Error> {
@@ -993,6 +1064,9 @@ struct WireJourney {
     date: String,
     prod_x: Option<usize>,
     dir_txt: Option<String>,
+    /// The lines of a ride whose vehicle goes on under another line.
+    #[serde(default, deserialize_with = "lenient_list")]
+    prod_l: Vec<JourneyProduct>,
     #[serde(default)]
     is_cncl: bool,
     stb_stop: Option<Stop>,
@@ -1002,11 +1076,23 @@ struct WireJourney {
     msg_l: Vec<Message>,
 }
 
+/// A line of a ride and the stops, by their `idx`, it holds between.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct JourneyProduct {
+    prod_x: Option<usize>,
+    f_idx: Option<usize>,
+    t_idx: Option<usize>,
+}
+
 /// A call at a stop, with the fields of an arrival, a departure or both.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Stop {
+    idx: Option<usize>,
     loc_x: Option<usize>,
+    /// The direction of the line the ride goes on under from here.
+    d_dir_txt: Option<String>,
     a_time_s: Option<String>,
     a_time_r: Option<String>,
     d_time_s: Option<String>,

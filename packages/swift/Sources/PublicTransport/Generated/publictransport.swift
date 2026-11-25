@@ -2476,8 +2476,8 @@ public struct Leg: Equatable, Hashable, Codable {
     /**
      * Whether the traveler stays in the vehicle of the ride before: the
      * vehicle goes on under another line or another number of the run.
-     * ``Trip/transfers`` does not count such a ride. HAFAS and MOTIS
-     * answer with one leg for both parts instead, under the first line.
+     * ``Trip/transfers`` does not count such a ride. MOTIS joins both
+     * parts into one leg under the first line instead.
      */
     public var sameVehicle: Bool
     /**
@@ -2516,8 +2516,8 @@ public struct Leg: Equatable, Hashable, Codable {
         /**
          * Whether the traveler stays in the vehicle of the ride before: the
          * vehicle goes on under another line or another number of the run.
-         * ``Trip/transfers`` does not count such a ride. HAFAS and MOTIS
-         * answer with one leg for both parts instead, under the first line.
+         * ``Trip/transfers`` does not count such a ride. MOTIS joins both
+         * parts into one leg under the first line instead.
          */sameVehicle: Bool, 
         /**
          * What the server says about it: disruptions and hints. Empty if it

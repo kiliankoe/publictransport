@@ -836,3 +836,99 @@ fn remark_of_an_unknown_shape_costs_only_itself() {
     assert!(complete.is_ok(), "{complete:?}");
     assert_eq!(odd, complete);
 }
+
+/// Two trips through Leipzig: walk, tram 16, walk, and walk, tram 9 that goes
+/// on as tram 10 from Connewitzer Kreuz, walk.
+const SAME_VEHICLE: &[u8] = include_bytes!("fixtures/hafas/nasa-same-vehicle.json");
+
+/// The IDs of the stops a leg passes between its ends.
+fn passed(leg: &publictransport::Leg) -> Vec<&str> {
+    let stops = leg.intermediate_stops.iter();
+    stops.map(|s| s.stop.id.as_str()).collect()
+}
+
+/// HAFAS names both lines in one ride section; the other protocols give a
+/// leg per line, the second one marked to stay seated.
+#[test]
+fn ride_whose_line_changes_on_the_way_becomes_a_leg_per_line() {
+    let found = vbb()
+        .parse_trips(&TripsQuery::new("a", "b"), &respond(SAME_VEHICLE))
+        .unwrap();
+    let [single, changing] = found.trips.as_slice() else {
+        unreachable!("two trips: {:?}", found.trips)
+    };
+
+    // A ride with one line stays one leg.
+    let kinds: Vec<_> = single.legs.iter().map(|leg| &leg.kind).collect();
+    assert!(
+        matches!(
+            kinds.as_slice(),
+            [LegKind::Walk, LegKind::Transit { .. }, LegKind::Walk]
+        ),
+        "{kinds:?}"
+    );
+    assert_eq!(single.legs[1].intermediate_stops.len(), 6);
+
+    let [walk, nine, ten, last] = changing.legs.as_slice() else {
+        unreachable!("walk, two rides, walk: {:?}", changing.legs)
+    };
+    assert_eq!((&walk.kind, &last.kind), (&LegKind::Walk, &LegKind::Walk));
+    let flags: Vec<bool> = changing.legs.iter().map(|leg| leg.same_vehicle).collect();
+    assert_eq!(flags, [false, false, true, false]);
+    assert_eq!(changing.transfers(), 0);
+    assert!(nine.journey_id.is_some(), "{nine:?}");
+    assert_eq!(nine.journey_id, ten.journey_id);
+
+    let LegKind::Transit {
+        line: line_nine,
+        direction: direction_nine,
+    } = &nine.kind
+    else {
+        unreachable!("a ride: {:?}", nine.kind)
+    };
+    let LegKind::Transit {
+        line: line_ten,
+        direction: direction_ten,
+    } = &ten.kind
+    else {
+        unreachable!("a ride: {:?}", ten.kind)
+    };
+    // The library may shorten "Str 9" and "Str 10".
+    assert!(line_nine.name.ends_with('9'), "{line_nine:?}");
+    assert!(line_ten.name.ends_with("10"), "{line_ten:?}");
+    assert_eq!(
+        direction_nine.as_deref(),
+        Some("Connewitzer Kreuz > 10 Lößnig")
+    );
+    assert_eq!(direction_ten.as_deref(), Some("Lößnig"));
+
+    // Bayerischer Bahnhof to Connewitzer Kreuz, and on to Moritz Hof.
+    let ends = |leg: &publictransport::Leg| {
+        (
+            leg.departure.stop.id.clone(),
+            leg.departure.scheduled_time,
+            leg.arrival.stop.id.clone(),
+            leg.arrival.scheduled_time,
+        )
+    };
+    assert_eq!(
+        ends(nine),
+        (
+            "10983".into(),
+            berlin(26, 22, 9, 0),
+            "301300702".into(),
+            berlin(26, 22, 17, 0)
+        )
+    );
+    assert_eq!(
+        ends(ten),
+        (
+            "301300702".into(),
+            berlin(26, 22, 17, 0),
+            "11338".into(),
+            berlin(26, 22, 25, 0)
+        )
+    );
+    assert_eq!(passed(nine), ["11342", "11343", "22934", "11563", "13247"]);
+    assert_eq!(passed(ten), ["11341", "11339", "11340", "11337"]);
+}
