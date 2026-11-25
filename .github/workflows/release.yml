@@ -348,13 +348,25 @@ jobs:
           merge-multiple: true
       - run: scripts/kotlin-natives.sh "$RUNNER_TEMP/wheels" "$RUNNER_TEMP/natives"
       # Maven Central takes a version once, and the whole of it or nothing.
+      # The jar and the Android library go up together, so one stands for
+      # both. Only a missing file means that the version is not there: any
+      # other answer stops the job, so that an outage of Maven Central does
+      # not lead to a second upload.
       - id: published
         run: |
-          if curl --silent --fail --output /dev/null --user-agent "$GITHUB_REPOSITORY release workflow" \
-            "https://repo1.maven.org/maven2/io/github/kiliankoe/publictransport/$VERSION/publictransport-$VERSION.pom"; then
-            echo "publictransport $VERSION is published"
-            echo "published=true" >> "$GITHUB_OUTPUT"
-          fi
+          status=$(curl --silent --output /dev/null --write-out '%{http_code}' --user-agent "$GITHUB_REPOSITORY release workflow" \
+            "https://repo1.maven.org/maven2/io/github/kiliankoe/publictransport/$VERSION/publictransport-$VERSION.pom") || true
+          case $status in
+            200)
+              echo "publictransport $VERSION is published"
+              echo "published=true" >> "$GITHUB_OUTPUT"
+              ;;
+            404) ;;
+            *)
+              echo "::error::Maven Central answered $status, so it is unknown whether $VERSION is published"
+              exit 1
+              ;;
+          esac
       # On its own, so that only the upload runs with the secrets.
       - if: steps.published.outputs.published != 'true'
         run: nix develop .#android -c gradle --project-dir packages/kotlin build -PnativeLibraries="$RUNNER_TEMP/natives"
@@ -364,6 +376,9 @@ jobs:
           # Waits until the version can be downloaded, not only until
           # Maven Central has accepted it.
           ORG_GRADLE_PROJECT_mavenCentralDeploymentValidation: PUBLISHED
+          # Maven Central can take longer than the 15 minutes that the
+          # plugin waits by default.
+          ORG_GRADLE_PROJECT_SONATYPE_CLOSE_TIMEOUT_SECONDS: 3600
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signAllPublications: true
