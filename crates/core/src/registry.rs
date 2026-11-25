@@ -593,6 +593,15 @@ bundled! {
     VrrEfa => "vrr-efa", "../data/networks/vrr-efa.json";
     VrrTrias => "vrr-trias", "../data/networks/vrr-trias.json";
     VrrOjp => "vrr-ojp", "../data/networks/vrr-ojp.json";
+    LinzEfa => "linz-efa", "../data/transport-apis/data/at/linz-efa.json";
+    BayernfahrplanEfa => "bayernfahrplan-efa", "../data/transport-apis/data/de/bayernfahrplan-efa.json";
+    BwegtEfa => "bwegt-efa", "../data/transport-apis/data/de/bwegt-efa.json";
+    KvvEfa => "kvv-efa", "../data/transport-apis/data/de/kvv-efa.json";
+    MvvEfa => "mvv-efa", "../data/transport-apis/data/de/mvv-efa.json";
+    RolphEfa => "rolph-efa", "../data/transport-apis/data/de/rolph-efa.json";
+    VgnEfa => "vgn-efa", "../data/transport-apis/data/de/vgn-efa.json";
+    VvsEfa => "vvs-efa", "../data/transport-apis/data/de/vvs-efa.json";
+    StaEfa => "sta-efa", "../data/transport-apis/data/it/sta-efa.json";
     OebbHafas => "oebb-hafas", "../data/transport-apis/data/at/oebb-hafas-mgate.json";
     OoevvHafas => "ooevv-hafas", "../data/transport-apis/data/at/ooevv-hafas-mgate.json";
     SalzburgHafas => "salzburg-hafas", "../data/transport-apis/data/at/salzburg-hafas-mgate.json";
@@ -676,6 +685,8 @@ fn corrected(mut network: Network) -> Network {
     // The address a server has moved to.
     let moved = match network.id.as_str() {
         "mobiliteit-lu-hafas" => Some("https://cdt.hafas.de/gate"),
+        // The entry names the data portal of the province.
+        "sta-efa" => Some("https://efa.sta.bz.it/apb/"),
         "ooevv-hafas" => Some("https://app.verkehrsauskunft.at/hamm/gate"),
         "salzburg-hafas" => Some("https://verkehrsauskunft.salzburg.gv.at/hamm/gate"),
         "stv-hafas" => Some("https://verkehrsauskunft.verbundlinie.at/hamm/gate"),
@@ -689,6 +700,10 @@ fn corrected(mut network: Network) -> Network {
         endpoint.clone_into(&mut network.endpoint);
     }
     match network.id.as_str() {
+        // The entries name no time zone.
+        "bayernfahrplan-efa" | "kvv-efa" | "vvs-efa" => {
+            network.timezone = Some("Europe/Berlin".to_owned());
+        }
         // The entry names the time zone of Berlin for a server in Iowa.
         "dart-hafas" => network.timezone = Some("America/Chicago".to_owned()),
         // The format has no field for a geocoder or for usage terms, and

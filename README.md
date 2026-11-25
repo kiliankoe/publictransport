@@ -13,7 +13,7 @@ The project is at an early stage. It can search for locations by name, find the 
 - HAFAS mgate, the JSON interface behind the apps of many operators
 - OpenTripPlanner 2 with its Transmodel API
 
-It ships with [networks](https://kiliankoe.github.io/publictransport/networks.html) that were checked against their live servers: VVO, VRR, Transitous, Entur and the HAFAS servers of about 35 operators in Europe and the USA. Each says where it has coverage, so an application can pick the networks for a position. Further networks can be described in code or read from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis).
+It ships with [networks](https://kiliankoe.github.io/publictransport/networks.html) that were checked against their live servers: Transitous, Entur, the EFA servers of eleven operators in Germany, Austria and Italy, and the HAFAS servers of about 35 operators in Europe and the USA. Each says where it has coverage, so an application can pick the networks for a position. Further networks can be described in code or read from entries in the format of [transport-apis](https://github.com/public-transport/transport-apis).
 
 ## Usage
 

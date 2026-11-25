@@ -4565,6 +4565,42 @@ public enum BundledNetwork: Equatable, Hashable, CaseIterable {
      */
     case vrrOjp
     /**
+     * linz-efa
+     */
+    case linzEfa
+    /**
+     * bayernfahrplan-efa
+     */
+    case bayernfahrplanEfa
+    /**
+     * bwegt-efa
+     */
+    case bwegtEfa
+    /**
+     * kvv-efa
+     */
+    case kvvEfa
+    /**
+     * mvv-efa
+     */
+    case mvvEfa
+    /**
+     * rolph-efa
+     */
+    case rolphEfa
+    /**
+     * vgn-efa
+     */
+    case vgnEfa
+    /**
+     * vvs-efa
+     */
+    case vvsEfa
+    /**
+     * sta-efa
+     */
+    case staEfa
+    /**
      * oebb-hafas
      */
     case oebbHafas
@@ -4769,79 +4805,97 @@ struct FfiConverterTypeBundledNetwork: FfiConverterRustBuffer {
         
         case 6: return .vrrOjp
         
-        case 7: return .oebbHafas
+        case 7: return .linzEfa
         
-        case 8: return .ooevvHafas
+        case 8: return .bayernfahrplanEfa
         
-        case 9: return .salzburgHafas
+        case 9: return .bwegtEfa
         
-        case 10: return .stvHafas
+        case 10: return .kvvEfa
         
-        case 11: return .svvHafas
+        case 11: return .mvvEfa
         
-        case 12: return .vkgHafas
+        case 12: return .rolphEfa
         
-        case 13: return .vorHafas
+        case 13: return .vgnEfa
         
-        case 14: return .vvtHafas
+        case 14: return .vvsEfa
         
-        case 15: return .vvvHafas
+        case 15: return .staEfa
         
-        case 16: return .tpgHafas
+        case 16: return .oebbHafas
         
-        case 17: return .avvHafas
+        case 17: return .ooevvHafas
         
-        case 18: return .bvgHafas
+        case 18: return .salzburgHafas
         
-        case 19: return .dartHafas
+        case 19: return .stvHafas
         
-        case 20: return .dbBusradarNrwHafas
+        case 20: return .svvHafas
         
-        case 21: return .dbSbahnMuenchenHafas
+        case 21: return .vkgHafas
         
-        case 22: return .dbSmartrblHafas
+        case 22: return .vorHafas
         
-        case 23: return .gvhHafas
+        case 23: return .vvtHafas
         
-        case 24: return .invgHafas
+        case 24: return .vvvHafas
         
-        case 25: return .kvbHafas
+        case 25: return .tpgHafas
         
-        case 26: return .nahshHafas
+        case 26: return .avvHafas
         
-        case 27: return .nasaHafas
+        case 27: return .bvgHafas
         
-        case 28: return .nvvHafas
+        case 28: return .dartHafas
         
-        case 29: return .rmvHafas
+        case 29: return .dbBusradarNrwHafas
         
-        case 30: return .rsagHafas
+        case 30: return .dbSbahnMuenchenHafas
         
-        case 31: return .saarvvHafas
+        case 31: return .dbSmartrblHafas
         
-        case 32: return .vbbHafas
+        case 32: return .gvhHafas
         
-        case 33: return .vbnHafas
+        case 33: return .invgHafas
         
-        case 34: return .vmtHafas
+        case 34: return .kvbHafas
         
-        case 35: return .vosHafas
+        case 35: return .nahshHafas
         
-        case 36: return .vsnHafas
+        case 36: return .nasaHafas
         
-        case 37: return .rejseplanenHafas
+        case 37: return .nvvHafas
         
-        case 38: return .iarnrodEireannHafas
+        case 38: return .rmvHafas
         
-        case 39: return .mobiliteitLuHafas
+        case 39: return .rsagHafas
         
-        case 40: return .resrobotHafas
+        case 40: return .saarvvHafas
         
-        case 41: return .bartHafas
+        case 41: return .vbbHafas
         
-        case 42: return .entur
+        case 42: return .vbnHafas
         
-        case 43: return .transitous
+        case 43: return .vmtHafas
+        
+        case 44: return .vosHafas
+        
+        case 45: return .vsnHafas
+        
+        case 46: return .rejseplanenHafas
+        
+        case 47: return .iarnrodEireannHafas
+        
+        case 48: return .mobiliteitLuHafas
+        
+        case 49: return .resrobotHafas
+        
+        case 50: return .bartHafas
+        
+        case 51: return .entur
+        
+        case 52: return .transitous
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -4875,152 +4929,188 @@ struct FfiConverterTypeBundledNetwork: FfiConverterRustBuffer {
             writeInt(&buf, Int32(6))
         
         
-        case .oebbHafas:
+        case .linzEfa:
             writeInt(&buf, Int32(7))
         
         
-        case .ooevvHafas:
+        case .bayernfahrplanEfa:
             writeInt(&buf, Int32(8))
         
         
-        case .salzburgHafas:
+        case .bwegtEfa:
             writeInt(&buf, Int32(9))
         
         
-        case .stvHafas:
+        case .kvvEfa:
             writeInt(&buf, Int32(10))
         
         
-        case .svvHafas:
+        case .mvvEfa:
             writeInt(&buf, Int32(11))
         
         
-        case .vkgHafas:
+        case .rolphEfa:
             writeInt(&buf, Int32(12))
         
         
-        case .vorHafas:
+        case .vgnEfa:
             writeInt(&buf, Int32(13))
         
         
-        case .vvtHafas:
+        case .vvsEfa:
             writeInt(&buf, Int32(14))
         
         
-        case .vvvHafas:
+        case .staEfa:
             writeInt(&buf, Int32(15))
         
         
-        case .tpgHafas:
+        case .oebbHafas:
             writeInt(&buf, Int32(16))
         
         
-        case .avvHafas:
+        case .ooevvHafas:
             writeInt(&buf, Int32(17))
         
         
-        case .bvgHafas:
+        case .salzburgHafas:
             writeInt(&buf, Int32(18))
         
         
-        case .dartHafas:
+        case .stvHafas:
             writeInt(&buf, Int32(19))
         
         
-        case .dbBusradarNrwHafas:
+        case .svvHafas:
             writeInt(&buf, Int32(20))
         
         
-        case .dbSbahnMuenchenHafas:
+        case .vkgHafas:
             writeInt(&buf, Int32(21))
         
         
-        case .dbSmartrblHafas:
+        case .vorHafas:
             writeInt(&buf, Int32(22))
         
         
-        case .gvhHafas:
+        case .vvtHafas:
             writeInt(&buf, Int32(23))
         
         
-        case .invgHafas:
+        case .vvvHafas:
             writeInt(&buf, Int32(24))
         
         
-        case .kvbHafas:
+        case .tpgHafas:
             writeInt(&buf, Int32(25))
         
         
-        case .nahshHafas:
+        case .avvHafas:
             writeInt(&buf, Int32(26))
         
         
-        case .nasaHafas:
+        case .bvgHafas:
             writeInt(&buf, Int32(27))
         
         
-        case .nvvHafas:
+        case .dartHafas:
             writeInt(&buf, Int32(28))
         
         
-        case .rmvHafas:
+        case .dbBusradarNrwHafas:
             writeInt(&buf, Int32(29))
         
         
-        case .rsagHafas:
+        case .dbSbahnMuenchenHafas:
             writeInt(&buf, Int32(30))
         
         
-        case .saarvvHafas:
+        case .dbSmartrblHafas:
             writeInt(&buf, Int32(31))
         
         
-        case .vbbHafas:
+        case .gvhHafas:
             writeInt(&buf, Int32(32))
         
         
-        case .vbnHafas:
+        case .invgHafas:
             writeInt(&buf, Int32(33))
         
         
-        case .vmtHafas:
+        case .kvbHafas:
             writeInt(&buf, Int32(34))
         
         
-        case .vosHafas:
+        case .nahshHafas:
             writeInt(&buf, Int32(35))
         
         
-        case .vsnHafas:
+        case .nasaHafas:
             writeInt(&buf, Int32(36))
         
         
-        case .rejseplanenHafas:
+        case .nvvHafas:
             writeInt(&buf, Int32(37))
         
         
-        case .iarnrodEireannHafas:
+        case .rmvHafas:
             writeInt(&buf, Int32(38))
         
         
-        case .mobiliteitLuHafas:
+        case .rsagHafas:
             writeInt(&buf, Int32(39))
         
         
-        case .resrobotHafas:
+        case .saarvvHafas:
             writeInt(&buf, Int32(40))
         
         
-        case .bartHafas:
+        case .vbbHafas:
             writeInt(&buf, Int32(41))
         
         
-        case .entur:
+        case .vbnHafas:
             writeInt(&buf, Int32(42))
         
         
-        case .transitous:
+        case .vmtHafas:
             writeInt(&buf, Int32(43))
+        
+        
+        case .vosHafas:
+            writeInt(&buf, Int32(44))
+        
+        
+        case .vsnHafas:
+            writeInt(&buf, Int32(45))
+        
+        
+        case .rejseplanenHafas:
+            writeInt(&buf, Int32(46))
+        
+        
+        case .iarnrodEireannHafas:
+            writeInt(&buf, Int32(47))
+        
+        
+        case .mobiliteitLuHafas:
+            writeInt(&buf, Int32(48))
+        
+        
+        case .resrobotHafas:
+            writeInt(&buf, Int32(49))
+        
+        
+        case .bartHafas:
+            writeInt(&buf, Int32(50))
+        
+        
+        case .entur:
+            writeInt(&buf, Int32(51))
+        
+        
+        case .transitous:
+            writeInt(&buf, Int32(52))
         
         }
     }
