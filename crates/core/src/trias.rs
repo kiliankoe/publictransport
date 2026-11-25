@@ -258,7 +258,7 @@ pub(crate) fn parse_nearby(
     // Both dialects name the locality alone here.
     Ok(results
         .into_iter()
-        .filter_map(|result| result.location.into_location(network, false))
+        .filter_map(|result| result.location.into_location(false))
         .collect())
 }
 
@@ -326,7 +326,7 @@ pub(crate) fn parse_journey(network: &Network, response: &HttpResponse) -> Resul
             .previous
             .into_iter()
             .chain(result.onward)
-            .map(|call| call.into_stopover(network, &context))
+            .map(|call| call.into_stopover(&context))
             .collect(),
         cancelled,
         remarks,
@@ -382,7 +382,7 @@ pub(crate) fn parse_locations(
     let ojp = Dialect::of(network).ojp;
     Ok(results
         .into_iter()
-        .filter_map(|result| result.location.into_location(network, ojp))
+        .filter_map(|result| result.location.into_location(ojp))
         .collect())
 }
 
@@ -397,7 +397,7 @@ pub(crate) fn parse_departures(
     let mut departures = answer
         .results(failure, response.status, &["NOEVENTFOUND"])?
         .into_iter()
-        .map(|result| result.stop_event.into_departure(network, &context, board))
+        .map(|result| result.stop_event.into_departure(&context, board))
         .collect::<Result<Vec<_>, _>>()?;
     departures.sort_by_key(Departure::expected_time);
     Ok(departures)
@@ -427,7 +427,7 @@ pub(crate) fn parse_trips(
                 same_vehicle = true;
                 continue;
             }
-            let leg = leg.into_leg(network, &context)?;
+            let leg = leg.into_leg(&context)?;
             if let Some(mut leg) = leg {
                 let is_ride = |leg: &Leg| matches!(leg.kind, LegKind::Transit { .. });
                 leg.same_vehicle =
@@ -941,7 +941,7 @@ impl WireLocation {
     /// `full_name` says that the name of the location is the whole name
     /// with the locality in parentheses, as in a search by name on OJP,
     /// and not the locality alone.
-    fn into_location(self, network: &Network, full_name: bool) -> Option<Location> {
+    fn into_location(self, full_name: bool) -> Option<Location> {
         let (kind, id, name, global_ids) = if let Some(stop) = self.stop_point {
             let id = stop.stop_point_ref.trim().to_owned();
             (
@@ -990,7 +990,7 @@ impl WireLocation {
                 location_name
             },
             coordinate: self.geo_position.map(Coordinate::from),
-            timezone: network.timezone.clone(),
+            timezone: None,
             network: None,
         })
     }
@@ -1120,7 +1120,7 @@ struct Extension {
 }
 
 impl Call {
-    fn into_stopover(self, network: &Network, context: &Context) -> Stopover {
+    fn into_stopover(self, context: &Context) -> Stopover {
         let (arrival, departure) = (self.service_arrival, self.service_departure);
         let scheduled_platform = text(self.planned_bay);
         let stop = trimmed(self.stop_point_ref);
@@ -1165,7 +1165,7 @@ impl Call {
                     .unwrap_or_default(),
                 locality: None,
                 coordinate,
-                timezone: network.timezone.clone(),
+                timezone: None,
                 network: None,
             },
         }
@@ -1243,17 +1243,12 @@ impl Service {
 }
 
 impl StopEvent {
-    fn into_departure(
-        mut self,
-        network: &Network,
-        context: &Context,
-        board: Board,
-    ) -> Result<Departure, Error> {
+    fn into_departure(mut self, context: &Context, board: Board) -> Result<Departure, Error> {
         let remarks = self.service.remarks(&context.situations);
         let journey_id = self.service.journey_id();
         let origin = text(std::mem::take(&mut self.service.origin_text));
         let (line, direction, cancelled) = self.service.into_line(self.extension);
-        let stopover = self.this_call.call_at_stop.into_stopover(network, context);
+        let stopover = self.this_call.call_at_stop.into_stopover(context);
         let end = stopover.on(board).ok_or_else(|| Error::Parse {
             message: "a stop event has no scheduled time".to_owned(),
         })?;
@@ -1352,7 +1347,7 @@ impl TripLeg {
     }
 
     /// `None` for a leg of a kind this crate does not know.
-    fn into_leg(self, network: &Network, context: &Context) -> Result<Option<Leg>, Error> {
+    fn into_leg(self, context: &Context) -> Result<Option<Leg>, Error> {
         let no_time = || Error::Parse {
             message: "a leg has no scheduled time at one of its ends".to_owned(),
         };
@@ -1365,18 +1360,18 @@ impl TripLeg {
                 kind: LegKind::Transit { line, direction },
                 departure: ride
                     .leg_board
-                    .into_stopover(network, context)
+                    .into_stopover(context)
                     .into_leg_start()
                     .ok_or_else(no_time)?,
                 arrival: ride
                     .leg_alight
-                    .into_stopover(network, context)
+                    .into_stopover(context)
                     .into_leg_end()
                     .ok_or_else(no_time)?,
                 intermediate_stops: ride
                     .intermediates
                     .into_iter()
-                    .map(|call| call.into_stopover(network, context))
+                    .map(|call| call.into_stopover(context))
                     .collect(),
                 cancelled,
                 remarks,
@@ -1396,7 +1391,7 @@ impl TripLeg {
             return Ok(None);
         };
         let end_at = |call: Call, time: WireTime| LegEnd {
-            stop: call.into_stopover(network, context).stop,
+            stop: call.into_stopover(context).stop,
             scheduled_time: time.0,
             realtime_time: None,
             scheduled_platform: None,

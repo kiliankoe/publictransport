@@ -73,22 +73,16 @@ pub(crate) fn nearby_request(network: &Network, query: &NearbyQuery) -> Result<H
     ))
 }
 
-pub(crate) fn parse_nearby(
-    network: &Network,
-    response: &HttpResponse,
-) -> Result<Vec<Location>, Error> {
+pub(crate) fn parse_nearby(response: &HttpResponse) -> Result<Vec<Location>, Error> {
     let response: StopFinderResponse = response.json()?;
     Ok(response
         .locations
         .into_iter()
-        .map(|location| location.into_location(network))
+        .map(WireLocation::into_location)
         .collect())
 }
 
-pub(crate) fn parse_locations(
-    network: &Network,
-    response: &HttpResponse,
-) -> Result<Vec<Location>, Error> {
+pub(crate) fn parse_locations(response: &HttpResponse) -> Result<Vec<Location>, Error> {
     // `systemMessages` is not checked: the server reports an ambiguous search
     // as an error there and still returns the matches.
     let mut response: StopFinderResponse = response.json()?;
@@ -99,7 +93,7 @@ pub(crate) fn parse_locations(
     Ok(response
         .locations
         .into_iter()
-        .map(|location| location.into_location(network))
+        .map(WireLocation::into_location)
         .collect())
 }
 
@@ -217,7 +211,7 @@ pub(crate) fn parse_journey(network: &Network, response: &HttpResponse) -> Resul
         stops: leg
             .stop_sequence
             .into_iter()
-            .map(|call| call.into_stopover(network))
+            .map(WireLocation::into_stopover)
             .collect(),
         cancelled: is_cancelled(leg.is_cancelled, &leg.realtime_status),
         remarks: remarks(network, leg.infos, leg.hints),
@@ -684,7 +678,7 @@ fn non_empty(text: Option<String>) -> Option<String> {
 }
 
 impl WireLocation {
-    fn into_location(self, network: &Network) -> Location {
+    fn into_location(self) -> Location {
         let wire = self;
         let locality = wire
             .ancestor("locality")
@@ -704,7 +698,7 @@ impl WireLocation {
         };
         Location {
             // The server sends no time zone.
-            timezone: network.timezone.clone(),
+            timezone: None,
             network: None,
             global_ids: GlobalId::ifopt(&wire.id)
                 .filter(|_| wire.is_global_id == Some(true))
@@ -725,7 +719,7 @@ impl WireLocation {
 }
 
 impl WireLocation {
-    fn into_stopover(mut self, network: &Network) -> Stopover {
+    fn into_stopover(mut self) -> Stopover {
         let platforms = self.properties.take();
         Stopover {
             scheduled_arrival: self.arrival_time_planned.take().map(|time| time.0),
@@ -737,7 +731,7 @@ impl WireLocation {
                 .and_then(|platforms| non_empty(platforms.planned_platform_name.clone())),
             realtime_platform: platforms.and_then(|platforms| non_empty(platforms.platform_name)),
             cancelled: false,
-            stop: self.into_location(network),
+            stop: self.into_location(),
         }
     }
 }
@@ -839,7 +833,7 @@ impl StopEvent {
         let mut location = self.location;
         let platforms = location.properties.take();
         Ok(Departure {
-            stop: location.into_location(network),
+            stop: location.into_location(),
             line,
             direction,
             scheduled_time: planned
@@ -888,12 +882,12 @@ impl WireLeg {
         });
         let mut departure = self
             .origin
-            .into_stopover(network)
+            .into_stopover()
             .into_leg_start()
             .ok_or_else(no_time)?;
         let mut arrival = self
             .destination
-            .into_stopover(network)
+            .into_stopover()
             .into_leg_end()
             .ok_or_else(no_time)?;
         if !predicted {
@@ -911,7 +905,7 @@ impl WireLeg {
                 .into_iter()
                 .skip(1)
                 .take(between)
-                .map(|call| call.into_stopover(network))
+                .map(WireLocation::into_stopover)
                 .collect(),
             cancelled: is_cancelled(self.is_cancelled, &self.realtime_status),
             remarks: remarks(network, self.infos, self.hints),

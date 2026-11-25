@@ -434,11 +434,11 @@ impl Network {
     /// is not what the protocol defines.
     pub fn parse_locations(&self, response: &HttpResponse) -> Result<Vec<Location>, Error> {
         let mut locations = match self.protocol {
-            Protocol::Efa => efa::parse_locations(self, response),
+            Protocol::Efa => efa::parse_locations(response),
             Protocol::Motis => motis::parse_locations(response),
             Protocol::Trias | Protocol::Ojp1 => trias::parse_locations(self, response),
-            Protocol::HafasMgate => hafas::parse_locations(self, response),
-            Protocol::OtpTransmodel => otp::parse_locations(self, response),
+            Protocol::HafasMgate => hafas::parse_locations(response),
+            Protocol::OtpTransmodel => otp::parse_locations(response),
         }?;
         for location in &mut locations {
             self.mark(location);
@@ -484,11 +484,11 @@ impl Network {
         response: &HttpResponse,
     ) -> Result<Vec<Location>, Error> {
         let mut locations = match self.protocol {
-            Protocol::Efa => efa::parse_nearby(self, response),
+            Protocol::Efa => efa::parse_nearby(response),
             Protocol::Motis => motis::parse_locations(response),
             Protocol::Trias | Protocol::Ojp1 => trias::parse_nearby(self, response),
-            Protocol::HafasMgate => hafas::parse_nearby(self, response),
-            Protocol::OtpTransmodel => otp::parse_nearby(self, response),
+            Protocol::HafasMgate => hafas::parse_nearby(response),
+            Protocol::OtpTransmodel => otp::parse_nearby(response),
         }?;
         // The request asks for stops only. A server may not filter. Nor
         // does every server measure the radius as the distance on the

@@ -170,10 +170,7 @@ pub(crate) fn nearby_request(network: &Network, query: &NearbyQuery) -> Result<H
     ))
 }
 
-pub(crate) fn parse_nearby(
-    network: &Network,
-    response: &HttpResponse,
-) -> Result<Vec<Location>, Error> {
+pub(crate) fn parse_nearby(response: &HttpResponse) -> Result<Vec<Location>, Error> {
     let (data, error) = data(response)?;
     let Some(nearest) = data.nearest else {
         return Err(error.unwrap_or_else(|| Error::Parse {
@@ -197,7 +194,7 @@ pub(crate) fn parse_nearby(
                         latitude,
                         longitude,
                     }),
-                timezone: network.timezone.clone(),
+                timezone: None,
                 network: None,
             })
         })
@@ -235,10 +232,7 @@ pub(crate) fn trips_request(network: &Network, query: &TripsQuery) -> Result<Htt
     ))
 }
 
-pub(crate) fn parse_locations(
-    network: &Network,
-    response: &HttpResponse,
-) -> Result<Vec<Location>, Error> {
+pub(crate) fn parse_locations(response: &HttpResponse) -> Result<Vec<Location>, Error> {
     let found: Features = response.json()?;
     Ok(found
         .features
@@ -268,7 +262,7 @@ pub(crate) fn parse_locations(
                     }),
                     _ => None,
                 },
-                timezone: network.timezone.clone(),
+                timezone: None,
                 network: None,
             }
         })
@@ -304,7 +298,7 @@ pub(crate) fn parse_journey(network: &Network, response: &HttpResponse) -> Resul
         stops: {
             let mut stops = calls
                 .into_iter()
-                .map(|call| call.into_stopover(network))
+                .map(Call::into_stopover)
                 .collect::<Result<Vec<_>, _>>()?;
             // The server sends all four times for every call.
             if let Some(first) = stops.first_mut() {
@@ -377,10 +371,7 @@ pub(crate) fn parse_departures(
             let incomplete = || Error::Parse {
                 message: "a call has no line or no time".to_owned(),
             };
-            let end = call
-                .into_stopover(network)?
-                .on(board)
-                .ok_or_else(incomplete)?;
+            let end = call.into_stopover()?.on(board).ok_or_else(incomplete)?;
             Ok(Departure {
                 line: line.map(WireLine::into_line).ok_or_else(incomplete)?,
                 // The answer does not say where a vehicle comes from.
@@ -649,7 +640,7 @@ impl Call {
         )
     }
 
-    fn into_stopover(self, network: &Network) -> Result<Stopover, Error> {
+    fn into_stopover(self) -> Result<Stopover, Error> {
         let (scheduled_platform, realtime_platform) = self.platforms();
         let time = |time: Option<WireTime>| time.map(|time| time.0);
         // Without real-time data the server repeats the planned times.
@@ -664,7 +655,7 @@ impl Call {
             cancelled: self.cancellation,
             stop: self
                 .quay
-                .map(|quay| quay.into_location(network))
+                .map(Quay::into_location)
                 .ok_or_else(|| Error::Parse {
                     message: "a call has no platform".to_owned(),
                 })?,
@@ -692,7 +683,7 @@ struct Quay {
 }
 
 impl Quay {
-    fn into_location(self, network: &Network) -> Location {
+    fn into_location(self) -> Location {
         Location {
             id: self.id.unwrap_or_default(),
             global_ids: Vec::new(),
@@ -710,7 +701,7 @@ impl Quay {
                     latitude,
                     longitude,
                 }),
-            timezone: self.time_zone.or_else(|| network.timezone.clone()),
+            timezone: self.time_zone,
             network: None,
         }
     }
@@ -854,7 +845,7 @@ impl WireLeg {
                 let (scheduled_platform, realtime_platform) =
                     call.as_ref().map_or_default(Call::platforms);
                 LegEnd {
-                    stop: place.into_location(network),
+                    stop: place.into_location(),
                     scheduled_time: planned.0,
                     // Without real-time data the server repeats the planned times.
                     realtime_time: now.filter(|_| self.realtime).map(|time| time.0),
@@ -889,7 +880,7 @@ impl WireLeg {
             intermediate_stops: self
                 .intermediate_estimated_calls
                 .into_iter()
-                .map(|call| call.into_stopover(network))
+                .map(Call::into_stopover)
                 .collect::<Result<_, _>>()?,
             remarks,
             journey_id,
@@ -907,9 +898,9 @@ struct WirePlace {
 }
 
 impl WirePlace {
-    fn into_location(self, network: &Network) -> Location {
+    fn into_location(self) -> Location {
         if let Some(quay) = self.quay {
-            return quay.into_location(network);
+            return quay.into_location();
         }
         Location {
             // The server has no ID for a place that is no platform.
@@ -922,7 +913,7 @@ impl WirePlace {
                 latitude: self.latitude,
                 longitude: self.longitude,
             }),
-            timezone: network.timezone.clone(),
+            timezone: None,
             network: None,
         }
     }

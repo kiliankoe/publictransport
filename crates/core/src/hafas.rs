@@ -336,17 +336,14 @@ pub(crate) fn nearby_request(network: &Network, query: &NearbyQuery) -> Result<H
     request(network, "LocGeoPos", &arguments)
 }
 
-pub(crate) fn parse_nearby(
-    network: &Network,
-    response: &HttpResponse,
-) -> Result<Vec<Location>, Error> {
+pub(crate) fn parse_nearby(response: &HttpResponse) -> Result<Vec<Location>, Error> {
     let Some(found) = result::<Matches>(response, &[])? else {
         return Ok(Vec::new());
     };
     Ok(found
         .loc_l
         .into_iter()
-        .map(|location| location.into_location(network))
+        .map(WireLocation::into_location)
         .collect())
 }
 
@@ -474,10 +471,7 @@ fn result<T: for<'a> Deserialize<'a>>(
     }
 }
 
-pub(crate) fn parse_locations(
-    network: &Network,
-    response: &HttpResponse,
-) -> Result<Vec<Location>, Error> {
+pub(crate) fn parse_locations(response: &HttpResponse) -> Result<Vec<Location>, Error> {
     let Some(result) = result::<LocationsResult>(response, &["NO_MATCH"])? else {
         return Ok(Vec::new());
     };
@@ -485,7 +479,7 @@ pub(crate) fn parse_locations(
         .matches
         .loc_l
         .into_iter()
-        .map(|location| location.into_location(network))
+        .map(WireLocation::into_location)
         .collect())
 }
 
@@ -582,7 +576,7 @@ impl<'a> Reader<'a> {
     fn location(&self, index: Option<usize>) -> Result<Location, Error> {
         index
             .and_then(|index| self.common.locations.get(index))
-            .map(|location| location.clone().into_location(self.network))
+            .map(|location| location.clone().into_location())
             .ok_or_else(|| Error::Parse {
                 message: "a stop refers to a location the response does not list".to_owned(),
             })
@@ -970,7 +964,7 @@ struct Position {
 }
 
 impl WireLocation {
-    fn into_location(self, network: &Network) -> Location {
+    fn into_location(self) -> Location {
         Location {
             // The short ID names a stop in a request and nothing else.
             id: self
@@ -1011,7 +1005,7 @@ impl WireLocation {
                 latitude: position.y / 1e6,
                 longitude: position.x / 1e6,
             }),
-            timezone: network.timezone.clone(),
+            timezone: None,
             network: None,
         }
     }
